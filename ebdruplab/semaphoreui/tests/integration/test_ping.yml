@@ -11,5 +11,5 @@
       register: ping_result
 
     - name: 'Show ping result'
-      ansible.debug:
+      ansible.builtin.debug:
         var: ping_result.result

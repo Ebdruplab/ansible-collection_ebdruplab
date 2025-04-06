@@ -3,8 +3,13 @@ import urllib.request
 import urllib.error
 import json
 
+__all__ = ["semaphore_get", "semaphore_post", "semaphore_request", "get_auth_headers"]
+
 def semaphore_get(url, validate_certs=True, headers=None):
     return semaphore_request("GET", url, headers=headers, validate_certs=validate_certs)[0:3]
+
+def semaphore_post(url, body=None, headers=None, validate_certs=True):
+    return semaphore_request("POST", url, body=body, headers=headers, validate_certs=validate_certs)[0:3]
 
 def semaphore_request(method, url, body=None, headers=None, validate_certs=True):
     """
@@ -40,4 +45,5 @@ def get_auth_headers(session_cookie=None, api_token=None):
         headers["Cookie"] = session_cookie
     else:
         raise ValueError("Either session_cookie or api_token must be provided.")
+    headers["Content-Type"] = "application/json"
     return headers

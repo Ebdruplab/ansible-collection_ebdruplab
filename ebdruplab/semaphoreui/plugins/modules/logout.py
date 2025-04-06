@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.semaphore_api import semaphore_post, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 
 DOCUMENTATION = r'''
 ---

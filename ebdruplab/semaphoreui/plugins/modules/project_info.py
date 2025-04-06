@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.semaphore_api import get_auth_headers, semaphore_get # type: ignore
+from ..module_utils.semaphore_api import get_auth_headers, semaphore_get
 import json
 
 DOCUMENTATION = r'''

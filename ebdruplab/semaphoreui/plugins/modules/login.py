@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.semaphore_api import semaphore_post
+from ..module_utils.semaphore_api import semaphore_post
+
 import json
 
 DOCUMENTATION = r'''
