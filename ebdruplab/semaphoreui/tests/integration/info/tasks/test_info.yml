@@ -4,8 +4,8 @@
   vars:
     semaphore_host: "http://localhost"
     semaphore_port: 3000
-    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
-    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('test123', true) }}"
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('Admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
   tasks:
     - name: Login to Semaphore
       ebdruplab.semaphoreui.login:
