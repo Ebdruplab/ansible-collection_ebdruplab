@@ -1,7 +1,7 @@
 # plugins/modules/websocket_status.py
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_get
+from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
 DOCUMENTATION = r'''
 ---
@@ -9,7 +9,8 @@ module: websocket_status
 short_description: Check WebSocket support on the Semaphore server
 version_added: "1.0.0"
 description:
-  - Sends GET to /ws and checks if it's reachable (authentication not required)
+  - Sends GET to /ws and checks if it's reachable.
+  - Authentication is now required as of Semaphore 2.x.
 options:
   host:
     type: str
@@ -17,6 +18,14 @@ options:
   port:
     type: int
     required: true
+  session_cookie:
+    type: str
+    required: false
+    no_log: true
+  api_token:
+    type: str
+    required: false
+    no_log: true
   validate_certs:
     type: bool
     default: true
@@ -29,6 +38,7 @@ EXAMPLES = r'''
   ebdruplab.semaphoreui.websocket_status:
     host: http://localhost
     port: 3000
+    api_token: "abcd1234"
 '''
 
 RETURN = r'''
@@ -47,15 +57,22 @@ def main():
         argument_spec=dict(
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
+            session_cookie=dict(type='str', required=False, no_log=True),
+            api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
+        required_one_of=[["session_cookie", "api_token"]],
         supports_check_mode=True
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/ws"
+    url = f"{module.params['host']}:{module.params['port']}/ws"
 
     try:
-        _, status, _ = semaphore_get(url, validate_certs=module.params["validate_certs"])
+        headers = get_auth_headers(
+            module.params['session_cookie'],
+            module.params['api_token']
+        )
+        _, status, _ = semaphore_get(url, headers=headers, validate_certs=module.params["validate_certs"])
         module.exit_json(changed=False, reachable=(status == 200), status=status)
     except Exception as e:
         module.fail_json(msg=str(e))
