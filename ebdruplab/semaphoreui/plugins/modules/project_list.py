@@ -6,7 +6,7 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: project_info
+module: project_list
 short_description: Retrieve list of projects from Semaphore UI
 version_added: "1.0.0"
 description:
@@ -38,7 +38,7 @@ options:
     type: bool
     default: true
 author:
-  - Your Name (@yourhandle)
+  - Kristian Ebdrup @kris9854
 '''
 
 EXAMPLES = r'''

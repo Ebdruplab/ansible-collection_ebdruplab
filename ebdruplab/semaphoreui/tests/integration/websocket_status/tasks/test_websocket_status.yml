@@ -1,0 +1,15 @@
+- name: Test Semaphore /ws endpoint
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+  tasks:
+    - name: Check websocket availability
+      ebdruplab.semaphoreui.websocket_status:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+      register: ws_result
+
+    - debug:
+        var: ws_result

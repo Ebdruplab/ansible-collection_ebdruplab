@@ -27,7 +27,7 @@ options:
     type: bool
     default: true
 author:
-  - Your Name
+  - Kristian Ebdrup @kris9854
 '''
 
 def main():
