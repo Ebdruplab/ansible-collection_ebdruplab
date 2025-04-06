@@ -1,15 +1,33 @@
+# plugins/module_utils/semaphore_api.py
+
 import ssl
 import urllib.request
 import urllib.error
 import json
 
-__all__ = ["semaphore_get", "semaphore_post", "semaphore_request", "get_auth_headers"]
+__all__ = [
+    "semaphore_get",
+    "semaphore_post",
+    "semaphore_put",
+    "semaphore_delete",
+    "semaphore_request",
+    "get_auth_headers"
+]
+
 
 def semaphore_get(url, validate_certs=True, headers=None):
     return semaphore_request("GET", url, headers=headers, validate_certs=validate_certs)[0:3]
 
+
 def semaphore_post(url, body=None, headers=None, validate_certs=True):
     return semaphore_request("POST", url, body=body, headers=headers, validate_certs=validate_certs)[0:3]
+
+
+def semaphore_delete(url, headers=None, validate_certs=True):
+    return semaphore_request("DELETE", url, headers=headers, validate_certs=validate_certs)[0:3]
+
+def semaphore_put(url, body=None, headers=None, validate_certs=True):
+    return semaphore_request("PUT", url, body=body, headers=headers, validate_certs=validate_certs)[0:3]
 
 def semaphore_request(method, url, body=None, headers=None, validate_certs=True):
     """
@@ -36,6 +54,7 @@ def semaphore_request(method, url, body=None, headers=None, validate_certs=True)
         raise ConnectionError(f"{method} failed with status {e.code}: {e.read().decode()}")
     except urllib.error.URLError as e:
         raise ConnectionError(f"Failed to connect to {url}: {e}")
+
 
 def get_auth_headers(session_cookie=None, api_token=None):
     headers = {}

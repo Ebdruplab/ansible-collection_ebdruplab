@@ -1,13 +1,14 @@
-- name: Test Semaphore /events endpoints
+---
+- name: Integration test for events_last module
   hosts: localhost
   gather_facts: false
   vars:
     semaphore_host: "http://localhost"
     semaphore_port: 3000
-    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('Admin', true) }}"
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
   tasks:
-    - name: Login
+    - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -15,17 +16,20 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Fetch all events
-      ebdruplab.semaphoreui.events:
+    - name: Get last 200 events
+      ebdruplab.semaphoreui.events_last:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
       register: events_result
 
-    - debug:
-        var: events_result.events
+    - name: Assert we received a list of events
+      assert:
+        that:
+          - events_result.events is defined
+          - events_result.events is iterable
 
-    - name: Logout
+    - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
