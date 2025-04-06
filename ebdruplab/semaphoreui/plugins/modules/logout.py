@@ -1,82 +1,59 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.semaphore_api import semaphore_request
+from ansible.module_utils.semaphore_api import semaphore_post, get_auth_headers
 
-DOCUMENTATION = r"""
+DOCUMENTATION = r'''
 ---
 module: logout
-short_description: Logout from Semaphore UI
-version_added: "1.0.0"
-description:
-  - Logs out from the Semaphore API using the session cookie.
+short_description: Logout of Semaphore UI
+description: Destroys the current session
 options:
   host:
-    description:
-      - The host of the Semaphore API (e.g. http://localhost)
-    required: true
     type: str
+    required: true
   port:
-    description:
-      - The port of the Semaphore API (e.g. 3000)
-    required: true
     type: int
-  session_cookie:
-    description:
-      - Session cookie obtained from login module (e.g. semaphore=abc123)
     required: true
+  session_cookie:
     type: str
+    required: false
+    no_log: true
+  api_token:
+    type: str
+    required: false
+    no_log: true
   validate_certs:
-    description:
-      - Whether to validate SSL certificates
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-"""
-
-EXAMPLES = r"""
-- name: Logout from Semaphore
-  ebdruplab.semaphoreui.logout:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.cookie }}"
-"""
-
-RETURN = r"""
-logged_out:
-  description: Whether the logout succeeded
-  returned: always
-  type: bool
-  sample: true
-"""
+  - Your Name
+'''
 
 def main():
-    module_args = dict(
-        host=dict(type='str', required=True),
-        port=dict(type='int', required=True),
-        session_cookie=dict(type='str', required=True),
-        validate_certs=dict(type='bool', default=True)
+    module = AnsibleModule(
+        argument_spec=dict(
+            host=dict(type='str', required=True),
+            port=dict(type='int', required=True),
+            session_cookie=dict(type='str', required=False, no_log=True),
+            api_token=dict(type='str', required=False, no_log=True),
+            validate_certs=dict(type='bool', default=True)
+        ),
+        required_one_of=[["session_cookie", "api_token"]],
+        supports_check_mode=False
     )
 
-    module = AnsibleModule(argument_spec=module_args, supports_check_mode=False)
-
-    url = f"{module.params['host'].rstrip('/')}:{module.params['port']}/auth/logout"
-    headers = {
-        "Content-Type": "application/json",
-        "Cookie": module.params['session_cookie']
-    }
+    url = f"{module.params['host']}:{module.params['port']}/api/auth/logout"
 
     try:
-        _, status, _ = semaphore_request(
-            method="POST",
-            url=url,
-            headers=headers,
-            validate_certs=module.params["validate_certs"]
-        )
-        module.exit_json(changed=False, logged_out=status in (200, 204))
+        headers = get_auth_headers(module.params["session_cookie"], module.params["api_token"])
+        _, status, _ = semaphore_post(url, headers=headers, validate_certs=module.params["validate_certs"])
+        if status != 204:
+            module.fail_json(msg=f"Logout failed, status: {status}")
+        module.exit_json(changed=True)
     except Exception as e:
         module.fail_json(msg=str(e))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

@@ -1,97 +1,61 @@
 #!/usr/bin/python
 
 from ansible.module_utils.basic import AnsibleModule
-from ansible.module_utils.semaphore_api import semaphore_request
+from ansible.module_utils.semaphore_api import semaphore_post
 import json
 
-DOCUMENTATION = r"""
+DOCUMENTATION = r'''
 ---
 module: login
-short_description: Login to Semaphore UI and retrieve session cookie
-version_added: "1.0.0"
-description:
-  - Logs into the Semaphore API using username and password.
-  - Returns a session cookie to be reused in other modules.
+short_description: Log into Semaphore UI
+description: Logs in and returns session cookie
 options:
   host:
-    description:
-      - The host of the Semaphore API (e.g. http://localhost)
-    required: true
     type: str
+    required: true
   port:
-    description:
-      - The port of the Semaphore API (e.g. 3000)
-    required: true
     type: int
+    required: true
   username:
-    description:
-      - Semaphore login username
-    required: true
     type: str
+    required: true
   password:
-    description:
-      - Semaphore login password
-    required: true
     type: str
+    required: true
+    no_log: true
   validate_certs:
-    description:
-      - Whether to validate SSL certificates
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-"""
-
-EXAMPLES = r"""
-- name: Login to Semaphore
-  ebdruplab.semaphoreui.login:
-    host: http://localhost
-    port: 3000
-    username: admin
-    password: secret
-  register: login_result
-"""
-
-RETURN = r"""
-cookie:
-  description: Session cookie to use for authenticated requests
-  returned: always
-  type: str
-  sample: semaphore=abc123
-"""
+  - Your Name
+'''
 
 def main():
-    module_args = dict(
-        host=dict(type='str', required=True),
-        port=dict(type='int', required=True),
-        username=dict(type='str', required=True, no_log=True),
-        password=dict(type='str', required=True, no_log=True),
-        validate_certs=dict(type='bool', default=True)
+    module = AnsibleModule(
+        argument_spec=dict(
+            host=dict(type='str', required=True),
+            port=dict(type='int', required=True),
+            username=dict(type='str', required=True),
+            password=dict(type='str', required=True, no_log=True),
+            validate_certs=dict(type='bool', default=True),
+        ),
+        supports_check_mode=False
     )
 
-    module = AnsibleModule(argument_spec=module_args, supports_check_mode=False)
-
-    url = f"{module.params['host'].rstrip('/')}:{module.params['port']}/auth/login"
-    headers = {"Content-Type": "application/json"}
-    body = {
+    url = f"{module.params['host']}:{module.params['port']}/api/auth/login"
+    payload = {
         "auth": module.params["username"],
         "password": module.params["password"]
     }
 
     try:
-        response_body, status, cookie = semaphore_request(
-            method="POST",
-            url=url,
-            body=body,
-            headers=headers,
-            validate_certs=module.params["validate_certs"]
-        )
-        if cookie and "semaphore=" in cookie:
-            module.exit_json(changed=False, cookie=cookie.split(";")[0])
-        else:
-            module.fail_json(msg="Login succeeded, but no session cookie received.")
+        _, status, cookie = semaphore_post(url, body=payload, validate_certs=module.params["validate_certs"])
+        if status != 204:
+            module.fail_json(msg=f"Login failed, status: {status}")
+        module.exit_json(changed=False, session_cookie=cookie)
     except Exception as e:
         module.fail_json(msg=str(e))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

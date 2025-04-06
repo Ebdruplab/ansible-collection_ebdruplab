@@ -3,10 +3,8 @@ import urllib.request
 import urllib.error
 import json
 
-
 def semaphore_get(url, validate_certs=True, headers=None):
-    return semaphore_request("GET", url, headers=headers, validate_certs=validate_certs)[0]
-
+    return semaphore_request("GET", url, headers=headers, validate_certs=validate_certs)[0:3]
 
 def semaphore_request(method, url, body=None, headers=None, validate_certs=True):
     """
@@ -33,3 +31,13 @@ def semaphore_request(method, url, body=None, headers=None, validate_certs=True)
         raise ConnectionError(f"{method} failed with status {e.code}: {e.read().decode()}")
     except urllib.error.URLError as e:
         raise ConnectionError(f"Failed to connect to {url}: {e}")
+
+def get_auth_headers(session_cookie=None, api_token=None):
+    headers = {}
+    if api_token:
+        headers["Authorization"] = f"Bearer {api_token}"
+    elif session_cookie:
+        headers["Cookie"] = session_cookie
+    else:
+        raise ValueError("Either session_cookie or api_token must be provided.")
+    return headers
