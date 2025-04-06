@@ -1,0 +1,37 @@
+
+---
+- name: Integration test for project_backup and project_restore modules
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('test123', true) }}"
+  tasks:
+
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Backup project
+      ebdruplab.semaphoreui.project_backup:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: 1
+      register: backup_result
+
+    - name: Show backup result
+      ansible.builtin.debug:
+        var: backup_result.backup
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
