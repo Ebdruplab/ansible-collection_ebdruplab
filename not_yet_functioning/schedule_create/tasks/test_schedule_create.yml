@@ -3,7 +3,7 @@
   hosts: localhost
   gather_facts: false
   vars:
-    semaphore_host: "http://localhost"
+    semaphore_host: "localhost"
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
@@ -29,12 +29,15 @@
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ projects.projects[0].id }}"
-        cron_format: "* * * * *"
-        template_id: 1
-        name: "Test Schedule"
-        active: true
+        schedule:
+          id: 0
+          cron_format: "* * * * *"
+          project_id: "{{ projects.projects[0].id }}"
+          template_id: 1
+          name: "Test Schedule"
+          active: true
       register: schedule_create
 
     - name: Show result
-      debug:
+      ansible.builtin.debug:
         var: schedule_create

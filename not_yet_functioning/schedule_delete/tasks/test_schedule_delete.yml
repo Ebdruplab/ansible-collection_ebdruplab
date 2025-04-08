@@ -1,5 +1,5 @@
 ---
-- name: Test create schedule
+- name: Test delete schedule
   hosts: localhost
   gather_facts: false
   vars:
@@ -23,7 +23,7 @@
         session_cookie: "{{ login_result.session_cookie }}"
       register: projects
 
-    - name: Create a schedule
+    - name: Create a schedule to delete
       ebdruplab.semaphoreui.schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -31,10 +31,19 @@
         project_id: "{{ projects.projects[0].id }}"
         cron_format: "* * * * *"
         template_id: 1
-        name: "Test Schedule"
+        name: "Temp Schedule to Delete"
         active: true
-      register: schedule_create
+      register: created_schedule
 
-    - name: Show result
-      debug:
-        var: schedule_create
+    - name: Delete the schedule
+      ebdruplab.semaphoreui.schedule_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        schedule_id: "{{ created_schedule.schedule.id }}"
+      register: delete_result
+
+    - name: Show deletion result
+      ansible.builtin.debug:
+        var: delete_result

@@ -1,5 +1,4 @@
----
-- name: Test get schedule
+- name: Test delete user
   hosts: localhost
   gather_facts: false
   vars:
@@ -8,7 +7,7 @@
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
   tasks:
-    - name: Log in to Semaphore
+    - name: Login to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -16,15 +15,17 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get project and schedule
-      ebdruplab.semaphoreui.schedule_get:
+    - name: List users
+      ebdruplab.semaphoreui.user_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: 1
-        schedule_id: 1
-      register: schedule
+      register: users
 
-    - name: Show schedule
-      debug:
-        var: schedule
+    - name: Delete the last user in the list (for test only)
+      when: users.users | length > 1
+      ebdruplab.semaphoreui.user_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        user_id: "{{ users.users[-1].id }}"

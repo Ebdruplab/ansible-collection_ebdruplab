@@ -1,0 +1,62 @@
+---
+- name: Integration test for project_update module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get list of projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: project_list
+
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that:
+          - project_list.projects | length > 0
+
+    - name: Update project metadata
+      ebdruplab.semaphoreui.project_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        project:
+          name: "Updated Project Name"
+          alert: true
+          alert_chat: "Ansible"
+          max_parallel_tasks: 5
+          type: "test"
+          demo: false
+
+    - name: Fetch project again to verify update
+      ebdruplab.semaphoreui.project_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+      register: updated_project
+
+    - name: Show updated project details
+      ansible.builtin.debug:
+        var: updated_project
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
