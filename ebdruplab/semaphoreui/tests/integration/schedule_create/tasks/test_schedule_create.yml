@@ -1,5 +1,5 @@
 ---
-- name: Test get schedule
+- name: Test create schedule
   hosts: localhost
   gather_facts: false
   vars:
@@ -16,15 +16,27 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get project and schedule
-      ebdruplab.semaphoreui.schedule_get:
+    - name: Get list of projects
+      ebdruplab.semaphoreui.project_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: 1
-        schedule_id: 1
-      register: schedule
+      register: projects
 
-    - name: Show schedule
+    - name: Create a schedule
+      ebdruplab.semaphoreui.schedule_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        schedule:
+          cron_format: "* * * 1 *"
+          template_id: 1
+          name: "My Schedule"
+          active: true
+
+      register: schedule_create
+
+    - name: Show result
       ansible.builtin.debug:
-        var: schedule
+        var: schedule_create

@@ -1,0 +1,85 @@
+---
+- name: Test update schedule
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get list of projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: projects
+
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that: projects.projects | length > 0
+
+    - name: Create a dummy template
+      ebdruplab.semaphoreui.template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "Template for Schedule Test"
+          inventory_id: null
+          repository_id: null
+          environment_id: null
+          playbook: "playbook.yml"
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
+      register: created_template
+
+    - name: Create a schedule to be updated
+      ebdruplab.semaphoreui.schedule_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        schedule:
+          name: "Test Schedule"
+          cron_format: "* * * * *"
+          template_id: "{{ created_template.template.id }}"
+          project_id: "{{ projects.projects[0].id }}"
+          active: true
+      register: created_schedule
+
+    - name: Update the created schedule
+      ebdruplab.semaphoreui.schedule_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_schedule.schedule.project_id }}"
+        schedule_id: "{{ created_schedule.schedule.id }}"
+        schedule:
+          id: "{{ created_schedule.schedule.id }}"
+          name: "Updated Schedule"
+          cron_format: "0 */2 * * *"
+          template_id: "{{ created_template.template.id }}"
+          project_id: "{{ created_schedule.schedule.project_id }}"
+          active: false
+      register: update_result
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: update_result
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

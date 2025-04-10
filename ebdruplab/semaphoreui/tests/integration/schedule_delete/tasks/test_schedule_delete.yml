@@ -1,5 +1,5 @@
 ---
-- name: Integration test for project_backup and project_restore modules
+- name: Integration test for schedule_delete module
   hosts: localhost
   gather_facts: false
   vars:
@@ -17,53 +17,34 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get all projects
+    - name: Get list of projects
       ebdruplab.semaphoreui.project_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
+      register: projects
 
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
-
-    - name: Select first project ID
-      set_fact:
-        project_id: "{{ project_list.projects[0].id }}"
-
-    - name: Backup project
-      ebdruplab.semaphoreui.project_backup:
+    - name: Create a schedule to delete
+      ebdruplab.semaphoreui.schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_id }}"
-      register: backup_result
+        project_id: "{{ projects.projects[0].id }}"
+        schedule:
+          cron_format: "* * * * *"
+          project_id: "{{ projects.projects[0].id }}"
+          template_id: 1
+          name: "Temp Schedule"
+          active: true
+      register: created_schedule
 
-    - name: Show backup payload
-      ansible.builtin.debug:
-        var: backup_result
-
-    - name: Restore project from backup
-      ebdruplab.semaphoreui.project_restore:
+    - name: Delete the schedule
+      ebdruplab.semaphoreui.schedule_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        backup: "{{ backup_result }}"
-      register: restore_result
-
-    - name: Show restored project info
-      ansible.builtin.debug:
-        var: restore_result.project
-
-    - name: Clean up restored project
-      ebdruplab.semaphoreui.project_delete:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ restore_result.project.id }}"
-      when: restore_result.project is defined
+        project_id: "{{ projects.projects[0].id }}"
+        schedule_id: "{{ created_schedule.schedule.id }}"
 
     - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:

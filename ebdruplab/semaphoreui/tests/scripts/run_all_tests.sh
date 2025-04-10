@@ -17,34 +17,52 @@
 
 set -e
 
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
 COLLECTION_BUILD_DIR="../../"
 TESTS_DIR="../integration"
 RUN_SEMAPHORE=false
 SEMAPHORE_CONTAINER_NAME="semaphore"
 
+function info() {
+    echo -e "${CYAN}[INFO]${NC} $1"
+}
+
+function success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+function error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
 function build_and_install_collection() {
-    echo "[INFO] Building Ansible collection in: $COLLECTION_BUILD_DIR"
+    info "Building Ansible collection in: $COLLECTION_BUILD_DIR"
     cd "$COLLECTION_BUILD_DIR"
 
     ansible-galaxy collection build --force
 
     archive_name=$(ls *.tar.gz | head -n 1)
     if [ -z "$archive_name" ]; then
-        echo "[ERROR] Collection archive was not created."
+        error "Collection archive was not created."
         exit 1
     fi
 
-    echo "[INFO] Installing collection: $archive_name"
+    info "Installing collection: $archive_name"
     ansible-galaxy collection install --force "$archive_name"
 
-    echo "[INFO] Removing archive: $archive_name"
+    info "Removing archive: $archive_name"
     rm -f "$archive_name"
 
     cd - >/dev/null
 }
 
 function start_semaphore_container() {
-    echo "[INFO] Starting Semaphore container..."
+    info "Starting Semaphore container..."
     sudo docker run --name "$SEMAPHORE_CONTAINER_NAME" \
         -p 3000:3000 \
         -e SEMAPHORE_DB_DIALECT=bolt \
@@ -56,26 +74,26 @@ function start_semaphore_container() {
 }
 
 function stop_semaphore_container() {
-    echo "[INFO] Stopping and removing Semaphore container..."
+    info "Stopping and removing Semaphore container..."
     sudo docker stop "$SEMAPHORE_CONTAINER_NAME"
     sudo docker rm "$SEMAPHORE_CONTAINER_NAME"
 }
 
 function run_tests() {
-    echo "[INFO] Running Ansible integration tests locally..."
-    find "$TESTS_DIR" -type f -path "*/tasks/*.yml" | sort | while read -r playbook; do
-        echo "------------------------------------------------------------"
+    info "Running Ansible integration tests locally..."
+    find "$TESTS_DIR" -type f -path "*/tasks/*.yml" ! -name "backup_single_project.yml" | sort | while read -r playbook; do
+        echo -e "${CYAN}------------------------------------------------------------"
         echo "Running test playbook: $playbook"
-        echo "------------------------------------------------------------"
+        echo -e "------------------------------------------------------------${NC}"
         ansible-playbook -i 'localhost,' --connection=local "$playbook"
         if [ $? -ne 0 ]; then
-            echo "[ERROR] Playbook failed: $playbook"
+            error "Playbook failed: $playbook"
             [ "$RUN_SEMAPHORE" = true ] && stop_semaphore_container
             exit 1
         fi
         echo ""
     done
-    echo "[INFO] All tests completed successfully."
+    success "All tests completed successfully."
 }
 
 function show_help() {
@@ -96,7 +114,7 @@ while [[ $# -gt 0 ]]; do
         exit 0
         ;;
     *)
-        echo "[ERROR] Unknown option: $1"
+        error "Unknown option: $1"
         show_help
         exit 1
         ;;

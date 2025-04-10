@@ -1,5 +1,5 @@
 ---
-- name: Integration test for project_backup and project_restore modules
+- name: Clean Semaphore and create integration test project
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,8 +7,8 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    new_project_name: "ebdruplab integration test"
   tasks:
-
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
@@ -24,48 +24,34 @@
         session_cookie: "{{ login_result.session_cookie }}"
       register: project_list
 
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
-
-    - name: Select first project ID
-      set_fact:
-        project_id: "{{ project_list.projects[0].id }}"
-
-    - name: Backup project
-      ebdruplab.semaphoreui.project_backup:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_id }}"
-      register: backup_result
-
-    - name: Show backup payload
-      ansible.builtin.debug:
-        var: backup_result
-
-    - name: Restore project from backup
-      ebdruplab.semaphoreui.project_restore:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        backup: "{{ backup_result }}"
-      register: restore_result
-
-    - name: Show restored project info
-      ansible.builtin.debug:
-        var: restore_result.project
-
-    - name: Clean up restored project
+    - name: Delete existing projects
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ restore_result.project.id }}"
-      when: restore_result.project is defined
+        project_id: "{{ item.id }}"
+      loop: "{{ project_list.projects }}"
+      loop_control:
+        label: "{{ item.name }} (ID: {{ item.id }})"
 
-    - name: Log out of Semaphore
+    - name: Create new integration test project
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ new_project_name }}"
+        alert: true
+        alert_chat: "Ansible"
+        max_parallel_tasks: 5
+        type: "test"
+        demo: false
+      register: created_project
+
+    - name: Show created project info
+      ansible.builtin.debug:
+        var: created_project.project
+
+    - name: Log out
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"

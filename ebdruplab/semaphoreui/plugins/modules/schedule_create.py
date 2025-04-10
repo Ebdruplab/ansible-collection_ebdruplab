@@ -1,3 +1,5 @@
+# plugins/modules/schedule_create.py
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -31,13 +33,8 @@ options:
     type: dict
     required: true
     options:
-      id:
-        type: int
       cron_format:
         type: str
-        required: true
-      project_id:
-        type: int
         required: true
       template_id:
         type: int
@@ -63,8 +60,7 @@ EXAMPLES = r'''
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     schedule:
-      cron_format: "* * * 1 *"
-      project_id: 1
+      cron_format: "* * * * *"
       template_id: 1
       name: "My Schedule"
       active: true
@@ -92,7 +88,6 @@ def main():
         supports_check_mode=False
     )
 
-    # Construct URL with the correct API path
     host = module.params["host"]
     port = module.params["port"]
     project_id = module.params["project_id"]
@@ -106,8 +101,16 @@ def main():
     )
     headers["Content-Type"] = "application/json"
 
+    # Only send required fields to avoid backend validation errors
+    payload = {
+        "cron_format": schedule["cron_format"],
+        "template_id": schedule["template_id"],
+        "name": schedule["name"],
+        "active": schedule.get("active", True)
+    }
+
     try:
-        body = json.dumps(schedule).encode("utf-8")
+        body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
             body=body,
@@ -123,7 +126,6 @@ def main():
 
     except Exception as e:
         module.fail_json(msg=str(e))
-
 
 if __name__ == '__main__':
     main()

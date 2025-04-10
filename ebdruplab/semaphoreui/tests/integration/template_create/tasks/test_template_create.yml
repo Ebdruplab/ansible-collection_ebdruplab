@@ -1,0 +1,61 @@
+---
+- name: Test create template
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login
+
+    - name: Get projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"
+      register: projects
+
+    - name: Create template
+      ebdruplab.semaphoreui.template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "Test Template"
+          playbook: "test.yml"
+          arguments: "[]"
+          app: "ansible"
+          description: "Hello, World!"
+          inventory_id: 1
+          repository_id: 1
+          environment_id: 1
+          view_id: 1
+          suppress_success_alerts: true
+          app: "ansible"
+          git_branch: "main"
+          type: ""
+          start_version: "1.0.0"
+          build_template_id: 0
+          autorun: true
+          vaults: []
+          survey_vars: []
+      register: result
+
+    - name: Show result
+      ansible.builtin.debug:
+        var: result
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"

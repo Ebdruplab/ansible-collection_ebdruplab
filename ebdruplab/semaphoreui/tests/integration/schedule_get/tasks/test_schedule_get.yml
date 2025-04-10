@@ -1,9 +1,9 @@
 ---
-- name: Test create schedule
+- name: Test get schedule
   hosts: localhost
   gather_facts: false
   vars:
-    semaphore_host: "localhost"
+    semaphore_host: "http://localhost"
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
@@ -23,21 +23,39 @@
         session_cookie: "{{ login_result.session_cookie }}"
       register: projects
 
-    - name: Create a schedule
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that: projects.projects | length > 0
+
+    - name: Create a schedule (ensure it exists)
       ebdruplab.semaphoreui.schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ projects.projects[0].id }}"
         schedule:
-          id: 0
-          cron_format: "* * * * *"
-          project_id: "{{ projects.projects[0].id }}"
-          template_id: 1
           name: "Test Schedule"
+          cron_format: "* * * * *"
+          template_id: 1
+          project_id: "{{ projects.projects[0].id }}"
           active: true
-      register: schedule_create
+      register: created_schedule
 
-    - name: Show result
+    - name: Fetch created schedule
+      ebdruplab.semaphoreui.schedule_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        schedule_id: "{{ created_schedule.schedule.id }}"
+      register: fetched_schedule
+
+    - name: Show fetched schedule
       ansible.builtin.debug:
-        var: schedule_create
+        var: fetched_schedule.schedule
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
