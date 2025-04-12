@@ -7,6 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: 'ebdruplab_test_project_backup_integration_test'
   tasks:
 
     - name: Log in to Semaphore
@@ -24,10 +25,25 @@
         session_cookie: "{{ login_result.session_cookie }}"
       register: project_list
 
-    - name: Ensure we have at least one project
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
+    - name: Create a dummy project if none exist
+      when: project_list.projects | length == 0
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        type: "ci"
+        demo: false
+
+    - name: Get list of all projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: project_list
 
     - name: Backup each project using include_tasks
       include_tasks: backup_single_project.yml
