@@ -1,5 +1,5 @@
 ---
-- name: Integration test for project_backup on all projects
+- name: Integration test for project_backup
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,9 +7,8 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: 'ebdruplab_test_project_backup_integration_test'
+    project_name: "ebdruplab_test_project_backup_integration_test"
   tasks:
-
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
@@ -18,15 +17,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get list of all projects
-      ebdruplab.semaphoreui.project_list:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
-
-    - name: Create a dummy project if none exist
-      when: project_list.projects | length == 0
+    - name: Create dummy project
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -37,19 +28,29 @@
         max_parallel_tasks: 2
         type: "ci"
         demo: false
+      register: created_project
 
-    - name: Get list of all projects
-      ebdruplab.semaphoreui.project_list:
+    - name: Run project_backup on the dummy project
+      ebdruplab.semaphoreui.project_backup:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
+        project_id: "{{ created_project.project.id }}"
+      register: backup_result
 
-    - name: Backup each project using include_tasks
-      include_tasks: backup_single_project.yml
-      loop: "{{ project_list.projects }}"
-      loop_control:
-        loop_var: project
+    - name: Assert that project backup succeeded
+      assert:
+        that:
+          - backup_result is defined
+          - backup_result.failed is not defined or not backup_result.failed
+          - backup_result.backup is defined
+
+    - name: Delete dummy project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
 
     - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:

@@ -25,7 +25,25 @@
 
     - name: Ensure at least one project exists
       ansible.builtin.assert:
-        that: projects.projects | length > 0
+        that:
+          - projects.projects | length > 0
+
+    - name: Create a dummy template for schedule
+      ebdruplab.semaphoreui.template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "Template for Schedule Get Test"
+          inventory_id: null
+          repository_id: null
+          environment_id: null
+          playbook: "playbook.yml"
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
+      register: created_template
 
     - name: Create a schedule (ensure it exists)
       ebdruplab.semaphoreui.schedule_create:
@@ -36,8 +54,7 @@
         schedule:
           name: "Test Schedule"
           cron_format: "* * * * *"
-          template_id: 1
-          project_id: "{{ projects.projects[0].id }}"
+          template_id: "{{ created_template.template.id }}"
           active: true
       register: created_schedule
 
@@ -49,6 +66,13 @@
         project_id: "{{ projects.projects[0].id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
       register: fetched_schedule
+
+    - name: Assert fetched schedule matches expected name
+      assert:
+        that:
+          - fetched_schedule is defined
+          - fetched_schedule.failed is not defined or not fetched_schedule.failed
+          - fetched_schedule.schedule.name == "Test Schedule"
 
     - name: Show fetched schedule
       ansible.builtin.debug:

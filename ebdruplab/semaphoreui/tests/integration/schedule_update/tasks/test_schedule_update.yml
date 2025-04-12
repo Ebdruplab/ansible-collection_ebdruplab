@@ -1,5 +1,5 @@
 ---
-- name: Test update schedule
+- name: Integration test for schedule_create and schedule_update
   hosts: localhost
   gather_facts: false
   vars:
@@ -25,7 +25,8 @@
 
     - name: Ensure at least one project exists
       ansible.builtin.assert:
-        that: projects.projects | length > 0
+        that:
+          - projects.projects | length > 0
 
     - name: Create a dummy template
       ebdruplab.semaphoreui.template_create:
@@ -54,7 +55,6 @@
           name: "Test Schedule"
           cron_format: "* * * * *"
           template_id: "{{ created_template.template.id }}"
-          project_id: "{{ projects.projects[0].id }}"
           active: true
       register: created_schedule
 
@@ -66,17 +66,18 @@
         project_id: "{{ created_schedule.schedule.project_id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
         schedule:
-          id: "{{ created_schedule.schedule.id }}"
           name: "Updated Schedule"
           cron_format: "0 */2 * * *"
           template_id: "{{ created_template.template.id }}"
-          project_id: "{{ created_schedule.schedule.project_id }}"
           active: false
       register: update_result
 
-    - name: Show result
-      ansible.builtin.debug:
-        var: update_result
+    - name: Verify schedule update response
+      assert:
+        that:
+          - update_result is defined
+          - update_result.failed is not defined or not update_result.failed
+          - update_result.schedule.name == "Updated Schedule"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:

@@ -23,6 +23,28 @@
         session_cookie: "{{ login_result.session_cookie }}"
       register: projects
 
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that:
+          - projects.projects | length > 0
+
+    - name: Create a dummy template
+      ebdruplab.semaphoreui.template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "Test Template"
+          inventory_id: null
+          repository_id: null
+          environment_id: null
+          playbook: "playbook.yml"
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
+      register: created_template
+
     - name: Create a schedule
       ebdruplab.semaphoreui.schedule_create:
         host: "{{ semaphore_host }}"
@@ -31,12 +53,24 @@
         project_id: "{{ projects.projects[0].id }}"
         schedule:
           cron_format: "* * * 1 *"
-          template_id: 1
+          template_id: "{{ created_template.template.id }}"
           name: "My Schedule"
           active: true
-
       register: schedule_create
+
+    - name: Verify schedule creation
+      assert:
+        that:
+          - schedule_create is defined
+          - schedule_create.failed is not defined or not schedule_create.failed
+          - schedule_create.schedule.name == "My Schedule"
 
     - name: Show result
       ansible.builtin.debug:
         var: schedule_create
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
