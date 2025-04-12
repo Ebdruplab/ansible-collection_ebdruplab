@@ -1,0 +1,67 @@
+---
+- name: Integration test for user_update module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get list of users
+      ebdruplab.semaphoreui.user_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: users
+
+    - name: Find the admin user
+      set_fact:
+        target_user: "{{ users.users | selectattr('username', 'equalto', semaphore_username) | list | first }}"
+
+    - name: Save original user state
+      set_fact:
+        original_user:
+          name: "{{ target_user.name }}"
+          username: "{{ target_user.username }}"
+          email: "{{ target_user.email }}"
+          alert: "{{ target_user.alert }}"
+          admin: "{{ target_user.admin }}"
+
+    - name: Update the user
+      ebdruplab.semaphoreui.user_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        user_id: "{{ target_user.id }}"
+        name: "Updated Admin"
+        username: "{{ semaphore_username }}"
+        email: "admin-updated@localhost"
+        alert: false
+        admin: true
+
+    - name: Revert user update
+      ebdruplab.semaphoreui.user_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        user_id: "{{ target_user.id }}"
+        name: "{{ original_user.name }}"
+        username: "{{ original_user.username }}"
+        email: "{{ original_user.email }}"
+        alert: "{{ original_user.alert }}"
+        admin: "{{ original_user.admin }}"
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
