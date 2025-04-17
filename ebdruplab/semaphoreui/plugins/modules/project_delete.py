@@ -72,7 +72,7 @@ def main():
     host = module.params["host"]
     port = module.params["port"]
     project_id = module.params["project_id"]
-    url = f"{host}:{port}/project/{project_id}"
+    url = f"{host}:{port}/api/project/{project_id}"
 
     try:
         headers = get_auth_headers(

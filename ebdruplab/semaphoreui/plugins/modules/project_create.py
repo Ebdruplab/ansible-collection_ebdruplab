@@ -1,5 +1,3 @@
-# plugins/modules/project_create.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -15,9 +13,11 @@ options:
   host:
     type: str
     required: true
+    description: Hostname of the Semaphore server (without protocol).
   port:
     type: int
     required: true
+    description: Port of the Semaphore server (typically 3000).
   session_cookie:
     type: str
     required: false
@@ -29,18 +29,16 @@ options:
   name:
     type: str
     required: true
+    description: Name of the project to create.
   alert:
     type: bool
     default: false
   alert_chat:
     type: str
-    default: ''
+    default: 'Ansible'
   max_parallel_tasks:
     type: int
     default: 0
-  type:
-    type: str
-    default: ''
   demo:
     type: bool
     default: false
@@ -48,23 +46,23 @@ options:
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
-- name: Create a new project
+- name: Create a new Semaphore project
   ebdruplab.semaphoreui.project_create:
-    host: http://localhost
+    host: localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
-    name: "ebdruplab_integration_test_1"
+    name: "ebdruplab integration test"
 '''
 
 RETURN = r'''
 project:
-  description: Details of the created project
-  returned: success
+  description: Details of the created project.
   type: dict
+  returned: success
 '''
 
 def main():
@@ -76,9 +74,8 @@ def main():
             api_token=dict(type='str', required=False, no_log=True),
             name=dict(type='str', required=True),
             alert=dict(type='bool', default=False),
-            alert_chat=dict(type='str', default=''),
+            alert_chat=dict(type='str', default='Ansible'),
             max_parallel_tasks=dict(type='int', default=0),
-            type=dict(type='str', default=''),
             demo=dict(type='bool', default=False),
             validate_certs=dict(type='bool', default=True),
         ),
@@ -86,10 +83,13 @@ def main():
         supports_check_mode=False
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/projects"
+    host = module.params['host']
+    port = module.params['port']
+    url = f"{host}:{port}/api/projects/"
+
     headers = get_auth_headers(
-        module.params['session_cookie'],
-        module.params['api_token']
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
@@ -98,21 +98,21 @@ def main():
         "alert": module.params["alert"],
         "alert_chat": module.params["alert_chat"],
         "max_parallel_tasks": module.params["max_parallel_tasks"],
-        "type": module.params["type"],
-        "demo": module.params["demo"]
+        "demo": module.params["demo"],
+        "type": ""
     }
 
     try:
         body = json.dumps(project_data).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
-            body=body,  # CORRECT keyword
+            body=body,
             headers=headers,
             validate_certs=module.params["validate_certs"]
         )
 
         if status not in (200, 201):
-            module.fail_json(msg=f"Failed to create project: HTTP {status} - {response_body}")
+            module.fail_json(msg=f"Failed to create project: HTTP {status} - {response_body.decode()}")
 
         project = json.loads(response_body)
         module.exit_json(changed=True, project=project)

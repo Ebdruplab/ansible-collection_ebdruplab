@@ -44,7 +44,6 @@
         alert: true
         alert_chat: "Ansible"
         max_parallel_tasks: 5
-        type: "test"
         demo: false
       register: created_project
 
