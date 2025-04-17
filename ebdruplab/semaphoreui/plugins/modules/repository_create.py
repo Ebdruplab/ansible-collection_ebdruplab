@@ -77,7 +77,7 @@ def main():
         supports_check_mode=False,
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
     repo = module.params["repository"]
