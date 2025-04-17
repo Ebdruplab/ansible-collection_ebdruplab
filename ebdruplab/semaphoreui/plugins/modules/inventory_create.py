@@ -4,11 +4,11 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: template_create
-short_description: Create a Semaphore template
+module: inventory_create
+short_description: Create an inventory in Semaphore
 version_added: "1.0.0"
 description:
-  - Creates a new template in Semaphore.
+  - Creates an inventory inside a Semaphore project.
 options:
   host:
     type: str
@@ -19,10 +19,10 @@ options:
   project_id:
     type: int
     required: true
-  template:
+  inventory:
     type: dict
     required: true
-    description: Dictionary describing the template.
+    description: Dictionary describing the inventory.
   session_cookie:
     type: str
     required: false
@@ -39,27 +39,22 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Create a template
-  ebdruplab.semaphoreui.template_create:
+- name: Create inventory
+  ebdruplab.semaphoreui.inventory_create:
     host: localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    template:
-      name: "Test Template"
-      app: "ansible"
-      playbook: "playbook.yml"
-      inventory_id: 1
-      repository_id: 2
-      type: "job"
-      view_id: "Empty"
-      allow_override_args_in_task: false
-      survey_vars: []
+    inventory:
+      name: "Local Inventory"
+      type: "static"
+      inventory: |
+        localhost ansible_connection=local
 '''
 
 RETURN = r'''
-template:
-  description: The created template object.
+inventory:
+  description: The created inventory object.
   type: dict
   returned: success
 '''
@@ -70,7 +65,7 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            template=dict(type='dict', required=True),
+            inventory=dict(type='dict', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -81,10 +76,7 @@ def main():
 
     host = module.params["host"]
     port = module.params["port"]
-    project_id = module.params["project_id"]
-    template = module.params["template"]
-
-    url = f"{host}:{port}/api/project/{project_id}/templates"
+    url = f"{host}:{port}/api/project/{module.params['project_id']}/inventory"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -92,21 +84,16 @@ def main():
     )
     headers["Content-Type"] = "application/json"
 
-    # Validate required fields
-    required_fields = ["name", "app", "playbook", "inventory_id", "repository_id"]
-    missing = [f for f in required_fields if f not in template or template[f] in [None, ""]]
-    if missing:
-        module.fail_json(msg=f"Missing required fields in template: {', '.join(missing)}")
+    inventory_data = module.params["inventory"]
+    inventory_data["project_id"] = module.params["project_id"]
 
-    # Set default view_id to 'Empty' if not provided
-    if "view_id" not in template or not template["view_id"]:
-        template["view_id"] = "Empty"
-
-    # Add project_id for completeness
-    template["project_id"] = project_id
+    # Validate `type` field
+    valid_types = ["static", "static-yaml", "file"]
+    if "type" not in inventory_data or inventory_data["type"] not in valid_types:
+        module.fail_json(msg=f"Invalid or missing inventory type. Must be one of: {', '.join(valid_types)}")
 
     try:
-        body = json.dumps(template).encode("utf-8")
+        body = json.dumps(inventory_data).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
             body=body,
@@ -115,11 +102,10 @@ def main():
         )
 
         if status not in (200, 201):
-            msg = response_body if isinstance(response_body, str) else response_body.decode()
-            module.fail_json(msg=f"Failed to create template: HTTP {status} - {msg}", status=status)
+            module.fail_json(msg=f"Failed to create inventory: HTTP {status} - {response_body.decode()}")
 
         result = json.loads(response_body)
-        module.exit_json(changed=True, template=result)
+        module.exit_json(changed=True, inventory=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))
