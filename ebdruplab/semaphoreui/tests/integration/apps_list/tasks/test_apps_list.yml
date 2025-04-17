@@ -1,0 +1,41 @@
+---
+- name: Test apps_list module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: 'Get list of apps'
+      ebdruplab.semaphoreui.apps_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: apps_result
+
+    - name: Assert that apps list was returned
+      assert:
+        that:
+          - apps_result is defined
+          - apps_result.apps is iterable
+          - apps_result.apps | length >= 0
+
+    - name: Debug app list (for visibility in CI logs)
+      debug:
+        var: apps_result.apps
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

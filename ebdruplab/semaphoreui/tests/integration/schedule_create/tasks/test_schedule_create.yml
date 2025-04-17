@@ -28,6 +28,29 @@
         that:
           - projects.projects | length > 0
 
+    - name: Get list of apps
+      ebdruplab.semaphoreui.apps_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: apps_result
+
+    - name: Filter app with id == 'ansible'
+      set_fact:
+        ansible_app: "{{ apps_result.apps | selectattr('id', 'equalto', 'ansible') | list }}"
+
+    - name: Assert that ansible app exists
+      ansible.builtin.assert:
+        that:
+          - ansible_app | length > 0
+        fail_msg: "No app with id 'ansible' found"
+
+
+    - name: Set app_id from ansible_app
+      set_fact:
+        app_id: "{{ ansible_app[0].id }}"
+
+
     - name: Create a dummy template
       ebdruplab.semaphoreui.template_create:
         host: "{{ semaphore_host }}"
@@ -36,6 +59,7 @@
         project_id: "{{ projects.projects[0].id }}"
         template:
           name: "Test Template"
+          app_id: "{{ app_id }}"
           inventory_id: null
           repository_id: null
           environment_id: null
