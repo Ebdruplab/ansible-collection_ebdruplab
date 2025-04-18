@@ -1,14 +1,14 @@
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
 
 DOCUMENTATION = r'''
 ---
-module: repository_create
-short_description: Create a repository in Semaphore
+module: key_update
+short_description: Update an access key in Semaphore
 version_added: "1.0.0"
 description:
-  - Creates a new repository within a Semaphore project.
+  - Updates an existing access key in a specific Semaphore project.
 options:
   host:
     type: str
@@ -21,31 +21,29 @@ options:
   project_id:
     type: int
     required: true
-    description: ID of the project to create the repository in.
+    description: ID of the project containing the key.
+  key_id:
+    type: int
+    required: true
+    description: ID of the key to update.
   name:
     type: str
     required: true
-    description: Name of the repository.
-  git_url:
+    description: New name for the key.
+  key:
     type: str
     required: true
-    description: Git URL of the repository.
-  git_branch:
-    type: str
-    required: true
-    description: Branch of the repository.
-  ssh_key_id:
-    type: int
-    required: true
-    description: ID of the SSH key to access the repository.
+    description: New SSH public key string.
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie from a previous login.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token to authenticate instead of session cookie.
   validate_certs:
     type: bool
     default: true
@@ -55,21 +53,20 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Create repository
-  ebdruplab.semaphoreui.repository_create:
+- name: Update access key in Semaphore
+  ebdruplab.semaphoreui.key_update:
     host: localhost
     port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    name: "My Repo"
-    git_url: "https://github.com/example/repo.git"
-    git_branch: "main"
-    ssh_key_id: 1
+    key_id: 5
+    session_cookie: "{{ login_result.session_cookie }}"
+    name: "Updated Key Name"
+    key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC..."
 '''
 
 RETURN = r'''
-repository:
-  description: The created repository object.
+key:
+  description: The updated key object.
   type: dict
   returned: success
 '''
@@ -80,10 +77,9 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
+            key_id=dict(type='int', required=True),
             name=dict(type='str', required=True),
-            git_url=dict(type='str', required=True),
-            git_branch=dict(type='str', required=True),
-            ssh_key_id=dict(type='int', required=True),
+            key=dict(type='str', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -95,16 +91,14 @@ def main():
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
+    key_id = module.params["key_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/repositories"
+    url = f"{host}:{port}/api/project/{project_id}/keys/{key_id}"
 
-    repo_data = {
+    payload = {
         "name": module.params["name"],
-        "git_url": module.params["git_url"],
-        "git_branch": module.params["git_branch"],
-        "ssh_key_id": module.params["ssh_key_id"],
-        "project_id": project_id
+        "key": module.params["key"]
     }
 
     headers = get_auth_headers(
@@ -114,20 +108,20 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
-        body = json.dumps(repo_data).encode("utf-8")
-        response_body, status, _ = semaphore_post(
-            url,
+        body = json.dumps(payload).encode("utf-8")
+        response_body, status, _ = semaphore_put(
+            url=url,
             body=body,
             headers=headers,
             validate_certs=validate_certs
         )
 
-        if status not in (200, 201):
-            msg = response_body if isinstance(response_body, str) else response_body.decode()
-            module.fail_json(msg=f"Failed to create repository: HTTP {status} - {msg}", status=status)
+        if status != 200:
+            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"Failed to update key: HTTP {status} - {msg}", status=status)
 
-        result = json.loads(response_body)
-        module.exit_json(changed=True, repository=result)
+        result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        module.exit_json(changed=True, key=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))

@@ -4,11 +4,11 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: repository_create
-short_description: Create a repository in Semaphore
+module: key_create
+short_description: Create an access key in Semaphore
 version_added: "1.0.0"
 description:
-  - Creates a new repository within a Semaphore project.
+  - Creates a new access key in Semaphore that can be used for SSH authentication.
 options:
   host:
     type: str
@@ -21,23 +21,15 @@ options:
   project_id:
     type: int
     required: true
-    description: ID of the project to create the repository in.
+    description: ID of the project to associate the key with.
   name:
     type: str
     required: true
-    description: Name of the repository.
-  git_url:
+    description: Name of the key.
+  key:
     type: str
     required: true
-    description: Git URL of the repository.
-  git_branch:
-    type: str
-    required: true
-    description: Branch of the repository.
-  ssh_key_id:
-    type: int
-    required: true
-    description: ID of the SSH key to access the repository.
+    description: Public SSH key string.
   session_cookie:
     type: str
     required: false
@@ -55,21 +47,19 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Create repository
-  ebdruplab.semaphoreui.repository_create:
+- name: Create an access key in Semaphore
+  ebdruplab.semaphoreui.key_create:
     host: localhost
     port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    name: "My Repo"
-    git_url: "https://github.com/example/repo.git"
-    git_branch: "main"
-    ssh_key_id: 1
+    session_cookie: "{{ login_result.session_cookie }}"
+    name: "Default SSH Key"
+    key: "ssh-rsa AAAAB3..."
 '''
 
 RETURN = r'''
-repository:
-  description: The created repository object.
+key:
+  description: The created key object.
   type: dict
   returned: success
 '''
@@ -81,9 +71,7 @@ def main():
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
             name=dict(type='str', required=True),
-            git_url=dict(type='str', required=True),
-            git_branch=dict(type='str', required=True),
-            ssh_key_id=dict(type='int', required=True),
+            key=dict(type='str', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -97,15 +85,7 @@ def main():
     project_id = module.params["project_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/repositories"
-
-    repo_data = {
-        "name": module.params["name"],
-        "git_url": module.params["git_url"],
-        "git_branch": module.params["git_branch"],
-        "ssh_key_id": module.params["ssh_key_id"],
-        "project_id": project_id
-    }
+    url = f"{host}:{port}/api/project/{project_id}/keys"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -113,8 +93,17 @@ def main():
     )
     headers["Content-Type"] = "application/json"
 
+    key_payload = {
+        "name": module.params["name"],
+        "type": "none",
+        "project_id": project_id,
+        "ssh": {
+            "private_key": module.params["key"]
+        }
+    }
+
     try:
-        body = json.dumps(repo_data).encode("utf-8")
+        body = json.dumps(key_payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
             body=body,
@@ -124,10 +113,10 @@ def main():
 
         if status not in (200, 201):
             msg = response_body if isinstance(response_body, str) else response_body.decode()
-            module.fail_json(msg=f"Failed to create repository: HTTP {status} - {msg}", status=status)
+            module.fail_json(msg=f"Failed to create key: HTTP {status} - {msg}", status=status)
 
         result = json.loads(response_body)
-        module.exit_json(changed=True, repository=result)
+        module.exit_json(changed=True, key=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))

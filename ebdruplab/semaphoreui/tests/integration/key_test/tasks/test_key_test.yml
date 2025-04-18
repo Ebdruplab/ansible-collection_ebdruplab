@@ -1,5 +1,5 @@
 ---
-- name: Test repository list in Semaphore
+- name: Test access key lifecycle in Semaphore
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,7 +7,11 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    ssh_key_id: 1
+    key1_name: "Test Key 1"
+    key2_name: "Test Key 2"
+    dummy_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD"
+    updated_key2_name: "Updated Key 2"
+    updated_dummy_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQNEW"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -25,61 +29,76 @@
       register: project_list
 
     - name: Ensure at least one project exists
-      assert:
+      ansible.builtin.assert:
         that:
           - project_list.projects | length > 0
 
-    - name: Create first repository
-      ebdruplab.semaphoreui.repository_create:
+    - name: Create first key
+      ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
-        name: "Repo A"
-        git_url: "https://github.com/example/repo-a.git"
-        git_branch: "main"
-        ssh_key_id: "{{ ssh_key_id }}"
-      register: created_repo1
+        name: "{{ key1_name }}"
+        key: "{{ dummy_key }}"
+      register: created_key1
 
-    - name: Create second repository
-      ebdruplab.semaphoreui.repository_create:
+    - name: Create second key
+      ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
-        name: "Repo B"
-        git_url: "https://github.com/example/repo-b.git"
-        git_branch: "main"
-        ssh_key_id: "{{ ssh_key_id }}"
-      register: created_repo2
+        name: "{{ key2_name }}"
+        key: "{{ dummy_key }}"
+      register: created_key2
 
-    - name: List all repositories in the project
-      ebdruplab.semaphoreui.repository_list:
+    - name: List all keys before update
+      ebdruplab.semaphoreui.key_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
-      register: listed_repos
+      register: listed_keys_before
 
-    - name: Show repositories
-      debug:
-        var: listed_repos.repositories
+    - name: Show keys before update
+      ansible.builtin.debug:
+        var: listed_keys_before
 
-    - name: Delete repository 1
-      ebdruplab.semaphoreui.repository_delete:
+    - name: Wait briefly before updating key (workaround for backend readiness)
+      ansible.builtin.pause:
+        seconds: 4
+
+    - name: Update second key
+      ebdruplab.semaphoreui.key_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
-        repository_id: "{{ created_repo1.repository.id }}"
+        key_id: "{{ created_key2.key.id }}"
+        name: "{{ updated_key2_name }}"
+        key: "{{ updated_dummy_key }}"
+      register: updated_key2
 
-    - name: Delete repository 2
-      ebdruplab.semaphoreui.repository_delete:
+    - name: Show updated second key
+      ansible.builtin.debug:
+        var: updated_key2.key
+
+    - name: Delete first key
+      ebdruplab.semaphoreui.key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
-        repository_id: "{{ created_repo2.repository.id }}"
+        key_id: "{{ created_key1.key.id }}"
+
+    - name: Delete second (updated) key
+      ebdruplab.semaphoreui.key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        key_id: "{{ updated_key2.key.id }}"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:
