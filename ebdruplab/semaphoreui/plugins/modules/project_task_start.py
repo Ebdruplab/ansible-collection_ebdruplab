@@ -1,14 +1,14 @@
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
 DOCUMENTATION = r'''
 ---
-module: key_update
-short_description: Update an access key in Semaphore
+module: project_task_start
+short_description: Start a job/task in Semaphore
 version_added: "1.0.0"
 description:
-  - Updates an existing access key in a specific Semaphore project.
+  - Starts a new job/task in a specific Semaphore project.
 options:
   host:
     type: str
@@ -21,19 +21,11 @@ options:
   project_id:
     type: int
     required: true
-    description: ID of the project containing the key.
-  key_id:
-    type: int
+    description: ID of the project where the task should be started.
+  task:
+    type: dict
     required: true
-    description: ID of the key to update.
-  name:
-    type: str
-    required: true
-    description: New name for the key.
-  key:
-    type: str
-    required: true
-    description: New SSH public key string.
+    description: Dictionary describing the task details (template_id, debug, playbook, etc).
   session_cookie:
     type: str
     required: false
@@ -53,20 +45,21 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Update access key in Semaphore
-  ebdruplab.semaphoreui.key_update:
-    host: localhost
+- name: Start a task
+  ebdruplab.semaphoreui.project_task_start:
+    host: http://localhost
     port: 3000
-    project_id: 1
-    key_id: 5
     session_cookie: "{{ login_result.session_cookie }}"
-    name: "Updated Key Name"
-    key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC..."
+    project_id: 1
+    task:
+      template_id: 1
+      debug: true
+      playbook: "site.yml"
 '''
 
 RETURN = r'''
-key:
-  description: The updated key object.
+task:
+  description: The task/job that was started.
   type: dict
   returned: success
 '''
@@ -77,9 +70,7 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            key_id=dict(type='int', required=True),
-            name=dict(type='str', required=True),
-            key=dict(type='str', required=True),
+            task=dict(type='dict', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -91,15 +82,10 @@ def main():
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    key_id = module.params["key_id"]
+    task_data = module.params["task"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/keys/{key_id}"
-
-    payload = {
-        "name": module.params["name"],
-        "key": module.params["key"]
-    }
+    url = f"{host}:{port}/api/project/{project_id}/tasks"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -108,20 +94,20 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
-        body = json.dumps(payload).encode("utf-8")
-        response_body, status, _ = semaphore_put(
-            url=url,
+        body = json.dumps(task_data).encode("utf-8")
+        response_body, status, _ = semaphore_post(
+            url,
             body=body,
             headers=headers,
             validate_certs=validate_certs
         )
 
-        if status != 200:
+        if status not in (200, 201):
             msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
-            module.fail_json(msg=f"Failed to update key: HTTP {status} - {msg}", status=status)
+            module.fail_json(msg=f"Failed to start task: HTTP {status} - {msg}", status=status)
 
         result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
-        module.exit_json(changed=True, key=result)
+        module.exit_json(changed=True, task=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))

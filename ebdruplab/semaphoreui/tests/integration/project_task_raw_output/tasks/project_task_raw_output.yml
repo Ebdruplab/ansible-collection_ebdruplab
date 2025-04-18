@@ -1,0 +1,66 @@
+---
+- name: Retrieve latest task raw output from Semaphore
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get list of projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: projects
+
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that:
+          - projects.projects | length > 0
+
+    - name: Get list of tasks for first project
+      ebdruplab.semaphoreui.project_task_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+      register: project_tasks
+
+    - name: Ensure at least one task exists
+      ansible.builtin.assert:
+        that:
+          - project_tasks.tasks | length > 0
+
+    - name: Set latest task ID
+      ansible.builtin.set_fact:
+        latest_task_id: "{{ (project_tasks.tasks | sort(attribute='start') | last).id }}"
+        current_project_id: "{{ projects.projects[0].id }}"
+
+    - name: Fetch raw output of latest task
+      ebdruplab.semaphoreui.project_task_raw_output:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ current_project_id }}"
+        task_id: "{{ latest_task_id }}"
+      register: raw_output
+
+    - name: Show raw task output
+      ansible.builtin.debug:
+        var: raw_output.raw_output
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

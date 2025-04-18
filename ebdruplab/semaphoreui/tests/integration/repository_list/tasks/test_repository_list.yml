@@ -7,7 +7,8 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    ssh_key_id: 1
+    dummy_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD"
+    ssh_key_name: "Temp SSH Key"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -25,9 +26,19 @@
       register: project_list
 
     - name: Ensure at least one project exists
-      assert:
+      ansible.builtin.assert:
         that:
           - project_list.projects | length > 0
+
+    - name: Create SSH key for repositories
+      ebdruplab.semaphoreui.key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        name: "{{ ssh_key_name }}"
+        key: "{{ dummy_key }}"
+      register: created_key
 
     - name: Create first repository
       ebdruplab.semaphoreui.repository_create:
@@ -38,7 +49,7 @@
         name: "Repo A"
         git_url: "https://github.com/example/repo-a.git"
         git_branch: "main"
-        ssh_key_id: "{{ ssh_key_id }}"
+        ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo1
 
     - name: Create second repository
@@ -50,7 +61,7 @@
         name: "Repo B"
         git_url: "https://github.com/example/repo-b.git"
         git_branch: "main"
-        ssh_key_id: "{{ ssh_key_id }}"
+        ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo2
 
     - name: List all repositories in the project
@@ -80,6 +91,14 @@
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
         repository_id: "{{ created_repo2.repository.id }}"
+
+    - name: Delete temporary key
+      ebdruplab.semaphoreui.key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        key_id: "{{ created_key.key.id }}"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:
