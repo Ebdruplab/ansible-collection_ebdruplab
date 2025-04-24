@@ -4,22 +4,15 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: schedule_get
-short_description: Get a schedule by ID for a Semaphore project
-version_added: "1.0.0"
+module: project_task_get
+short_description: Get a single task in a Semaphore project
 description:
-  - Retrieves a specific schedule from a Semaphore project.
+  - Retrieves details of a specific task in a project by ID.
 options:
   host:
     type: str
     required: true
   port:
-    type: int
-    required: true
-  project_id:
-    type: int
-    required: true
-  schedule_id:
     type: int
     required: true
   session_cookie:
@@ -30,6 +23,12 @@ options:
     type: str
     required: false
     no_log: true
+  project_id:
+    type: int
+    required: true
+  task_id:
+    type: int
+    required: true
   validate_certs:
     type: bool
     default: true
@@ -38,19 +37,19 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Get a schedule
-  ebdruplab.semaphoreui.schedule_get:
+- name: Get details of a specific task
+  ebdruplab.semaphoreui.project_task_get:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    schedule_id: 5
+    task_id: 23
 '''
 
 RETURN = r'''
-schedule:
-  description: The schedule object retrieved from the API
-  returned: always
+task:
+  description: Task detail object
+  returned: success
   type: dict
 '''
 
@@ -59,45 +58,44 @@ def main():
         argument_spec=dict(
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
-            project_id=dict(type='int', required=True),
-            schedule_id=dict(type='int', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
+            project_id=dict(type='int', required=True),
+            task_id=dict(type='int', required=True),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=True
+        supports_check_mode=True,
     )
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    schedule_id = module.params["schedule_id"]
+    task_id = module.params["task_id"]
     validate_certs = module.params["validate_certs"]
-    session_cookie = module.params.get("session_cookie")
-    api_token = module.params.get("api_token")
 
-    url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
+    url = f"{host}:{port}/api/project/{project_id}/tasks/{task_id}"
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
     try:
-        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
-        headers["Content-Type"] = "application/json"
-
         response_body, status, _ = semaphore_get(
-            url,
-            headers=headers,
-            validate_certs=validate_certs
+            url, headers=headers, validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status} - {response_body}")
+            module.fail_json(msg=f"GET failed with status {status}", response=response_body)
 
-        schedule = json.loads(response_body)
-        module.exit_json(changed=False, schedule=schedule)
+        task = json.loads(response_body)
+        module.exit_json(changed=False, task=task)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
 

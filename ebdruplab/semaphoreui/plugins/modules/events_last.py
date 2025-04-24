@@ -1,5 +1,3 @@
-# plugins/modules/events_last.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -43,7 +41,7 @@ EXAMPLES = r'''
 
 RETURN = r'''
 events:
-  description: List of events
+  description: List of the last 200 events
   returned: always
   type: list
   elements: dict
@@ -62,17 +60,23 @@ def main():
         supports_check_mode=True
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/events/last"
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    validate_certs = module.params["validate_certs"]
+
+    url = f"{host}:{port}/api/events/last"
+
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
     try:
-        headers = get_auth_headers(
-            module.params['session_cookie'],
-            module.params['api_token']
-        )
-        response_body, status, _ = semaphore_get(url, headers=headers, validate_certs=module.params["validate_certs"])
+        response_body, status, _ = semaphore_get(url, headers=headers, validate_certs=validate_certs)
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch last events: HTTP {status}", status=status)
+            module.fail_json(msg=f"Failed to fetch last events: HTTP {status}", response=response_body)
 
         try:
             events = json.loads(response_body)
@@ -84,5 +88,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+

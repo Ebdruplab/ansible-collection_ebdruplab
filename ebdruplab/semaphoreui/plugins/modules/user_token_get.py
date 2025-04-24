@@ -60,14 +60,25 @@ def main():
         supports_check_mode=True
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/user/tokens"
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    validate_certs = module.params["validate_certs"]
+    session_cookie = module.params.get("session_cookie")
+    api_token = module.params.get("api_token")
+
+    url = f"{host}:{port}/api/user/tokens"
 
     try:
         headers = get_auth_headers(
-            module.params.get("session_cookie"),
-            module.params.get("api_token")
+            session_cookie=session_cookie,
+            api_token=api_token
         )
-        response_body, status, _ = semaphore_get(url, headers=headers, validate_certs=module.params["validate_certs"])
+
+        response_body, status, _ = semaphore_get(
+            url,
+            headers=headers,
+            validate_certs=validate_certs
+        )
 
         if status != 200:
             module.fail_json(msg=f"Failed to fetch tokens: HTTP {status} - {response_body}")
@@ -78,5 +89,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+

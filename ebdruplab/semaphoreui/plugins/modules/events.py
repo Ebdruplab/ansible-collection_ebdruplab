@@ -1,5 +1,3 @@
-# plugins/modules/events.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -10,7 +8,7 @@ module: events
 short_description: Get events from Semaphore
 version_added: "1.0.0"
 description:
-  - Gets events related to Semaphore and projects the user is part of.
+  - Retrieves events related to Semaphore and projects accessible to the user.
 options:
   host:
     type: str
@@ -29,7 +27,7 @@ options:
   last_only:
     type: bool
     default: false
-    description: Fetch only the last 200 events
+    description: Whether to only fetch the last 200 events
   validate_certs:
     type: bool
     default: true
@@ -74,32 +72,39 @@ def main():
         supports_check_mode=True
     )
 
-    endpoint = "/events/last" if module.params['last_only'] else "/api/events"
-    url = f"{module.params['host']}:{module.params['port']}{endpoint}"
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    validate_certs = module.params["validate_certs"]
+    last_only = module.params["last_only"]
+
+    endpoint = "/events/last" if last_only else "/api/events"
+    url = f"{host}:{port}{endpoint}"
+
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
     try:
-        headers = get_auth_headers(
-            module.params['session_cookie'],
-            module.params['api_token']
-        )
         response_body, status, _ = semaphore_get(
-            url,
-            headers=headers,
-            validate_certs=module.params["validate_certs"]
+            url, headers=headers, validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch events: HTTP {status} - {response_body}", status=status)
+            module.fail_json(msg=f"Failed to fetch events: HTTP {status}", response=response_body)
 
         try:
             events = json.loads(response_body) if response_body else []
         except json.JSONDecodeError as e:
-            module.fail_json(msg=f"Invalid JSON response: {str(e)}", raw=response_body)
+            module.fail_json(msg=f"Invalid JSON response", raw=response_body)
 
         module.exit_json(changed=False, events=events)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+

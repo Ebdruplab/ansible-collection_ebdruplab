@@ -1,16 +1,14 @@
-# plugins/modules/project_restore.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_request, get_auth_headers
 import json
 
-DOCUMENTATION = r"""
+DOCUMENTATION = r'''
 ---
 module: project_restore
 short_description: Restore a Semaphore project
 version_added: "1.0.0"
 description:
-  - Restores a Semaphore project from backup data
+  - Restores a Semaphore project from backup data using the /api/projects/restore endpoint.
 options:
   host:
     type: str
@@ -34,23 +32,23 @@ options:
     default: true
 author:
   - Kristian Ebdrup @kris9854
-"""
+'''
 
-EXAMPLES = r"""
+EXAMPLES = r'''
 - name: Restore Semaphore project
   ebdruplab.semaphoreui.project_restore:
     host: http://localhost
     port: 3000
     api_token: "abcd1234"
     backup: "{{ lookup('file', 'project_backup.json') | from_json }}"
-"""
+'''
 
-RETURN = r"""
+RETURN = r'''
 project:
   description: Restored project information
   returned: always
   type: dict
-"""
+'''
 
 def main():
     module = AnsibleModule(
@@ -63,35 +61,39 @@ def main():
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=True
+        supports_check_mode=True,
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/projects/restore"
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    validate_certs = module.params["validate_certs"]
+    backup_data = module.params["backup"]
+
+    url = f"{host}:{port}/api/projects/restore"
+
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
     try:
-        headers = get_auth_headers(
-            session_cookie=module.params["session_cookie"],
-            api_token=module.params["api_token"]
-        )
-        headers["Content-Type"] = "application/json"
-
-        # Ensure the backup data is properly encoded to JSON
-        body = json.dumps(module.params["backup"]).encode("utf-8")
+        body = json.dumps(backup_data).encode("utf-8")
 
         response_body, status, _ = semaphore_request(
-            "POST", url, body=body, headers=headers,
-            validate_certs=module.params["validate_certs"]
+            "POST", url, body=body, headers=headers, validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to restore project: HTTP {status} - {response_body}")
+            module.fail_json(msg=f"Failed to restore project: HTTP {status}", response=response_body)
 
-        data = json.loads(response_body)
-        module.exit_json(changed=True, project=data)
+        project = json.loads(response_body)
+        module.exit_json(changed=True, project=project)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
+

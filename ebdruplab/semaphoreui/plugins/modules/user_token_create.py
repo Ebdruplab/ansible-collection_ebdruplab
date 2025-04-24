@@ -1,5 +1,3 @@
-# plugins/modules/user_token_create.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -10,7 +8,7 @@ module: user_token_create
 short_description: Create an API token for the logged-in user
 version_added: "1.0.0"
 description:
-  - Sends a POST request to create a new API token for the currently logged-in user in Semaphore.
+  - Sends a POST request to create a new API token for the currently authenticated user in Semaphore.
 options:
   host:
     type: str
@@ -39,7 +37,7 @@ EXAMPLES = r'''
 
 RETURN = r'''
 token:
-  description: The created API token
+  description: The created API token object
   returned: success
   type: dict
 '''
@@ -55,21 +53,26 @@ def main():
         supports_check_mode=False
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/user/tokens"
-    headers = get_auth_headers(session_cookie=module.params["session_cookie"])
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    validate_certs = module.params["validate_certs"]
+    session_cookie = module.params["session_cookie"]
+
+    url = f"{host}:{port}/api/user/tokens"
+
+    headers = get_auth_headers(session_cookie=session_cookie)
     headers["Content-Type"] = "application/json"
 
     try:
-        # No payload needed
         response_body, status, _ = semaphore_post(
             url,
-            body=None,
+            body=None,  # No payload required for this endpoint
             headers=headers,
-            validate_certs=module.params["validate_certs"]
+            validate_certs=validate_certs
         )
 
         if status != 201:
-            module.fail_json(msg=f"POST failed with status {status}: {response_body}")
+            module.fail_json(msg=f"Failed to create token: HTTP {status}", response=response_body)
 
         token = json.loads(response_body)
         module.exit_json(changed=True, token=token)
@@ -77,5 +80,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+

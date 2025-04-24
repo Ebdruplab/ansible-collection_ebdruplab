@@ -1,5 +1,3 @@
-# plugins/modules/schedule_delete.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
@@ -74,19 +72,20 @@ def main():
         supports_check_mode=True
     )
 
-    url = f"{module.params['host']}:{module.params['port']}/api/project/{module.params['project_id']}/schedules/{module.params['schedule_id']}"
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    project_id = module.params["project_id"]
+    schedule_id = module.params["schedule_id"]
+    validate_certs = module.params["validate_certs"]
+    session_cookie = module.params.get("session_cookie")
+    api_token = module.params.get("api_token")
+
+    url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
 
     try:
-        headers = get_auth_headers(
-            session_cookie=module.params["session_cookie"],
-            api_token=module.params["api_token"]
-        )
+        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
 
-        _, status, _ = semaphore_delete(
-            url,
-            headers=headers,
-            validate_certs=module.params["validate_certs"]
-        )
+        _, status, _ = semaphore_delete(url, headers=headers, validate_certs=validate_certs)
 
         if status != 204:
             module.fail_json(msg=f"Failed to delete schedule: HTTP {status}", status=status)
@@ -96,5 +95,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+
