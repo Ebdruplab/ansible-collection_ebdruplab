@@ -50,3 +50,4 @@
 #   group_name:
 #     - module1
 #     - module2
+requires_ansible: '>=2.13.10, <2.16.0'

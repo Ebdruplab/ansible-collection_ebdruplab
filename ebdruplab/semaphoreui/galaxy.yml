@@ -16,7 +16,7 @@ readme: README.md
 # A list of the collection's content authors. Can be just the name or in the format 'Full Name <email> (url)
 # @nicks:irc/im.site#channel'
 authors:
-- Kristian Ebdrup <kristian@ebdruplab.dk>
+  - Kristian Ebdrup <kristian@ebdruplab.dk>
 
 
 ### OPTIONAL but strongly recommended
@@ -26,7 +26,7 @@ description: An implementation that makes it easier to talk to semaphore UI API 
 # Either a single license or a list of licenses for content inside of a collection. Ansible Galaxy currently only
 # accepts L(SPDX,https://spdx.org/licenses/) licenses. This key is mutually exclusive with 'license_file'
 license:
-- GPL-2.0-or-later
+  - GPL-2.0-or-later
 
 # The path to the license file for the collection. This path is relative to the root of the collection. This key is
 # mutually exclusive with 'license'
@@ -48,7 +48,7 @@ dependencies: {}
 repository: https://github.com/ebdruplab/ansible-collection_ebdruplab
 
 # The URL to any online docs
-documentation: http://docs.example.com
+documentation: https://github.com/ebdruplab/ansible-collection_ebdruplab
 
 # The URL to the homepage of the collection/project
 homepage: https://github.com/Ebdruplab/ansible-collection_ebdruplab/tree/main/ebdruplab/semaphoreui
