@@ -4,20 +4,25 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: project_create
-short_description: Create a new Semaphore project
+module: inventory_create
+short_description: Create an inventory in Semaphore
 version_added: "1.0.0"
 description:
-  - Sends a POST request to create a new Semaphore project.
+  - Creates an inventory inside a Semaphore project.
 options:
   host:
     type: str
     required: true
-    description: Hostname of the Semaphore server (without protocol).
   port:
     type: int
     required: true
-    description: Port of the Semaphore server (typically 3000).
+  project_id:
+    type: int
+    required: true
+  inventory:
+    type: dict
+    required: true
+    description: Dictionary describing the inventory.
   session_cookie:
     type: str
     required: false
@@ -26,22 +31,6 @@ options:
     type: str
     required: false
     no_log: true
-  name:
-    type: str
-    required: true
-    description: Name of the project to create.
-  alert:
-    type: bool
-    default: false
-  alert_chat:
-    type: str
-    default: 'Ansible'
-  max_parallel_tasks:
-    type: int
-    default: 0
-  demo:
-    type: bool
-    default: false
   validate_certs:
     type: bool
     default: true
@@ -50,17 +39,22 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Create a new Semaphore project
-  ebdruplab.semaphoreui.project_create:
+- name: Create inventory
+  ebdruplab.semaphoreui.inventory_create:
     host: localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
-    name: "ebdruplab integration test"
+    project_id: 1
+    inventory:
+      name: "Local Inventory"
+      type: "static"
+      inventory: |
+        localhost ansible_connection=local
 '''
 
 RETURN = r'''
-project:
-  description: Details of the created project.
+inventory:
+  description: The created inventory object.
   type: dict
   returned: success
 '''
@@ -70,22 +64,19 @@ def main():
         argument_spec=dict(
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
+            project_id=dict(type='int', required=True),
+            inventory=dict(type='dict', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
-            name=dict(type='str', required=True),
-            alert=dict(type='bool', default=False),
-            alert_chat=dict(type='str', default='Ansible'),
-            max_parallel_tasks=dict(type='int', default=0),
-            demo=dict(type='bool', default=False),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
         supports_check_mode=False
     )
 
-    host = module.params['host']
-    port = module.params['port']
-    url = f"{host}:{port}/api/projects/"
+    host = module.params["host"]
+    port = module.params["port"]
+    url = f"{host}:{port}/api/project/{module.params['project_id']}/inventory"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -93,17 +84,16 @@ def main():
     )
     headers["Content-Type"] = "application/json"
 
-    project_data = {
-        "name": module.params["name"],
-        "alert": module.params["alert"],
-        "alert_chat": module.params["alert_chat"],
-        "max_parallel_tasks": module.params["max_parallel_tasks"],
-        "demo": module.params["demo"],
-        "type": ""
-    }
+    inventory_data = module.params["inventory"]
+    inventory_data["project_id"] = module.params["project_id"]
+
+    # Validate `type` field
+    valid_types = ["static", "static-yaml", "file"]
+    if "type" not in inventory_data or inventory_data["type"] not in valid_types:
+        module.fail_json(msg=f"Invalid or missing inventory type. Must be one of: {', '.join(valid_types)}")
 
     try:
-        body = json.dumps(project_data).encode("utf-8")
+        body = json.dumps(inventory_data).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
             body=body,
@@ -112,10 +102,10 @@ def main():
         )
 
         if status not in (200, 201):
-            module.fail_json(msg=f"Failed to create project: HTTP {status} - {response_body.decode()}")
+            module.fail_json(msg=f"Failed to create inventory: HTTP {status} - {response_body.decode()}")
 
-        project = json.loads(response_body)
-        module.exit_json(changed=True, project=project)
+        result = json.loads(response_body)
+        module.exit_json(changed=True, inventory=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))

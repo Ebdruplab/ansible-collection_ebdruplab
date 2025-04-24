@@ -30,6 +30,37 @@
         demo: false
       register: created_project
 
+    - name: Get list of apps
+      ebdruplab.semaphoreui.apps_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: apps_result
+
+    - name: Parse apps_result['apps'] string to real list
+      ansible.builtin.set_fact:
+        apps_list: "{{ apps_result['apps'] | from_json }}"
+
+    - name: Get ansible app id
+      ansible.builtin.set_fact:
+        ansible_app_id: "{{ (apps_list | selectattr('id', 'equalto', 'ansible') | list | first).id }}"
+
+    - name: Show ansible app id
+      ansible.builtin.debug:
+        var: ansible_app_id
+
+    - name: Create an inventory for the template
+      ebdruplab.semaphoreui.inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        inventory:
+          name: "Template Inventory"
+          type: "static"
+          inventory: "localhost ansible_connection=local"
+      register: created_inventory
+
     - name: Create a dummy template
       ebdruplab.semaphoreui.template_create:
         host: "{{ semaphore_host }}"
@@ -38,7 +69,8 @@
         project_id: "{{ created_project.project.id }}"
         template:
           name: "Test Template"
-          inventory_id: null
+          app: "{{ ansible_app_id }}"
+          inventory_id: "{{ created_inventory.inventory.id }}"
           repository_id: null
           environment_id: null
           playbook: "playbook.yml"
@@ -61,13 +93,13 @@
       register: schedule_create
 
     - name: Verify schedule creation
-      assert:
+      ansible.builtin.assert:
         that:
           - schedule_create is defined
           - schedule_create.failed is not defined or not schedule_create.failed
           - schedule_create.schedule.name == "My Schedule"
 
-    - name: Show result
+    - name: Show schedule result
       ansible.builtin.debug:
         var: schedule_create
 

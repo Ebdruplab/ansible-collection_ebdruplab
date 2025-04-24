@@ -1,5 +1,5 @@
 ---
-- name: Integration test for project_backup
+- name: Test creating and deleting inventory in Semaphore
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,9 +7,11 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: "ebdruplab_test_project_backup_integration_test"
+    test_inventory_name: "Local Static Inventory"
+    inventory_data: |
+      localhost ansible_connection=local
   tasks:
-    - name: 'Log in to Semaphore'
+    - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -17,44 +19,43 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: 'Create dummy project'
-      ebdruplab.semaphoreui.project_create:
+    - name: Get projects
+      ebdruplab.semaphoreui.project_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        name: "{{ project_name }}"
-        alert: true
-        alert_chat: "Test"
-        max_parallel_tasks: 2
-        demo: false
-      register: created_project
+      register: project_list
 
-    - debug:
-        var: created_project
-
-    - name: 'Run project_backup on the dummy project'
-      ebdruplab.semaphoreui.project_backup:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.project.id }}"
-      register: backup_result
-
-    - name: 'Assert that project backup succeeded'
-      assert:
+    - name: Assert there is at least one project
+      ansible.builtin.assert:
         that:
-          - backup_result is defined
-          - backup_result.failed is not defined or not backup_result.failed
-          - backup_result.backup is defined
+          - project_list.projects | length > 0
 
-    - name: 'Delete dummy project'
-      ebdruplab.semaphoreui.project_delete:
+    - name: Create inventory
+      ebdruplab.semaphoreui.inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.project.id }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        inventory:
+          name: "{{ test_inventory_name }}"
+          type: "static"
+          inventory: "{{ inventory_data }}"
+      register: created_inventory
 
-    - name: 'Log out of Semaphore'
+    - name: Show created inventory
+      debug:
+        var: created_inventory.inventory
+
+    - name: Delete created inventory
+      ebdruplab.semaphoreui.inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"

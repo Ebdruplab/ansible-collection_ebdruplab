@@ -1,13 +1,14 @@
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 DOCUMENTATION = r'''
 ---
-module: template_delete
-short_description: Delete a Semaphore template
+module: view_list
+short_description: List views in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Deletes a template from a Semaphore project.
+  - Retrieves all views defined within a specific Semaphore project.
 options:
   host:
     type: str
@@ -16,15 +17,11 @@ options:
   port:
     type: int
     required: true
-    description: Port of the Semaphore server (typically 3000).
+    description: Port of the Semaphore server (e.g., 3000).
   project_id:
     type: int
     required: true
-    description: ID of the project containing the template.
-  template_id:
-    type: int
-    required: true
-    description: ID of the template to delete.
+    description: ID of the project to fetch views for.
   session_cookie:
     type: str
     required: false
@@ -42,24 +39,20 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Delete a template from Semaphore
-  ebdruplab.semaphoreui.template_delete:
-    host: localhost
+- name: List views in project
+  ebdruplab.semaphoreui.view_list:
+    host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    template_id: 5
 '''
 
 RETURN = r'''
-deleted:
-  description: Whether the template was deleted.
-  type: bool
-  returned: always
-status:
-  description: HTTP response status code.
-  type: int
-  returned: always
+views:
+  description: List of views in the specified project.
+  type: list
+  elements: dict
+  returned: success
 '''
 
 def main():
@@ -68,7 +61,6 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            template_id=dict(type='int', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -77,36 +69,34 @@ def main():
         supports_check_mode=True,
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    template_id = module.params["template_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/templates/{template_id}"
+    url = f"{host}:{port}/api/project/{project_id}/views"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
         api_token=module.params.get("api_token")
     )
 
-    if module.check_mode:
-        module.exit_json(changed=True)
-
     try:
-        _, status, _ = semaphore_delete(
+        response_body, status, _ = semaphore_get(
             url=url,
             headers=headers,
             validate_certs=validate_certs
         )
 
-        if status not in (200, 204):
-            module.fail_json(msg=f"Failed to delete template: HTTP {status}", status=status)
+        if status != 200:
+            module.fail_json(msg=f"Failed to list views: HTTP {status}", status=status)
 
-        module.exit_json(changed=True, deleted=True, status=status)
+        views = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        module.exit_json(changed=False, views=views)
 
     except Exception as e:
         module.fail_json(msg=str(e))
+
 
 if __name__ == '__main__':
     main()

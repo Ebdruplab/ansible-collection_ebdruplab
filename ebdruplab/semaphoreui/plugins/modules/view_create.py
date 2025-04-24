@@ -1,13 +1,14 @@
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
+import json
 
 DOCUMENTATION = r'''
 ---
-module: template_delete
-short_description: Delete a Semaphore template
+module: view_create
+short_description: Create a view in Semaphore
 version_added: "1.0.0"
 description:
-  - Deletes a template from a Semaphore project.
+  - Creates a new view within a Semaphore project.
 options:
   host:
     type: str
@@ -16,15 +17,20 @@ options:
   port:
     type: int
     required: true
-    description: Port of the Semaphore server (typically 3000).
+    description: Port of the Semaphore server (e.g., 3000).
   project_id:
     type: int
     required: true
-    description: ID of the project containing the template.
-  template_id:
-    type: int
+    description: ID of the project to associate the view with.
+  title:
+    type: str
     required: true
-    description: ID of the template to delete.
+    description: Title of the view.
+  position:
+    type: int
+    required: false
+    description: Optional position of the view. Default is 0.
+    default: 0
   session_cookie:
     type: str
     required: false
@@ -42,24 +48,21 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Delete a template from Semaphore
-  ebdruplab.semaphoreui.template_delete:
-    host: localhost
+- name: Create a view in Semaphore
+  ebdruplab.semaphoreui.view_create:
+    host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    template_id: 5
+    title: "My View"
+    position: 1
 '''
 
 RETURN = r'''
-deleted:
-  description: Whether the template was deleted.
-  type: bool
-  returned: always
-status:
-  description: HTTP response status code.
-  type: int
-  returned: always
+view:
+  description: The created view object.
+  type: dict
+  returned: success
 '''
 
 def main():
@@ -68,45 +71,54 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            template_id=dict(type='int', required=True),
+            title=dict(type='str', required=True),
+            position=dict(type='int', required=False, default=0),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=True,
+        supports_check_mode=False,
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    template_id = module.params["template_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/templates/{template_id}"
+    url = f"{host}:{port}/api/project/{project_id}/views"
+
+    payload = {
+        "title": module.params["title"],
+        "project_id": project_id,
+        "position": module.params["position"],
+    }
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
         api_token=module.params.get("api_token")
     )
-
-    if module.check_mode:
-        module.exit_json(changed=True)
+    headers["Content-Type"] = "application/json"
 
     try:
-        _, status, _ = semaphore_delete(
-            url=url,
+        body = json.dumps(payload).encode("utf-8")
+        response_body, status, _ = semaphore_post(
+            url,
+            body=body,
             headers=headers,
             validate_certs=validate_certs
         )
 
-        if status not in (200, 204):
-            module.fail_json(msg=f"Failed to delete template: HTTP {status}", status=status)
+        if status not in (200, 201):
+            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"Failed to create view: HTTP {status} - {msg}", status=status)
 
-        module.exit_json(changed=True, deleted=True, status=status)
+        result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        module.exit_json(changed=True, view=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))
+
 
 if __name__ == '__main__':
     main()

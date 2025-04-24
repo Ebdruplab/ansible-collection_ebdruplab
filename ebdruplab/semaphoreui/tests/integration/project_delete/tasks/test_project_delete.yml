@@ -27,7 +27,6 @@
         alert: true
         alert_chat: "Test"
         max_parallel_tasks: 2
-        type: "ci"
         demo: false
       register: created_project
 
