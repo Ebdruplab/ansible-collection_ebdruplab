@@ -30,6 +30,9 @@
         demo: false
       register: created_project
 
+    - debug:
+        var: created_project
+
     - name: Run project_backup on the dummy project
       ebdruplab.semaphoreui.project_backup:
         host: "{{ semaphore_host }}"

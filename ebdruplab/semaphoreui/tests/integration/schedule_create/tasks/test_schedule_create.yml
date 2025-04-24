@@ -7,6 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: ebdruplab_integration_test_schedule_create
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -16,24 +17,25 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get list of projects
-      ebdruplab.semaphoreui.project_list:
+    - name: Create dummy project
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: projects
-
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - projects.projects | length > 0
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        type: "ci"
+        demo: false
+      register: created_project
 
     - name: Create a dummy template
       ebdruplab.semaphoreui.template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         template:
           name: "Test Template"
           inventory_id: null
@@ -50,7 +52,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         schedule:
           cron_format: "* * * 1 *"
           template_id: "{{ created_template.template.id }}"

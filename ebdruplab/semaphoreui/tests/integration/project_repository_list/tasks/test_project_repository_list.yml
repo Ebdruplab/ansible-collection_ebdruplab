@@ -1,5 +1,5 @@
 ---
-- name: Integration test for project_backup and project_restore modules
+- name: Integration test for project_repository_list module
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,9 +7,9 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: ebdruplab_integration_test_project_restore
+    project_name: "test_repo_list_project"
+    test_git_url: "git@example.com"
   tasks:
-
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
@@ -24,30 +24,38 @@
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         name: "{{ project_name }}"
-        alert: true
-        alert_chat: "Test"
-        max_parallel_tasks: 2
+        alert: false
         type: "ci"
         demo: false
       register: created_project
 
-    - debug:
-        var: created_project
-
-    - name: Run project_backup on the dummy project
-      ebdruplab.semaphoreui.project_backup:
+    - name: Create dummy repository in the project
+      ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
-      register: backup_result
+        repository:
+          name: "TestRepo"
+          git_url: "{{ test_git_url }}"
+          git_branch: "master"
+          ssh_key_id: 0
+      register: created_repository
 
-    - name: Assert that project backup succeeded
+    - name: List repositories in the project
+      ebdruplab.semaphoreui.project_repository_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+      register: repo_list
+
+    - name: Assert repository list includes created repo
       assert:
         that:
-          - backup_result is defined
-          - backup_result.failed is not defined or not backup_result.failed
-          - backup_result.backup is defined
+          - repo_list is defined
+          - repo_list.failed is not defined or not repo_list.failed
+          - repo_list.repositories | selectattr('id', 'equalto', created_repository.repository.id) | list | length == 1
 
     - name: Delete dummy project
       ebdruplab.semaphoreui.project_delete:
@@ -55,26 +63,6 @@
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
-
-    - name: Restore project from backup
-      ebdruplab.semaphoreui.project_restore:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        backup: "{{ backup_result }}"
-      register: restore_result
-
-    - name: Show restored project info
-      ansible.builtin.debug:
-        var: restore_result.project
-
-    - name: Clean up restored project
-      ebdruplab.semaphoreui.project_delete:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ restore_result.project.id }}"
-      when: restore_result.project is defined
 
     - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:
