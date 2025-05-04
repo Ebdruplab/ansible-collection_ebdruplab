@@ -1,4 +1,4 @@
-# ansible-playbook -i {inventory,} ansible_clean_semaphore.yml
+# ansible-playbook -i {inventory,} ansible_ebdruplab_example.yml
 
 ---
 - name: Clean Semaphore and create integration test project
@@ -32,7 +32,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        name: "{{ edb_project_name }}"
+        name: "{{ ebd_project_name }}"
         alert: true
         alert_chat: "{{ edb_alert_chat }}"
         max_parallel_tasks: 20
