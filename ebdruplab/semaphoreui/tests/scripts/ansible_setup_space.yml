@@ -27,7 +27,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: 'Create new integration test project'
+    - name: 'Create a new project'
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -39,7 +39,7 @@
         demo: false
       register: created_project
 
-    - name: Create inventory
+    - name: 'Create inventory in the new project'
       ebdruplab.semaphoreui.inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -51,7 +51,7 @@
           inventory: "{{ ebd_inventory_data }}"
       register: created_inventory
 
-    - name: Create SSH key for repositories
+    - name: 'Create SSH key within the new project'
       ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -61,14 +61,14 @@
         key: "{{ edb_ssh_key }}"
       register: created_key
 
-    - name: Create first repository
+    - name: 'Create ebdruplab example repository in project'
       ebdruplab.semaphoreui.repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.id }}"
-        name: "Repo A"
-        git_url: "https://github.com/example/repo-a.git"
+        name: "Repository - ansible-ebdruplab_example"
+        git_url: "https://github.com/ebdruplab/ansible-ebdruplab_example"
         git_branch: "main"
         ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo1
