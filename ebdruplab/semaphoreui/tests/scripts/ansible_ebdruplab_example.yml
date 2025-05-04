@@ -39,12 +39,17 @@
         demo: false
       register: created_project
 
+
+    - name: 'Debug'
+      ansible.builtin.debug:
+        var: created_project
+
     - name: 'Create inventory in the new project'
       ebdruplab.semaphoreui.inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.id }}"
+        project_id: "{{ created_project.project.id }}"
         inventory:
           name: "{{ ebd_inventory_name }}"
           type: "static"
@@ -56,7 +61,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.id }}"
+        project_id: "{{ created_project.project.id }}"
         name: "{{ edb_ssh_key_name }}"
         key: "{{ edb_ssh_key }}"
       register: created_key
@@ -66,7 +71,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.id }}"
+        project_id: "{{ created_project.project.id }}"
         name: "Repository - ansible-ebdruplab_example"
         git_url: "https://github.com/ebdruplab/ansible-ebdruplab_example"
         git_branch: "main"
