@@ -10,9 +10,11 @@
 # How to Run:
 #   ./run_all_tests.sh                       # Build collection, run all tests locally
 #   ./run_all_tests.sh --with-semaphore     # Start Semaphore container before tests
+#   ./run_all_tests.sh --with-semaphore --copy  # Start container and copy each playbook before running
 #
 # Flags:
-#   --with-semaphore  Start and stop the Semaphore UI Docker container before/after tests.
+#   --with-semaphore  Start and stop the Semaphore UI container (Docker or Podman).
+#   --copy            Copy each test playbook to /tmp before running.
 ################################################################################
 
 set -e
@@ -21,12 +23,14 @@ set -e
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 COLLECTION_BUILD_DIR="../../"
 TESTS_DIR="../integration"
 RUN_SEMAPHORE=false
+COPY_TASKS=false
 SEMAPHORE_CONTAINER_NAME="semaphore"
+CONTAINER_CMD=""
 
 function info() {
     echo -e "${CYAN}[INFO]${NC} $1"
@@ -61,9 +65,22 @@ function build_and_install_collection() {
     cd - >/dev/null
 }
 
+function determine_container_command() {
+    if command -v docker &>/dev/null; then
+        CONTAINER_CMD="docker"
+    elif command -v podman &>/dev/null; then
+        CONTAINER_CMD="podman"
+    else
+        error "Neither Docker nor Podman is installed. Cannot start Semaphore container."
+        exit 1
+    fi
+}
+
 function start_semaphore_container() {
-    info "Starting Semaphore container..."
-    sudo docker run --name "$SEMAPHORE_CONTAINER_NAME" \
+    determine_container_command
+
+    info "Starting Semaphore container with $CONTAINER_CMD..."
+    sudo "$CONTAINER_CMD" run --name "$SEMAPHORE_CONTAINER_NAME" \
         -p 3000:3000 \
         -e SEMAPHORE_DB_DIALECT=bolt \
         -e SEMAPHORE_ADMIN=admin \
@@ -74,50 +91,74 @@ function start_semaphore_container() {
 }
 
 function stop_semaphore_container() {
-    info "Stopping and removing Semaphore container..."
-    sudo docker stop "$SEMAPHORE_CONTAINER_NAME"
-    sudo docker rm "$SEMAPHORE_CONTAINER_NAME"
+    if [ -n "$CONTAINER_CMD" ]; then
+        info "Stopping and removing Semaphore container with $CONTAINER_CMD..."
+        sudo "$CONTAINER_CMD" stop "$SEMAPHORE_CONTAINER_NAME"
+        sudo "$CONTAINER_CMD" rm "$SEMAPHORE_CONTAINER_NAME"
+    fi
 }
 
 function run_tests() {
     info "Running Ansible integration tests locally..."
+
+    TMP_TASK_DIR="/tmp/ansible_test_tasks"
+    if [ "$COPY_TASKS" = true ]; then
+        mkdir -p "$TMP_TASK_DIR"
+    fi
+
     find "$TESTS_DIR" -type f -path "*/tasks/*.yml" ! -name "backup_single_project.yml" | sort | while read -r playbook; do
         echo -e "${CYAN}------------------------------------------------------------"
         echo "Running test playbook: $playbook"
         echo -e "------------------------------------------------------------${NC}"
-        ansible-playbook -i 'localhost,' --connection=local "$playbook"
+
+        local_playbook="$playbook"
+        if [ "$COPY_TASKS" = true ]; then
+            cp "$playbook" "$TMP_TASK_DIR/"
+            local_playbook="$TMP_TASK_DIR/$(basename "$playbook")"
+            info "Copied playbook to: $local_playbook"
+        fi
+
+        ansible-playbook -i 'localhost,' --connection=local "$local_playbook"
         if [ $? -ne 0 ]; then
-            error "Playbook failed: $playbook"
+            error "Playbook failed: $local_playbook"
             [ "$RUN_SEMAPHORE" = true ] && stop_semaphore_container
             exit 1
         fi
+
         echo ""
     done
+
     success "All tests completed successfully."
 }
 
 function show_help() {
-    echo "Usage: $0 [--with-semaphore]"
+    echo "Usage: $0 [--with-semaphore] [--copy]"
     echo ""
-    echo "  --with-semaphore  Start and stop the Semaphore UI Docker container."
+    echo "  --with-semaphore  Start and stop the Semaphore UI container (Docker or Podman)."
+    echo "  --copy            Copy each test playbook to /tmp before running."
+    echo "  -h, --help        Show this help message."
 }
 
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-    --with-semaphore)
-        RUN_SEMAPHORE=true
-        shift
-        ;;
-    -h | --help)
-        show_help
-        exit 0
-        ;;
-    *)
-        error "Unknown option: $1"
-        show_help
-        exit 1
-        ;;
+        --with-semaphore)
+            RUN_SEMAPHORE=true
+            shift
+            ;;
+        --copy)
+            COPY_TASKS=true
+            shift
+            ;;
+        -h | --help)
+            show_help
+            exit 0
+            ;;
+        *)
+            error "Unknown option: $1"
+            show_help
+            exit 1
+            ;;
     esac
 done
 
@@ -132,3 +173,4 @@ run_tests
 if [ "$RUN_SEMAPHORE" = true ]; then
     stop_semaphore_container
 fi
+

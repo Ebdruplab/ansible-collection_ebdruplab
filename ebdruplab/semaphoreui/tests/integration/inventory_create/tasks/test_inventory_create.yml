@@ -25,6 +25,9 @@
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
       register: project_list
+    
+    - debug:
+        var: project_list
 
     - name: Assert there is at least one project
       ansible.builtin.assert:
