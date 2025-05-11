@@ -8,13 +8,13 @@
 #   Supports optional Semaphore container for testing API interactions.
 #
 # How to Run:
-#   ./run_all_tests.sh                       # Build collection, run all tests locally
-#   ./run_all_tests.sh --with-semaphore     # Start Semaphore container before tests
-#   ./run_all_tests.sh --with-semaphore --copy  # Start container and copy each playbook before running
+#   ./run_all_tests.sh                          # Build collection, run all tests locally
+#   ./run_all_tests.sh --with-semaphore        # Start Semaphore container before tests
+#   ./run_all_tests.sh --with-semaphore --copy # Start container and copy path to clipboard before running
 #
 # Flags:
 #   --with-semaphore  Start and stop the Semaphore UI container (Docker or Podman).
-#   --copy            Copy each test playbook to /tmp before running.
+#   --copy            Copy each test playbook path to clipboard before running.
 ################################################################################
 
 set -e
@@ -98,29 +98,35 @@ function stop_semaphore_container() {
     fi
 }
 
+function copy_to_clipboard() {
+    local text="$1"
+    if command -v xclip &>/dev/null; then
+        echo -n "$text" | xclip -selection clipboard
+    elif command -v pbcopy &>/dev/null; then
+        echo -n "$text" | pbcopy
+    elif command -v wl-copy &>/dev/null; then
+        echo -n "$text" | wl-copy
+    else
+        info "Clipboard not supported: no xclip, pbcopy, or wl-copy found."
+    fi
+}
+
 function run_tests() {
     info "Running Ansible integration tests locally..."
-
-    TMP_TASK_DIR="/tmp/ansible_test_tasks"
-    if [ "$COPY_TASKS" = true ]; then
-        mkdir -p "$TMP_TASK_DIR"
-    fi
 
     find "$TESTS_DIR" -type f -path "*/tasks/*.yml" ! -name "backup_single_project.yml" | sort | while read -r playbook; do
         echo -e "${CYAN}------------------------------------------------------------"
         echo "Running test playbook: $playbook"
         echo -e "------------------------------------------------------------${NC}"
 
-        local_playbook="$playbook"
         if [ "$COPY_TASKS" = true ]; then
-            cp "$playbook" "$TMP_TASK_DIR/"
-            local_playbook="$TMP_TASK_DIR/$(basename "$playbook")"
-            info "Copied playbook to: $local_playbook"
+            copy_to_clipboard "$(realpath "$playbook")"
+            info "Copied playbook path to clipboard: $playbook"
         fi
 
-        ansible-playbook -i 'localhost,' --connection=local "$local_playbook"
+        ansible-playbook -i 'localhost,' --connection=local "$playbook"
         if [ $? -ne 0 ]; then
-            error "Playbook failed: $local_playbook"
+            error "Playbook failed: $playbook"
             [ "$RUN_SEMAPHORE" = true ] && stop_semaphore_container
             exit 1
         fi
@@ -135,7 +141,7 @@ function show_help() {
     echo "Usage: $0 [--with-semaphore] [--copy]"
     echo ""
     echo "  --with-semaphore  Start and stop the Semaphore UI container (Docker or Podman)."
-    echo "  --copy            Copy each test playbook to /tmp before running."
+    echo "  --copy            Copy each test playbook path to clipboard before running."
     echo "  -h, --help        Show this help message."
 }
 
@@ -173,4 +179,3 @@ run_tests
 if [ "$RUN_SEMAPHORE" = true ]; then
     stop_semaphore_container
 fi
-

@@ -1,3 +1,4 @@
+# Ansible ansible-playbook
 # ansible-playbook -i {inventory,} ansible_ebdruplab_example.yml
 
 ---
