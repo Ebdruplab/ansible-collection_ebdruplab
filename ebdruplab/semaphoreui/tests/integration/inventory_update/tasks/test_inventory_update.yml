@@ -7,6 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: 'edb_test_project_inventory004'
     original_inventory_name: "Inventory Before Update"
     updated_inventory_name: "Inventory After Update"
     original_inventory_data: |
@@ -22,24 +23,24 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get projects
-      ebdruplab.semaphoreui.project_list:
+    - name: 'Create project'
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
-
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        demo: false
+      register: create_result
 
     - name: Create an inventory
       ebdruplab.semaphoreui.inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         inventory:
           name: "{{ original_inventory_name }}"
           type: "static"
@@ -51,7 +52,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
         inventory:
           name: "{{ updated_inventory_name }}"
@@ -68,8 +69,15 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: 'Delete project'
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:

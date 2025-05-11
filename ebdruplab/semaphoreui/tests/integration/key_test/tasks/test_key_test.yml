@@ -1,5 +1,7 @@
+# test_key_test.yml
 ---
-- name: Test access key lifecycle in Semaphore
+
+- name: 'Test access key lifecycle in Semaphore'
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,11 +9,16 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    key1_name: "Test Key 1"
+    project_name: 'edb_test_key_inventory002'
+    key1_name: "Test_login"
+    key1_password: "changeme"
+    key1_login: "root"
+    key2_login: 'root'
     key2_name: "Test Key 2"
-    dummy_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD"
+    key2_ssh_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD"
   tasks:
-    - name: Log in to Semaphore
+
+    - name: 'Log in to Semaphore'
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -19,67 +26,80 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get projects
-      ebdruplab.semaphoreui.project_list:
+    - name: 'Create project'
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        demo: false
+      register: create_result
 
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
-
-    - name: Create first key
+    - name: 'Create first key'
       ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         name: "{{ key1_name }}"
-        key: "{{ dummy_key }}"
+        type: login_password
+        login_password:
+          login: "{{ key1_login }}"
+          password: "{{ key1_password }}"
       register: created_key1
 
-    - name: Create second key
+    - name: 'Create second key'
       ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         name: "{{ key2_name }}"
-        key: "{{ dummy_key }}"
+        type: "ssh"
+        ssh:
+          login: "{{ key2_login }}"
+          private_key: "{{ key2_ssh_key }}"
       register: created_key2
 
-    - name: List all keys
+    - name: 'List all keys'
       ebdruplab.semaphoreui.key_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
       register: listed_keys
 
-    - name: Show keys
+    - name: 'Show keys'
       ansible.builtin.debug:
         var: listed_keys
 
-    - name: Delete first key
+    - name: 'Delete first key'
       ebdruplab.semaphoreui.key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         key_id: "{{ created_key1.key.id }}"
 
-    - name: Delete second key
+    - name: 'Delete second key'
       ebdruplab.semaphoreui.key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ create_result.project.id }}"
         key_id: "{{ created_key2.key.id }}"
 
-    - name: Log out
+    - name: 'Delete project'
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+
+    - name: 'Log out'
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
