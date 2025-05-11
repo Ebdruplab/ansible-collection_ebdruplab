@@ -13,26 +13,32 @@ options:
   host:
     type: str
     required: true
+    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
     type: int
     required: true
+    description: Port of the Semaphore server (e.g., 3000).
   project_id:
     type: int
     required: true
+    description: ID of the project to create the key in.
   name:
     type: str
     required: true
+    description: Name of the key.
   type:
     type: str
     required: true
     choices: ["ssh", "login_password"]
+    description: Type of the access key.
   ssh:
     type: dict
     required: false
+    description: SSH key details (required if type is ssh).
     options:
       login:
         type: str
-        required: false
+        required: true
       passphrase:
         type: str
         required: false
@@ -44,10 +50,11 @@ options:
   login_password:
     type: dict
     required: false
+    description: Login/password details (required if type is login_password).
     options:
       login:
         type: str
-        required: false
+        required: true
       password:
         type: str
         required: true
@@ -56,6 +63,7 @@ options:
     type: bool
     required: false
     default: true
+    description: Whether to override the secret.
   session_cookie:
     type: str
     required: false
@@ -67,8 +75,9 @@ options:
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -82,7 +91,7 @@ EXAMPLES = r'''
     type: "ssh"
     ssh:
       login: "git"
-      private_key: "PRIVATE_KEY_HERE"
+      private_key: "{{ lookup('file', '~/.ssh/id_rsa') }}"
 
 - name: Create a login/password key
   ebdruplab.semaphoreui.key_create:
@@ -94,7 +103,7 @@ EXAMPLES = r'''
     type: "login_password"
     login_password:
       login: "admin"
-      password: "secret123"
+      password: "supersecret"
 '''
 
 RETURN = r'''
@@ -116,8 +125,8 @@ def main():
                 type='dict',
                 required=False,
                 options=dict(
-                    login=dict(type='str'),
-                    passphrase=dict(type='str', no_log=True),
+                    login=dict(type='str', required=True),
+                    passphrase=dict(type='str', required=False, no_log=True),
                     private_key=dict(type='str', required=True, no_log=True),
                 )
             ),
@@ -125,7 +134,7 @@ def main():
                 type='dict',
                 required=False,
                 options=dict(
-                    login=dict(type='str'),
+                    login=dict(type='str', required=True),
                     password=dict(type='str', required=True, no_log=True),
                 )
             ),
@@ -138,54 +147,46 @@ def main():
         supports_check_mode=False,
     )
 
-    host = module.params["host"].rstrip("/")
-    port = module.params["port"]
-    project_id = module.params["project_id"]
-    name = module.params["name"]
-    key_type = module.params["type"]
-    ssh_data = module.params.get("ssh")
-    login_password_data = module.params.get("login_password")
-    override_secret = module.params["override_secret"]
-    session_cookie = module.params.get("session_cookie")
-    api_token = module.params.get("api_token")
-    validate_certs = module.params["validate_certs"]
-
-    url = f"{host}:{port}/api/project/{project_id}/keys"
-
-    headers = get_auth_headers(
-        session_cookie=session_cookie,
-        api_token=api_token
-    )
-    headers["Content-Type"] = "application/json"
+    p = module.params
+    url = f"{p['host'].rstrip('/')}:{p['port']}/api/project/{p['project_id']}/keys"
 
     payload = {
-        "name": name,
-        "type": key_type,
-        "project_id": project_id,
-        "override_secret": override_secret,
+        "name": p["name"],
+        "type": p["type"],
+        "project_id": p["project_id"],
+        "override_secret": p["override_secret"]
     }
 
-    if key_type == "ssh":
-        if not ssh_data or not ssh_data.get("private_key"):
-            module.fail_json(msg="Field 'ssh.private_key' is required when type is 'ssh'")
-        payload["ssh"] = ssh_data
+    if p["type"] == "ssh":
+        if not p["ssh"]:
+            module.fail_json(msg="Parameter 'ssh' is required when type is 'ssh'.")
+        payload["ssh"] = p["ssh"]
 
-    elif key_type == "login_password":
-        if not login_password_data or not login_password_data.get("password"):
-            module.fail_json(msg="Field 'login_password.password' is required when type is 'login_password'")
-        payload["login_password"] = login_password_data
+    elif p["type"] == "login_password":
+        if not p["login_password"]:
+            module.fail_json(msg="Parameter 'login_password' is required when type is 'login_password'.")
+        payload["login_password"] = p["login_password"]
+
+    headers = get_auth_headers(
+        session_cookie=p.get("session_cookie"),
+        api_token=p.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
     try:
         body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url, body=body, headers=headers, validate_certs=validate_certs
+            url=url,
+            body=body,
+            headers=headers,
+            validate_certs=p["validate_certs"]
         )
 
         if status not in (200, 201):
-            msg = response_body if isinstance(response_body, str) else response_body.decode()
-            module.fail_json(msg=f"Failed to create key: HTTP {status} - {msg}", status=status)
+            error_msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"Failed to create key: HTTP {status} - {error_msg}", status=status)
 
-        key = json.loads(response_body)
+        key = json.loads(response_body) if response_body else {}
         module.exit_json(changed=True, key=key)
 
     except Exception as e:
@@ -194,4 +195,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
