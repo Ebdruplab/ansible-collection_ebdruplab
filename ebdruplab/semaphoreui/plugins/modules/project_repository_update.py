@@ -49,7 +49,7 @@ options:
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -90,16 +90,24 @@ def main():
         supports_check_mode=False,
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
     repository_id = module.params["repository_id"]
-    repository = module.params["repository"]
-
-    # Inject project_id into body to match API requirements
-    repository["project_id"] = project_id
+    repo = module.params["repository"]
+    validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/repository/{repository_id}"
+
+    # Construct payload for update
+    payload = {
+        "id": 0,
+        "name": repo["name"],
+        "git_url": repo["git_url"],
+        "git_branch": repo["git_branch"],
+        "ssh_key_id": repo["ssh_key_id"],
+        "project_id": project_id
+    }
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -108,19 +116,21 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
-        body = json.dumps(repository).encode("utf-8")
+        body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_put(
-            url, body=body, headers=headers, validate_certs=module.params["validate_certs"]
+            url, body=body, headers=headers, validate_certs=validate_certs
         )
 
         if status not in (200, 201):
-            module.fail_json(msg=f"PUT failed with status {status}", response=response_body)
+            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"PUT failed with status {status}: {msg}", status=status)
 
-        updated_repo = json.loads(response_body)
-        module.exit_json(changed=True, repository=updated_repo)
+        result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        module.exit_json(changed=True, repository=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
 if __name__ == "__main__":
     main()
+

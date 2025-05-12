@@ -1,5 +1,6 @@
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 DOCUMENTATION = r'''
 ---
@@ -92,7 +93,12 @@ def main():
         if status != 200:
             module.fail_json(msg=f"Failed to retrieve tasks: HTTP {status}", status=status)
 
-        module.exit_json(changed=False, tasks=response_body)
+        # Decode response body and parse JSON
+        if isinstance(response_body, bytes):
+            response_body = response_body.decode()
+
+        tasks = json.loads(response_body)
+        module.exit_json(changed=False, tasks=tasks)
 
     except Exception as e:
         module.fail_json(msg=str(e))
@@ -100,3 +106,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

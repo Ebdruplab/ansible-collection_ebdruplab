@@ -8,7 +8,7 @@ module: key_create
 short_description: Create an access key in Semaphore
 version_added: "1.0.0"
 description:
-  - Creates a new access key in Semaphore that supports either SSH or login/password authentication.
+  - Creates a new access key in Semaphore, supporting SSH or login/password types.
 options:
   host:
     type: str
@@ -34,6 +34,7 @@ options:
   ssh:
     type: dict
     required: false
+    no_log: true
     description: SSH key details (required if type is ssh).
     options:
       login:
@@ -50,6 +51,7 @@ options:
   login_password:
     type: dict
     required: false
+    no_log: true
     description: Login/password details (required if type is login_password).
     options:
       login:
@@ -61,7 +63,6 @@ options:
         no_log: true
   override_secret:
     type: bool
-    required: false
     default: true
     description: Whether to override the secret.
   session_cookie:
@@ -124,6 +125,7 @@ def main():
             ssh=dict(
                 type='dict',
                 required=False,
+                no_log=True,
                 options=dict(
                     login=dict(type='str', required=True),
                     passphrase=dict(type='str', required=False, no_log=True),
@@ -133,6 +135,7 @@ def main():
             login_password=dict(
                 type='dict',
                 required=False,
+                no_log=True,
                 options=dict(
                     login=dict(type='str', required=True),
                     password=dict(type='str', required=True, no_log=True),
@@ -147,31 +150,35 @@ def main():
         supports_check_mode=False,
     )
 
-    p = module.params
-    url = f"{p['host'].rstrip('/')}:{p['port']}/api/project/{p['project_id']}/keys"
-
-    payload = {
-        "name": p["name"],
-        "type": p["type"],
-        "project_id": p["project_id"],
-        "override_secret": p["override_secret"]
-    }
-
-    if p["type"] == "ssh":
-        if not p["ssh"]:
-            module.fail_json(msg="Parameter 'ssh' is required when type is 'ssh'.")
-        payload["ssh"] = p["ssh"]
-
-    elif p["type"] == "login_password":
-        if not p["login_password"]:
-            module.fail_json(msg="Parameter 'login_password' is required when type is 'login_password'.")
-        payload["login_password"] = p["login_password"]
-
+    params = module.params
+    host = params["host"].rstrip("/")
+    port = params["port"]
+    project_id = params["project_id"]
+    key_type = params["type"]
     headers = get_auth_headers(
-        session_cookie=p.get("session_cookie"),
-        api_token=p.get("api_token")
+        session_cookie=params.get("session_cookie"),
+        api_token=params.get("api_token")
     )
     headers["Content-Type"] = "application/json"
+
+    url = f"{host}:{port}/api/project/{project_id}/keys"
+
+    payload = {
+        "name": params["name"],
+        "type": key_type,
+        "project_id": project_id,
+        "override_secret": params["override_secret"]
+    }
+
+    if key_type == "ssh":
+        if not params.get("ssh"):
+            module.fail_json(msg="Missing required ssh data when type is 'ssh'")
+        payload["ssh"] = params["ssh"]
+
+    elif key_type == "login_password":
+        if not params.get("login_password"):
+            module.fail_json(msg="Missing required login_password data when type is 'login_password'")
+        payload["login_password"] = params["login_password"]
 
     try:
         body = json.dumps(payload).encode("utf-8")
@@ -179,7 +186,7 @@ def main():
             url=url,
             body=body,
             headers=headers,
-            validate_certs=p["validate_certs"]
+            validate_certs=params["validate_certs"]
         )
 
         if status not in (200, 201):
@@ -195,3 +202,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

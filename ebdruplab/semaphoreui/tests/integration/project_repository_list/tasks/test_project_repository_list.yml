@@ -42,6 +42,10 @@
           password: "ChangeMe"
       register: created_key
 
+    - name: Ensure ssh_key_id resolves cleanly
+      set_fact:
+        resolved_ssh_key_id: "{{ created_key.key.id }}"
+
     - name: Create dummy repository in the project
       ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
@@ -52,9 +56,11 @@
           name: "My Dotfiles Repo"
           git_url: "https://github.com/Ebdruplab/dotfiles.git"
           git_branch: "main"
-          ssh_key_id: "{{ created_key.key.id | int}}"
+          # ssh_key_id: "{{ created_key.key.id }}"
+          # ssh_key_id: 2
+          ssh_key_id: "{{ resolved_ssh_key_id }}"
       register: created_repository
-
+    
     - name: List repositories in the project
       ebdruplab.semaphoreui.project_repository_list:
         host: "{{ semaphore_host }}"

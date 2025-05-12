@@ -29,7 +29,7 @@ options:
   sort:
     type: str
     required: false
-    choices: ["name", "git_url", "ssh_key"]
+    choices: ["name", "git_url"]
   order:
     type: str
     required: false
@@ -38,7 +38,7 @@ options:
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -66,7 +66,7 @@ def main():
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             project_id=dict(type='int', required=True),
-            sort=dict(type='str', required=False, choices=["name", "git_url", "ssh_key"]),
+            sort=dict(type='str', required=False, choices=["name", "git_url"]),
             order=dict(type='str', required=False, choices=["asc", "desc"]),
             validate_certs=dict(type='bool', default=True),
         ),
@@ -74,7 +74,7 @@ def main():
         supports_check_mode=True,
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
     sort = module.params.get("sort")
@@ -102,9 +102,10 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"GET failed with status {status}", response=response_body)
+            msg = response_body if isinstance(response_body, str) else response_body.decode()
+            module.fail_json(msg=f"GET failed with status {status}: {msg}", status=status)
 
-        data = json.loads(response_body)
+        data = json.loads(response_body) if response_body else []
         module.exit_json(changed=False, repositories=data)
 
     except Exception as e:

@@ -67,30 +67,36 @@ def main():
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    task_data = module.params["task"]
     validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/tasks"
+
     headers = get_auth_headers(
-        session_cookie=p.get("session_cookie"),
-        api_token=p.get("api_token")
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
     try:
         response_body, status, _ = semaphore_get(
-            url, headers=headers, validate_certs=p["validate_certs"]
+            url, headers=headers, validate_certs=validate_certs
         )
 
         if status != 200:
             module.fail_json(msg=f"GET failed with status {status}", response=response_body)
 
-        tasks = json.loads(response_body)
+        try:
+            tasks = json.loads(response_body)
+        except json.JSONDecodeError as e:
+            module.fail_json(msg=f"Failed to decode JSON: {e}", raw=response_body)
+
+        if not isinstance(tasks, list):
+            module.fail_json(msg="Expected response to be a list of tasks", raw=response_body)
+
         module.exit_json(changed=False, tasks=tasks)
 
     except Exception as e:
         module.fail_json(msg=str(e))
-
 
 if __name__ == "__main__":
     main()

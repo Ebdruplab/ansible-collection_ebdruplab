@@ -6,6 +6,7 @@ DOCUMENTATION = r'''
 ---
 module: project_repository_create
 short_description: Create a repository in a Semaphore project
+version_added: "1.0.0"
 description:
   - This module sends a POST request to Semaphore to create a new repository under a specified project.
 options:
@@ -46,7 +47,7 @@ options:
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -60,7 +61,7 @@ EXAMPLES = r'''
       name: "MyRepo"
       git_url: "git@example.com"
       git_branch: "main"
-      ssh_key_id: 0
+      ssh_key_id: 2
 '''
 
 RETURN = r'''
@@ -85,36 +86,55 @@ def main():
         supports_check_mode=False
     )
 
-    host = module.params["host"]
-    port = module.params["port"]
-    project_id = module.params["project_id"]
-    repository = module.params["repository"]
+    p = module.params
+    repo = p["repository"]
+    host = p["host"].rstrip("/")
+    port = p["port"]
+    project_id = p["project_id"]
+    validate_certs = p["validate_certs"]
 
-    # Inject project_id into the payload body to match URL expectation
-    repository["project_id"] = project_id
+    try:
+        ssh_key_id = int(repo["ssh_key_id"])
+    except (ValueError, TypeError):
+        module.fail_json(msg="Invalid ssh_key_id: must be an integer")
 
     url = f"{host}:{port}/api/project/{project_id}/repositories"
 
+    payload = {
+        "id": 0,
+        "name": repo["name"],
+        "git_url": repo["git_url"],
+        "git_branch": repo["git_branch"],
+        "ssh_key_id": ssh_key_id,
+        "project_id": project_id
+    }
+
     headers = get_auth_headers(
-        session_cookie=module.params.get("session_cookie"),
-        api_token=module.params.get("api_token")
+        session_cookie=p.get("session_cookie"),
+        api_token=p.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
     try:
-        body = json.dumps(repository).encode("utf-8")
+        body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url, body=body, headers=headers, validate_certs=module.params["validate_certs"]
+            url=url,
+            body=body,
+            headers=headers,
+            validate_certs=validate_certs
         )
 
         if status not in (200, 201):
-            module.fail_json(msg=f"POST failed with status {status}: {response_body}")
+            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"POST failed with status {status}: {msg}", status=status)
 
-        created_repo = json.loads(response_body)
-        module.exit_json(changed=True, repository=created_repo)
+        result = json.loads(response_body)
+        module.exit_json(changed=True, repository=result)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == "__main__":
     main()
+

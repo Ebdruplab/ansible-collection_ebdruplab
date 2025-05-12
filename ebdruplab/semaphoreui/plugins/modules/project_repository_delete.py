@@ -11,9 +11,11 @@ options:
   host:
     type: str
     required: true
+    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
     type: int
     required: true
+    description: Port on which Semaphore is running.
   session_cookie:
     type: str
     required: false
@@ -25,14 +27,17 @@ options:
   project_id:
     type: int
     required: true
+    description: ID of the project the repository belongs to.
   repository_id:
     type: int
     required: true
+    description: ID of the repository to delete.
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -67,31 +72,36 @@ def main():
         supports_check_mode=False,
     )
 
-    host = module.params["host"]
-    port = module.params["port"]
-    project_id = module.params["project_id"]
-    repository_id = module.params["repository_id"]
+    p = module.params
+    host = p["host"].rstrip("/")
+    port = p["port"]
+    project_id = p["project_id"]
+    repository_id = p["repository_id"]
 
-    url = f"{host}:{port}/api/project/{project_id}/repository/{repository_id}"
+    # FIX: correct plural 'repositories'
+    url = f"{host}:{port}/api/project/{project_id}/repositories/{repository_id}"
 
     headers = get_auth_headers(
-        session_cookie=module.params.get("session_cookie"),
-        api_token=module.params.get("api_token")
+        session_cookie=p.get("session_cookie"),
+        api_token=p.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
     try:
-        response_body, status, _ = semaphore_delete(
-            url, headers=headers, validate_certs=module.params["validate_certs"]
+        _, status, _ = semaphore_delete(
+            url=url,
+            headers=headers,
+            validate_certs=p["validate_certs"]
         )
 
         if status != 204:
-            module.fail_json(msg=f"DELETE failed with status {status}", response=response_body)
+            module.fail_json(msg=f"DELETE failed with status {status}")
 
         module.exit_json(changed=True, msg="Repository deleted successfully.")
 
     except Exception as e:
         module.fail_json(msg=str(e))
+
 
 if __name__ == "__main__":
     main()

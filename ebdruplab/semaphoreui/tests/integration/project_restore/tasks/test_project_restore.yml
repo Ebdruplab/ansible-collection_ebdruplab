@@ -18,7 +18,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Create dummy project
+    - name: 'Create project'
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -27,7 +27,6 @@
         alert: true
         alert_chat: "Test"
         max_parallel_tasks: 2
-        type: "ci"
         demo: false
       register: created_project
 
@@ -43,7 +42,7 @@
       register: backup_result
 
     - name: Assert that project backup succeeded
-      assert:
+      ansible.builtin.assert:
         that:
           - backup_result is defined
           - backup_result.failed is not defined or not backup_result.failed
