@@ -1,5 +1,5 @@
 ---
-- name: Integration test for schedule_delete module
+- name: "Integration test for schedule_delete module"
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,8 +7,9 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    dummy_repo_url: "https://github.com/example/repo.git"
   tasks:
-    - name: Log in to Semaphore
+    - name: "Log in to Semaphore"
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -16,41 +17,78 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get list of projects
-      ebdruplab.semaphoreui.project_list:
+    - name: "Create dummy project"
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: projects
+        name: "schedule_delete_test_project"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+      register: created_project
 
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - projects.projects | length > 0
+    - name: "Create dummy SSH key"
+      ebdruplab.semaphoreui.key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        name: "Temp Repo Key"
+        type: "ssh"
+        ssh:
+          login: "git"
+          private_key: "dummy_private_key"
+      register: created_key
 
-    - name: Create a dummy template for schedule
+    - name: "Create dummy repository"
+      ebdruplab.semaphoreui.project_repository_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        name: "Temp Repo"
+        git_url: "{{ dummy_repo_url }}"
+        git_branch: "main"
+        ssh_key_id: "{{ created_key.key.id }}"
+      register: created_repo
+
+    - name: "Create dummy inventory"
+      ebdruplab.semaphoreui.inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        inventory:
+          name: "Dummy Inventory"
+          type: "static"
+          inventory: "localhost ansible_connection=local"
+      register: created_inventory
+
+    - name: "Create dummy template for schedule"
       ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         template:
           name: "Template for Schedule Delete Test"
-          inventory_id: null
-          repository_id: null
+          inventory_id: "{{ created_inventory.inventory.id }}"
+          repository_id: "{{ created_repo.repository.id }}"
           environment_id: null
           playbook: "playbook.yml"
           type: "job"
           allow_override_args_in_task: false
           survey_vars: []
+          app: "ansible"
       register: created_template
 
-    - name: Create a schedule to delete
+    - name: "Create a schedule to delete"
       ebdruplab.semaphoreui.schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         schedule:
           cron_format: "* * * * *"
           template_id: "{{ created_template.template.id }}"
@@ -58,23 +96,63 @@
           active: true
       register: created_schedule
 
-    - name: Delete the schedule
+    - name: "Delete the schedule"
       ebdruplab.semaphoreui.schedule_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
       register: delete_result
 
-    - name: Confirm schedule delete succeeded
-      assert:
+    - name: "Confirm schedule delete succeeded"
+      ansible.builtin.assert:
         that:
           - delete_result is defined
           - delete_result.failed is not defined or not delete_result.failed
 
-    - name: Log out of Semaphore
+    - name: "Clean up - delete template"
+      ebdruplab.semaphoreui.project_template_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        template_id: "{{ created_template.template.id }}"
+
+    - name: "Clean up - delete inventory"
+      ebdruplab.semaphoreui.inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: "Clean up - delete repository"
+      ebdruplab.semaphoreui.project_repository_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        repository_id: "{{ created_repo.repository.id }}"
+
+    - name: "Clean up - delete key"
+      ebdruplab.semaphoreui.key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        key_id: "{{ created_key.key.id }}"
+
+    - name: "Clean up - delete project"
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+
+    - name: "Log out of Semaphore"
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
+
