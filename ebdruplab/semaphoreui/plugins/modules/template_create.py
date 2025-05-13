@@ -13,19 +13,15 @@ options:
   host:
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
   project_id:
     type: int
     required: true
-    description: ID of the project in which to create the template.
   template:
     type: dict
     required: true
-    description: Dictionary describing the template. Must include required fields like name, app, playbook, etc.
     suboptions:
       name:
         type: str
@@ -47,15 +43,15 @@ options:
         required: false
       type:
         type: str
-        required: false
         default: "job"
       view_id:
-        type: str
+        type: int
         required: false
-        description: ID or name of the view to group the template in. Defaults to "Empty".
       allow_override_args_in_task:
         type: bool
-        required: false
+        default: false
+      suppress_success_alerts:
+        type: bool
         default: false
       survey_vars:
         type: list
@@ -72,15 +68,14 @@ options:
   validate_certs:
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup (@kris9854)
+  - Kristian Ebdrup @kris9854
 '''
 
 EXAMPLES = r'''
-- name: Create a template and set it to the "Empty" view
+- name: Create a Semaphore template
   ebdruplab.semaphoreui.template_create:
-    host: localhost
+    host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
@@ -88,12 +83,9 @@ EXAMPLES = r'''
       name: "My Template"
       app: "ansible"
       playbook: "playbook.yml"
-      inventory_id: 1
       repository_id: 1
-      type: "job"
-      view_id: "Empty"
-      allow_override_args_in_task: false
-      survey_vars: []
+      inventory_id: 1
+      view_id: 1
 '''
 
 RETURN = r'''
@@ -124,26 +116,26 @@ def main():
     template = module.params["template"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/templates"
-
-    # Validate required template fields
+    # Validate required fields
     required_fields = ["name", "app", "playbook", "inventory_id", "repository_id"]
     missing = [f for f in required_fields if f not in template or template[f] in [None, ""]]
     if missing:
         module.fail_json(msg=f"Missing required fields in template: {', '.join(missing)}")
 
-    # Default values
-    if "view_id" not in template or not template["view_id"]:
-        template["view_id"] = "Empty"
-    if "type" not in template:
-        template["type"] = "job"
-    if "allow_override_args_in_task" not in template:
-        template["allow_override_args_in_task"] = False
-    if "survey_vars" not in template:
-        template["survey_vars"] = []
+    # Ensure correct data types
+    for field in ["inventory_id", "repository_id", "view_id"]:
+        if field in template and template[field] is not None:
+            template[field] = int(template[field])
 
-    # Ensure project_id is included
+    # Apply defaults
+    template.setdefault("type", "job")
+    template.setdefault("view_id", 1)
+    template.setdefault("allow_override_args_in_task", False)
+    template.setdefault("suppress_success_alerts", False)
+    template.setdefault("survey_vars", [])
     template["project_id"] = project_id
+
+    url = f"{host}:{port}/api/project/{project_id}/templates"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -164,8 +156,7 @@ def main():
             msg = response_body if isinstance(response_body, str) else response_body.decode()
             module.fail_json(msg=f"Failed to create template: HTTP {status} - {msg}", status=status)
 
-        result = json.loads(response_body)
-        module.exit_json(changed=True, template=result)
+        module.exit_json(changed=True, template=json.loads(response_body))
 
     except Exception as e:
         module.fail_json(msg=str(e))
@@ -173,3 +164,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

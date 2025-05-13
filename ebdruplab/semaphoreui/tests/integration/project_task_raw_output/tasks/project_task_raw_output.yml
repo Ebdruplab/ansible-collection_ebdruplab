@@ -84,9 +84,9 @@
           app: "ansible"
           playbook: "site.yml"
           git_branch: "main"
-          inventory_id: "{{ created_inventory.inventory.id }}"
-          repository_id: "{{ created_repo.repository.id }}"
-          view_id: "{{ created_view.view.id }}"
+          inventory_id: "{{ created_inventory.inventory.id | int }}"
+          repository_id: "{{ created_repo.repository.id | int }}"
+          view_id: "{{ created_view.view.id | int }}"
           type: "job"
           allow_override_args_in_task: false
           survey_vars: []
