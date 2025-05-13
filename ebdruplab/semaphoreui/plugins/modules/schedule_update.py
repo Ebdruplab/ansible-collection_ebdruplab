@@ -1,4 +1,3 @@
-# plugins/modules/schedule_update.py
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
@@ -86,12 +85,17 @@ def main():
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
-    project_id = module.params["project_id"]
-    schedule_id = module.params["schedule_id"]
-    schedule = module.params["schedule"]
     validate_certs = module.params["validate_certs"]
     session_cookie = module.params.get("session_cookie")
     api_token = module.params.get("api_token")
+    schedule = module.params["schedule"]
+
+    # Validate numeric parameters
+    try:
+        project_id = int(module.params["project_id"])
+        schedule_id = int(module.params["schedule_id"])
+    except Exception as e:
+        module.fail_json(msg=f"Invalid numeric input: {str(e)}")
 
     url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
 
@@ -101,7 +105,12 @@ def main():
 
         body = json.dumps(schedule).encode("utf-8")
 
-        _, status, _ = semaphore_put(url, body=body, headers=headers, validate_certs=validate_certs)
+        _, status, _ = semaphore_put(
+            url,
+            body=body,
+            headers=headers,
+            validate_certs=validate_certs
+        )
 
         if status not in (200, 204):
             module.fail_json(msg=f"PUT failed with status {status}", status=status)

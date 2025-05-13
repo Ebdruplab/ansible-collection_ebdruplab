@@ -8,6 +8,7 @@
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
     project_name: ebdruplab_integration_test_schedule_create
+
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -26,35 +27,15 @@
         alert: true
         alert_chat: "Test"
         max_parallel_tasks: 2
-        type: "ci"
         demo: false
       register: created_project
-
-    - name: Get list of apps
-      ebdruplab.semaphoreui.apps_list:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-      register: apps_result
-
-    - name: Parse apps_result['apps'] string to real list
-      ansible.builtin.set_fact:
-        apps_list: "{{ apps_result['apps'] | from_json }}"
-
-    - name: Get ansible app id
-      ansible.builtin.set_fact:
-        ansible_app_id: "{{ (apps_list | selectattr('id', 'equalto', 'ansible') | list | first).id }}"
-
-    - name: Show ansible app id
-      ansible.builtin.debug:
-        var: ansible_app_id
 
     - name: Create an inventory for the template
       ebdruplab.semaphoreui.inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         inventory:
           name: "Template Inventory"
           type: "static"
@@ -69,12 +50,13 @@
         project_id: "{{ created_project.project.id }}"
         template:
           name: "Test Template"
-          app: "{{ ansible_app_id }}"
-          inventory_id: "{{ created_inventory.inventory.id }}"
-          repository_id: null
-          environment_id: null
+          app: "ansible"
           playbook: "playbook.yml"
+          inventory_id: "{{ created_inventory.inventory.id }}"
+          repository_id: 0
+          environment_id: 0
           type: "job"
+          view_id: 1
           allow_override_args_in_task: false
           survey_vars: []
       register: created_template
@@ -102,6 +84,37 @@
     - name: Show schedule result
       ansible.builtin.debug:
         var: schedule_create
+
+    - name: Delete schedule
+      ebdruplab.semaphoreui.schedule_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        schedule_id: "{{ schedule_create.schedule.id }}"
+
+    - name: Delete template
+      ebdruplab.semaphoreui.project_template_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        template_id: "{{ created_template.template.id }}"
+
+    - name: Delete inventory
+      ebdruplab.semaphoreui.inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: Delete project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:

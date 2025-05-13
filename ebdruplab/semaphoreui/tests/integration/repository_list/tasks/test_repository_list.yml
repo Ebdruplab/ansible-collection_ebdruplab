@@ -9,6 +9,8 @@
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
     dummy_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD"
     ssh_key_name: "Temp SSH Key"
+    test_project_name: "test_repo_list_project"
+
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -18,58 +20,61 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get projects
-      ebdruplab.semaphoreui.project_list:
+    - name: Create a temporary test project
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: project_list
-
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - project_list.projects | length > 0
+        name: "{{ test_project_name }}"
+        alert: false
+        demo: false
+      register: created_project
 
     - name: Create SSH key for repositories
       ebdruplab.semaphoreui.key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         name: "{{ ssh_key_name }}"
-        key: "{{ dummy_key }}"
+        type: "ssh"
+        ssh:
+          login: test_login
+          private_key: "{{ dummy_key }}"
       register: created_key
 
     - name: Create first repository
-      ebdruplab.semaphoreui.repository_create:
+      ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
-        name: "Repo A"
-        git_url: "https://github.com/example/repo-a.git"
-        git_branch: "main"
-        ssh_key_id: "{{ created_key.key.id }}"
+        project_id: "{{ created_project.project.id }}"
+        repository:
+          name: "Repo A"
+          git_url: "https://github.com/example/repo-a.git"
+          git_branch: "main"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo1
 
     - name: Create second repository
-      ebdruplab.semaphoreui.repository_create:
+      ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
-        name: "Repo B"
-        git_url: "https://github.com/example/repo-b.git"
-        git_branch: "main"
-        ssh_key_id: "{{ created_key.key.id }}"
+        project_id: "{{ created_project.project.id }}"
+        repository:
+          name: "Repo B"
+          git_url: "https://github.com/example/repo-b.git"
+          git_branch: "main"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo2
 
     - name: List all repositories in the project
-      ebdruplab.semaphoreui.repository_list:
+      ebdruplab.semaphoreui.project_repository_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
       register: listed_repos
 
     - name: Show repositories
@@ -77,19 +82,19 @@
         var: listed_repos.repositories
 
     - name: Delete repository 1
-      ebdruplab.semaphoreui.repository_delete:
+      ebdruplab.semaphoreui.project_repository_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         repository_id: "{{ created_repo1.repository.id }}"
 
     - name: Delete repository 2
-      ebdruplab.semaphoreui.repository_delete:
+      ebdruplab.semaphoreui.project_repository_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         repository_id: "{{ created_repo2.repository.id }}"
 
     - name: Delete temporary key
@@ -97,11 +102,19 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ project_list.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         key_id: "{{ created_key.key.id }}"
+
+    - name: Delete the temporary project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
 
     - name: Log out
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
+

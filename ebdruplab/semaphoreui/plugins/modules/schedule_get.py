@@ -71,11 +71,15 @@ def main():
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
-    project_id = module.params["project_id"]
-    schedule_id = module.params["schedule_id"]
     validate_certs = module.params["validate_certs"]
     session_cookie = module.params.get("session_cookie")
     api_token = module.params.get("api_token")
+
+    try:
+        project_id = int(module.params["project_id"])
+        schedule_id = int(module.params["schedule_id"])
+    except Exception as e:
+        module.fail_json(msg=f"Invalid numeric input: {str(e)}")
 
     url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
 
@@ -84,19 +88,20 @@ def main():
         headers["Content-Type"] = "application/json"
 
         response_body, status, _ = semaphore_get(
-            url,
+            url=url,
             headers=headers,
             validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status} - {response_body}")
+            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status}", status=status)
 
         schedule = json.loads(response_body)
         module.exit_json(changed=False, schedule=schedule)
 
     except Exception as e:
         module.fail_json(msg=str(e))
+
 
 if __name__ == '__main__':
     main()

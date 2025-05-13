@@ -74,11 +74,15 @@ def main():
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
-    project_id = module.params["project_id"]
-    schedule_id = module.params["schedule_id"]
     validate_certs = module.params["validate_certs"]
     session_cookie = module.params.get("session_cookie")
     api_token = module.params.get("api_token")
+
+    try:
+        project_id = int(module.params["project_id"])
+        schedule_id = int(module.params["schedule_id"])
+    except Exception as e:
+        module.fail_json(msg=f"Invalid numeric input: {str(e)}")
 
     url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
 

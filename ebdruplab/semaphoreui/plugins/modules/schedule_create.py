@@ -1,5 +1,3 @@
-# plugins/modules/schedule_create.py
-
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -88,10 +86,11 @@ def main():
         supports_check_mode=False
     )
 
-    host = module.params["host"]
+    host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
     schedule = module.params["schedule"]
+    validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/schedules"
 
@@ -101,25 +100,25 @@ def main():
     )
     headers["Content-Type"] = "application/json"
 
-    # Only send required fields to avoid backend validation errors
-    payload = {
-        "cron_format": schedule["cron_format"],
-        "template_id": schedule["template_id"],
-        "name": schedule["name"],
-        "active": schedule.get("active", True)
-    }
-
     try:
+        payload = {
+            "cron_format": str(schedule["cron_format"]),
+            "template_id": int(schedule["template_id"]),
+            "name": str(schedule["name"]),
+            "active": bool(schedule.get("active", True))
+        }
+
         body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
             body=body,
             headers=headers,
-            validate_certs=module.params["validate_certs"]
+            validate_certs=validate_certs
         )
 
         if status not in (200, 201):
-            module.fail_json(msg=f"POST failed with status {status}: {response_body}")
+            msg = response_body if isinstance(response_body, str) else response_body.decode()
+            module.fail_json(msg=f"POST failed with status {status}: {msg}", status=status)
 
         schedule_response = json.loads(response_body)
         module.exit_json(changed=True, schedule=schedule_response)
@@ -127,5 +126,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
+
