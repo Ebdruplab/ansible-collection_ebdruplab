@@ -24,7 +24,7 @@
       register: projects
 
     - name: Create template
-      ebdruplab.semaphoreui.template_create:
+      ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login.session_cookie }}"

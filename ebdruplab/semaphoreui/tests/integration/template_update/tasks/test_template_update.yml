@@ -28,7 +28,7 @@
         that: projects.projects | length > 0
 
     - name: Create a template to update
-      ebdruplab.semaphoreui.template_create:
+      ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -49,7 +49,7 @@
       register: created_template
 
     - name: Update the template
-      ebdruplab.semaphoreui.template_update:
+      ebdruplab.semaphoreui.project_template_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

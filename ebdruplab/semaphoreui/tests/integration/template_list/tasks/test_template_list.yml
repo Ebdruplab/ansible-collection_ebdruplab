@@ -24,18 +24,18 @@
       register: project_list
 
     - name: List templates for first project
-      ebdruplab.semaphoreui.template_list:
+      ebdruplab.semaphoreui.project_template_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ project_list.projects[0].id }}"
         sort: "name"
         order: "asc"
-      register: template_list
+      register: project_template_list
 
     - name: Show template list
       ansible.builtin.debug:
-        var: template_list.templates
+        var: project_template_list.templates
 
     - name: Log out
       ebdruplab.semaphoreui.logout:

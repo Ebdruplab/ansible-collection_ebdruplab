@@ -4,7 +4,7 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: template_create
+module: project_template_create
 short_description: Create a Semaphore template
 version_added: "1.0.0"
 description:
@@ -74,7 +74,7 @@ author:
 
 EXAMPLES = r'''
 - name: Create a Semaphore template
-  ebdruplab.semaphoreui.template_create:
+  ebdruplab.semaphoreui.project_template_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"

@@ -28,7 +28,7 @@
         that: projects.projects | length > 0
 
     - name: Create a template to delete
-      ebdruplab.semaphoreui.template_create:
+      ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -49,7 +49,7 @@
       register: temp_template
 
     - name: Delete the template
-      ebdruplab.semaphoreui.template_delete:
+      ebdruplab.semaphoreui.project_template_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

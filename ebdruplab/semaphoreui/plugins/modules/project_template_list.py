@@ -3,7 +3,7 @@ from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
 DOCUMENTATION = r'''
 ---
-module: template_list
+module: project_template_list
 short_description: List templates in a Semaphore project
 version_added: "1.0.0"
 description:
@@ -41,7 +41,7 @@ author:
 
 EXAMPLES = r'''
 - name: List templates in a project
-  ebdruplab.semaphoreui.template_list:
+  ebdruplab.semaphoreui.project_template_list:
     host: localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
