@@ -4,33 +4,18 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: view_create
-short_description: Create a view in Semaphore
+module: project_schedule_create
+short_description: Create a schedule for a Semaphore project
 version_added: "1.0.0"
 description:
-  - Creates a new view within a Semaphore project.
+  - Sends a POST request to create a new schedule for a specified project in Semaphore.
 options:
   host:
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
-  project_id:
-    type: int
-    required: true
-    description: ID of the project to associate the view with.
-  title:
-    type: str
-    required: true
-    description: Title of the view.
-  position:
-    type: int
-    required: false
-    description: Optional position of the view. Default is 0.
-    default: 0
   session_cookie:
     type: str
     required: false
@@ -39,28 +24,49 @@ options:
     type: str
     required: false
     no_log: true
+  project_id:
+    type: int
+    required: true
+  schedule:
+    type: dict
+    required: true
+    options:
+      cron_format:
+        type: str
+        required: true
+      template_id:
+        type: int
+        required: true
+      name:
+        type: str
+        required: true
+      active:
+        type: bool
+        default: true
   validate_certs:
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup (@kris9854)
+  - Kristian Ebdrup @kris9854
 '''
 
 EXAMPLES = r'''
-- name: Create a view in Semaphore
-  ebdruplab.semaphoreui.view_create:
+- name: Create a schedule
+  ebdruplab.semaphoreui.project_schedule_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    title: "My View"
-    position: 1
+    schedule:
+      cron_format: "* * * * *"
+      template_id: 1
+      name: "My Schedule"
+      active: true
 '''
 
 RETURN = r'''
-view:
-  description: The created view object.
+schedule:
+  description: Created schedule object
   type: dict
   returned: success
 '''
@@ -70,29 +76,23 @@ def main():
         argument_spec=dict(
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
-            project_id=dict(type='int', required=True),
-            title=dict(type='str', required=True),
-            position=dict(type='int', required=False, default=0),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
+            project_id=dict(type='int', required=True),
+            schedule=dict(type='dict', required=True),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=False,
+        supports_check_mode=False
     )
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
+    schedule = module.params["schedule"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/views"
-
-    payload = {
-        "title": module.params["title"],
-        "project_id": project_id,
-        "position": module.params["position"],
-    }
+    url = f"{host}:{port}/api/project/{project_id}/schedules"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -101,6 +101,13 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
+        payload = {
+            "cron_format": str(schedule["cron_format"]),
+            "template_id": int(schedule["template_id"]),
+            "name": str(schedule["name"]),
+            "active": bool(schedule.get("active", True))
+        }
+
         body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
             url,
@@ -110,11 +117,11 @@ def main():
         )
 
         if status not in (200, 201):
-            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
-            module.fail_json(msg=f"Failed to create view: HTTP {status} - {msg}", status=status)
+            msg = response_body if isinstance(response_body, str) else response_body.decode()
+            module.fail_json(msg=f"POST failed with status {status}: {msg}", status=status)
 
-        result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
-        module.exit_json(changed=True, view=result)
+        schedule_response = json.loads(response_body)
+        module.exit_json(changed=True, schedule=schedule_response)
 
     except Exception as e:
         module.fail_json(msg=str(e))
@@ -122,3 +129,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

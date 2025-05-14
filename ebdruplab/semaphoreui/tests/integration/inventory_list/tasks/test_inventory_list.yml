@@ -34,7 +34,7 @@
       register: create_result
 
     - name: Create first inventory
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -46,7 +46,7 @@
       register: created_inventory_1
 
     - name: Create second inventory
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -58,7 +58,7 @@
       register: created_inventory_2
 
     - name: List all inventories
-      ebdruplab.semaphoreui.inventory_list:
+      ebdruplab.semaphoreui.project_inventory_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -70,7 +70,7 @@
         var: listed_inventories.inventories
 
     - name: Delete only the two test inventories created
-      ebdruplab.semaphoreui.inventory_delete:
+      ebdruplab.semaphoreui.project_inventory_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

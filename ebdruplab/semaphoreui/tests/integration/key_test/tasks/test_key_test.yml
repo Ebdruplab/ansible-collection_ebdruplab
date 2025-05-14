@@ -39,7 +39,7 @@
       register: create_result
 
     - name: 'Create first key'
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -52,7 +52,7 @@
       register: created_key1
 
     - name: 'Create second key'
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -65,7 +65,7 @@
       register: created_key2
 
     - name: 'List all keys'
-      ebdruplab.semaphoreui.key_list:
+      ebdruplab.semaphoreui.project_key_list:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -77,7 +77,7 @@
         var: listed_keys
 
     - name: 'Delete first key'
-      ebdruplab.semaphoreui.key_delete:
+      ebdruplab.semaphoreui.project_key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -85,7 +85,7 @@
         key_id: "{{ created_key1.key.id }}"
 
     - name: 'Delete second key'
-      ebdruplab.semaphoreui.key_delete:
+      ebdruplab.semaphoreui.project_key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

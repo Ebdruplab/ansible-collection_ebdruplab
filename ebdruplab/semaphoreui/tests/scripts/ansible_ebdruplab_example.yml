@@ -46,7 +46,7 @@
         var: created_project
 
     - name: 'Create inventory in the new project'
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -58,7 +58,7 @@
       register: created_inventory
 
     - name: 'Create SSH key within the new project'
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

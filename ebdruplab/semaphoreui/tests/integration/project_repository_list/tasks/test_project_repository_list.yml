@@ -30,7 +30,7 @@
       register: create_result
 
     - name: 'Create first key'
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

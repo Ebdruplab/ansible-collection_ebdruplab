@@ -4,24 +4,24 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: schedule_get
-short_description: Get a schedule by ID for a Semaphore project
+module: project_view_list
+short_description: List views in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Retrieves a specific schedule from a Semaphore project.
+  - Retrieves all views defined within a specific Semaphore project.
 options:
   host:
     type: str
     required: true
+    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
     type: int
     required: true
+    description: Port of the Semaphore server (e.g., 3000).
   project_id:
     type: int
     required: true
-  schedule_id:
-    type: int
-    required: true
+    description: ID of the project to fetch views for.
   session_cookie:
     type: str
     required: false
@@ -33,25 +33,26 @@ options:
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
-- name: Get a schedule
-  ebdruplab.semaphoreui.schedule_get:
+- name: List views in project
+  ebdruplab.semaphoreui.project_view_list:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    schedule_id: 5
 '''
 
 RETURN = r'''
-schedule:
-  description: The schedule object retrieved from the API
-  returned: always
-  type: dict
+views:
+  description: List of views in the specified project.
+  type: list
+  elements: dict
+  returned: success
 '''
 
 def main():
@@ -60,33 +61,27 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            schedule_id=dict(type='int', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=True
+        supports_check_mode=True,
     )
 
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
+    project_id = module.params["project_id"]
     validate_certs = module.params["validate_certs"]
-    session_cookie = module.params.get("session_cookie")
-    api_token = module.params.get("api_token")
+
+    url = f"{host}:{port}/api/project/{project_id}/views"
+
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
 
     try:
-        project_id = int(module.params["project_id"])
-        schedule_id = int(module.params["schedule_id"])
-    except Exception as e:
-        module.fail_json(msg=f"Invalid numeric input: {str(e)}")
-
-    url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
-
-    try:
-        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
-        headers["Content-Type"] = "application/json"
-
         response_body, status, _ = semaphore_get(
             url=url,
             headers=headers,
@@ -94,10 +89,10 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status}", status=status)
+            module.fail_json(msg=f"Failed to list views: HTTP {status}", status=status)
 
-        schedule = json.loads(response_body)
-        module.exit_json(changed=False, schedule=schedule)
+        views = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        module.exit_json(changed=False, views=views)
 
     except Exception as e:
         module.fail_json(msg=str(e))
@@ -105,4 +100,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

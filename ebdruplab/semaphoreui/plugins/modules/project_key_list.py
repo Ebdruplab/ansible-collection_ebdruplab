@@ -4,11 +4,11 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: view_list
-short_description: List views in a Semaphore project
+module: project_key_list
+short_description: List access keys in Semaphore
 version_added: "1.0.0"
 description:
-  - Retrieves all views defined within a specific Semaphore project.
+  - Retrieves a list of access keys stored in Semaphore for a specific project.
 options:
   host:
     type: str
@@ -21,15 +21,17 @@ options:
   project_id:
     type: int
     required: true
-    description: ID of the project to fetch views for.
+    description: ID of the project to retrieve access keys from.
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie from a previous login.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token to authenticate instead of session cookie.
   validate_certs:
     type: bool
     default: true
@@ -39,20 +41,20 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: List views in project
-  ebdruplab.semaphoreui.view_list:
-    host: http://localhost
+- name: List access keys in Semaphore for a project
+  ebdruplab.semaphoreui.project_key_list:
+    host: localhost
     port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
+    session_cookie: "{{ login_result.session_cookie }}"
 '''
 
 RETURN = r'''
-views:
-  description: List of views in the specified project.
+keys:
+  description: List of access keys available in the specified project.
   type: list
-  elements: dict
   returned: success
+  elements: dict
 '''
 
 def main():
@@ -74,7 +76,7 @@ def main():
     project_id = module.params["project_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/views"
+    url = f"{host}:{port}/api/project/{project_id}/keys?sort=name&order=asc"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -89,10 +91,14 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to list views: HTTP {status}", status=status)
+            module.fail_json(msg=f"Failed to list keys: HTTP {status}", status=status)
 
-        views = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
-        module.exit_json(changed=False, views=views)
+        keys = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+
+        if not isinstance(keys, list):
+            module.fail_json(msg="Invalid response format: expected a list")
+
+        module.exit_json(changed=False, keys=keys)
 
     except Exception as e:
         module.fail_json(msg=str(e))

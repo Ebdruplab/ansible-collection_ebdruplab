@@ -1,5 +1,5 @@
 ---
-- name: Integration test for schedule_create and schedule_update
+- name: Integration test for project_schedule_create and project_schedule_update
   hosts: localhost
   gather_facts: false
   vars:
@@ -46,7 +46,7 @@
       register: created_template
 
     - name: Create a schedule to be updated
-      ebdruplab.semaphoreui.schedule_create:
+      ebdruplab.semaphoreui.project_schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -59,7 +59,7 @@
       register: created_schedule
 
     - name: Update the created schedule
-      ebdruplab.semaphoreui.schedule_update:
+      ebdruplab.semaphoreui.project_schedule_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

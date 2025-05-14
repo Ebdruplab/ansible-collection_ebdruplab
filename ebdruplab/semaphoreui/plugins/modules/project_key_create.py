@@ -4,7 +4,7 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: key_create
+module: project_key_create
 short_description: Create an access key in Semaphore
 version_added: "1.0.0"
 description:
@@ -83,7 +83,7 @@ author:
 
 EXAMPLES = r'''
 - name: Create an SSH key
-  ebdruplab.semaphoreui.key_create:
+  ebdruplab.semaphoreui.project_key_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
@@ -95,7 +95,7 @@ EXAMPLES = r'''
       private_key: "{{ lookup('file', '~/.ssh/id_rsa') }}"
 
 - name: Create a login/password key
-  ebdruplab.semaphoreui.key_create:
+  ebdruplab.semaphoreui.project_key_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"

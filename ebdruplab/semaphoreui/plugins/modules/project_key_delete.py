@@ -3,11 +3,11 @@ from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
 DOCUMENTATION = r'''
 ---
-module: view_delete
-short_description: Delete a view in Semaphore
+module: project_key_delete
+short_description: Delete an access key in Semaphore
 version_added: "1.0.0"
 description:
-  - Deletes a view from a Semaphore project.
+  - Deletes an access key stored in Semaphore.
 options:
   host:
     type: str
@@ -20,19 +20,21 @@ options:
   project_id:
     type: int
     required: true
-    description: ID of the project containing the view.
-  view_id:
+    description: ID of the project the key belongs to.
+  key_id:
     type: int
     required: true
-    description: ID of the view to delete.
+    description: ID of the access key to delete.
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie from a previous login.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token to authenticate instead of session cookie.
   validate_certs:
     type: bool
     default: true
@@ -42,18 +44,18 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Delete a view
-  ebdruplab.semaphoreui.view_delete:
+- name: Delete an access key in Semaphore
+  ebdruplab.semaphoreui.project_key_delete:
     host: localhost
     port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    view_id: 10
+    key_id: 42
+    session_cookie: "{{ login_result.session_cookie }}"
 '''
 
 RETURN = r'''
 changed:
-  description: Whether the view was successfully deleted.
+  description: Whether the key was successfully deleted.
   type: bool
   returned: always
 '''
@@ -64,7 +66,7 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            view_id=dict(type='int', required=True),
+            key_id=dict(type='int', required=True),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -76,10 +78,10 @@ def main():
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     project_id = module.params["project_id"]
-    view_id = module.params["view_id"]
+    key_id = module.params["key_id"]
     validate_certs = module.params["validate_certs"]
 
-    url = f"{host}:{port}/api/project/{project_id}/views/{view_id}"
+    url = f"{host}:{port}/api/project/{project_id}/keys/{key_id}"
 
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -94,7 +96,7 @@ def main():
         )
 
         if status != 204:
-            module.fail_json(msg=f"Failed to delete view: HTTP {status}", status=status)
+            module.fail_json(msg=f"Failed to delete key: HTTP {status}", status=status)
 
         module.exit_json(changed=True)
 

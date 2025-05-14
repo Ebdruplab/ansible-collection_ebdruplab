@@ -46,7 +46,7 @@
       register: created_template
 
     - name: Create a schedule (ensure it exists)
-      ebdruplab.semaphoreui.schedule_create:
+      ebdruplab.semaphoreui.project_schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -59,7 +59,7 @@
       register: created_schedule
 
     - name: Fetch created schedule
-      ebdruplab.semaphoreui.schedule_get:
+      ebdruplab.semaphoreui.project_schedule_get:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

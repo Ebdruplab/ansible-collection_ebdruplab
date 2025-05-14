@@ -4,7 +4,7 @@ import json
 
 DOCUMENTATION = r'''
 ---
-module: key_update
+module: project_key_update
 short_description: Update an access key in Semaphore
 version_added: "1.0.0"
 description:
@@ -51,7 +51,7 @@ author:
 
 EXAMPLES = r'''
 - name: Update SSH access key
-  ebdruplab.semaphoreui.key_update:
+  ebdruplab.semaphoreui.project_key_update:
     host: localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"

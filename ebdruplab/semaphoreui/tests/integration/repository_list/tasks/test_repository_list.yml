@@ -31,7 +31,7 @@
       register: created_project
 
     - name: Create SSH key for repositories
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -98,7 +98,7 @@
         repository_id: "{{ created_repo2.repository.id }}"
 
     - name: Delete temporary key
-      ebdruplab.semaphoreui.key_delete:
+      ebdruplab.semaphoreui.project_key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

@@ -1,5 +1,5 @@
 ---
-- name: "Integration test for schedule_delete module"
+- name: "Integration test for project_schedule_delete module"
   hosts: localhost
   gather_facts: false
   vars:
@@ -22,14 +22,14 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        name: "schedule_delete_test_project"
+        name: "project_schedule_delete_test_project"
         alert: true
         alert_chat: "Test"
         max_parallel_tasks: 2
       register: created_project
 
     - name: "Create dummy SSH key"
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -41,20 +41,21 @@
           private_key: "dummy_private_key"
       register: created_key
 
-    - name: "Create dummy repository"
+    - name: Create dummy repository
       ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
-        name: "Temp Repo"
-        git_url: "{{ dummy_repo_url }}"
-        git_branch: "main"
-        ssh_key_id: "{{ created_key.key.id }}"
+        repository:
+          name: "Integration Repo"
+          git_url: "https://github.com/example/repo.git"
+          git_branch: "main"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo
 
     - name: "Create dummy inventory"
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -84,7 +85,7 @@
       register: created_template
 
     - name: "Create a schedule to delete"
-      ebdruplab.semaphoreui.schedule_create:
+      ebdruplab.semaphoreui.project_schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -97,7 +98,7 @@
       register: created_schedule
 
     - name: "Delete the schedule"
-      ebdruplab.semaphoreui.schedule_delete:
+      ebdruplab.semaphoreui.project_schedule_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -120,7 +121,7 @@
         template_id: "{{ created_template.template.id }}"
 
     - name: "Clean up - delete inventory"
-      ebdruplab.semaphoreui.inventory_delete:
+      ebdruplab.semaphoreui.project_inventory_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -136,7 +137,7 @@
         repository_id: "{{ created_repo.repository.id }}"
 
     - name: "Clean up - delete key"
-      ebdruplab.semaphoreui.key_delete:
+      ebdruplab.semaphoreui.project_key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

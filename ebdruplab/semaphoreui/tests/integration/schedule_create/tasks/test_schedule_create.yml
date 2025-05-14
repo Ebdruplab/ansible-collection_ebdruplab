@@ -7,7 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: ebdruplab_integration_test_schedule_create
+    project_name: ebdruplab_integration_test_project_schedule_create
 
   tasks:
     - name: Log in to Semaphore
@@ -31,7 +31,7 @@
       register: created_project
 
     - name: Create an inventory for the template
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -62,7 +62,7 @@
       register: created_template
 
     - name: Create a schedule
-      ebdruplab.semaphoreui.schedule_create:
+      ebdruplab.semaphoreui.project_schedule_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -72,26 +72,26 @@
           template_id: "{{ created_template.template.id }}"
           name: "My Schedule"
           active: true
-      register: schedule_create
+      register: project_schedule_create
 
     - name: Verify schedule creation
       ansible.builtin.assert:
         that:
-          - schedule_create is defined
-          - schedule_create.failed is not defined or not schedule_create.failed
-          - schedule_create.schedule.name == "My Schedule"
+          - project_schedule_create is defined
+          - project_schedule_create.failed is not defined or not project_schedule_create.failed
+          - project_schedule_create.schedule.name == "My Schedule"
 
     - name: Show schedule result
       ansible.builtin.debug:
-        var: schedule_create
+        var: project_schedule_create
 
     - name: Delete schedule
-      ebdruplab.semaphoreui.schedule_delete:
+      ebdruplab.semaphoreui.project_schedule_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
-        schedule_id: "{{ schedule_create.schedule.id }}"
+        schedule_id: "{{ project_schedule_create.schedule.id }}"
 
     - name: Delete template
       ebdruplab.semaphoreui.project_template_delete:
@@ -102,7 +102,7 @@
         template_id: "{{ created_template.template.id }}"
 
     - name: Delete inventory
-      ebdruplab.semaphoreui.inventory_delete:
+      ebdruplab.semaphoreui.project_inventory_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

@@ -26,7 +26,7 @@
       register: created_project
 
     - name: Create dummy inventory
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -38,7 +38,7 @@
       register: created_inventory
 
     - name: Create dummy SSH key
-      ebdruplab.semaphoreui.key_create:
+      ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -64,7 +64,7 @@
       register: created_repo
 
     - name: Create dummy view
-      ebdruplab.semaphoreui.view_create:
+      ebdruplab.semaphoreui.project_view_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"

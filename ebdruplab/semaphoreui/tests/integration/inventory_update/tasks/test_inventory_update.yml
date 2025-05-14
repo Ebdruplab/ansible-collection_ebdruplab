@@ -36,7 +36,7 @@
       register: create_result
 
     - name: Create an inventory
-      ebdruplab.semaphoreui.inventory_create:
+      ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -48,7 +48,7 @@
       register: created_inventory
 
     - name: Update the inventory
-      ebdruplab.semaphoreui.inventory_update:
+      ebdruplab.semaphoreui.project_inventory_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
@@ -65,7 +65,7 @@
         var: updated_inventory.inventory
 
     - name: Delete updated inventory
-      ebdruplab.semaphoreui.inventory_delete:
+      ebdruplab.semaphoreui.project_inventory_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
