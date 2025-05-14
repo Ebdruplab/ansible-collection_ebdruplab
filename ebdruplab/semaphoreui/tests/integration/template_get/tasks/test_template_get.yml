@@ -5,8 +5,8 @@
   vars:
     semaphore_host: "http://localhost"
     semaphore_port: 3000
-    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
-    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    semaphore_username: "{{ lookup('env','ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env','ebdruplab_integration_test_PW') | default('changeme', true) }}"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -25,7 +25,8 @@
 
     - name: Ensure at least one project exists
       ansible.builtin.assert:
-        that: projects.projects | length > 0
+        that:
+          - projects.projects | length > 0
 
     - name: Create a template to update
       ebdruplab.semaphoreui.project_template_create:
@@ -35,17 +36,14 @@
         project_id: "{{ projects.projects[0].id }}"
         template:
           name: "Test Template"
+          app: "ansible"
           playbook: "site.yml"
           inventory_id: 1
           repository_id: 1
           environment_id: 1
-          view_id: 1
-          description: "Initial Description"
-          app: "ansible"
-          git_branch: "main"
-          type: ""
-          arguments: "[]"
-          autorun: false
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
       register: created_template
 
     - name: Update the template
@@ -57,19 +55,23 @@
         template_id: "{{ created_template.template.id }}"
         template:
           name: "Updated Template"
+          app: "ansible"
           playbook: "deploy.yml"
           inventory_id: 1
           repository_id: 1
           environment_id: 1
-          view_id: 1
-          description: "Updated Description"
-          app: "ansible"
-          git_branch: "main"
-          type: ""
-          arguments: "[]"
-          autorun: true
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
       register: update_result
 
     - name: Show update result
       ansible.builtin.debug:
         var: update_result
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+
