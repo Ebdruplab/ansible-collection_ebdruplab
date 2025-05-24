@@ -5,24 +5,27 @@ import json
 DOCUMENTATION = r'''
 ---
 module: project_template_create
-short_description: Create a Semaphore template
+short_description: Create a Semaphore template (task, deploy or build)
 version_added: "1.0.0"
 description:
-  - Creates a new template in Semaphore with support for all API fields like vaults, survey_vars, and metadata.
+  - Creates a new template in Semaphore with support for full configuration including build linkage, arguments, vaults, and survey variables.
 options:
   host:
     type: str
     required: true
+    description: Hostname or IP address of the Semaphore server.
   port:
     type: int
     required: true
+    description: Port of the Semaphore server.
   project_id:
     type: int
     required: true
+    description: ID of the Semaphore project to create the template under.
   template:
     type: dict
     required: true
-    description: Dictionary defining the template fields to submit to the API.
+    description: Template definition dictionary.
   session_cookie:
     type: str
     required: false
@@ -34,27 +37,49 @@ options:
   validate_certs:
     type: bool
     default: true
+    description: Whether to verify SSL certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
-- name: Create a template with full metadata
+- name: Create a basic template
   ebdruplab.semaphoreui.project_template_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     template:
-      name: "Deploy App"
+      name: "Deploy Web"
       app: "ansible"
       playbook: "deploy.yml"
       inventory_id: 1
       repository_id: 1
+
+- name: Create a full-featured build template
+  ebdruplab.semaphoreui.project_template_create:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 1
+    template:
+      name: "Build Pipeline"
+      app: "ansible"
+      playbook: "build.yml"
+      inventory_id: 1
+      repository_id: 1
       environment_id: 1
-      type: "deploy"
-      arguments: "[\"--limit app\"]"
-      description: "Deploy playbook with tagging"
+      view_id: 1
+      description: "Pipeline to build and deploy"
+      git_branch: "main"
+      arguments: "[]"
+      vault_password: ""
+      allow_override_args_in_task: false
+      suppress_success_alerts: false
+      autorun: false
+      type: "build"
+      start_version: ""
+      build_template_id: 0
       vaults: []
       survey_vars: []
 '''
@@ -62,8 +87,8 @@ EXAMPLES = r'''
 RETURN = r'''
 template:
   description: The created template object.
-  type: dict
   returned: success
+  type: dict
 '''
 
 def main():
@@ -77,74 +102,57 @@ def main():
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
-        required_one_of=[["session_cookie", "api_token"]],
+        required_one_of=[['session_cookie', 'api_token']],
         supports_check_mode=False,
     )
 
     p = module.params
-    template = p["template"]
-    host = p["host"].rstrip("/")
-    port = p["port"]
-    project_id = p["project_id"]
-    validate_certs = p["validate_certs"]
+    host = p['host'].rstrip('/')
+    port = p['port']
+    project_id = p['project_id']
+    tpl = p['template']
+    validate_certs = p['validate_certs']
 
-    required_fields = ["name", "app", "playbook", "inventory_id", "repository_id"]
-    missing = [f for f in required_fields if f not in template or template[f] in [None, ""]]
+    # Required fields
+    required = ['name', 'app', 'playbook', 'inventory_id', 'repository_id']
+    missing = [k for k in required if not tpl.get(k)]
     if missing:
         module.fail_json(msg=f"Missing required fields in template: {', '.join(missing)}")
 
-    # Defaults
-    defaults = {
-        "type": "job",
-        "view_id": 1,
-        "environment_id": 1,
-        "allow_override_args_in_task": False,
-        "suppress_success_alerts": False,
-        "autorun": False,
-        "survey_vars": [],
-        "vaults": [],
-        "description": "",
-    }
+    # Type conversions and defaults
+    tpl['project_id'] = project_id
+    tpl['type'] = tpl.get('type', '') or ''  # default to ""
+    tpl['view_id'] = int(tpl.get('view_id') or 1)
+    tpl['environment_id'] = int(tpl.get('environment_id') or 1)
+    tpl['build_template_id'] = int(tpl.get('build_template_id') or 0)
 
-    for key, val in defaults.items():
-        template.setdefault(key, val)
+    tpl['arguments'] = tpl.get('arguments', "[]")
+    tpl['start_version'] = tpl.get('start_version', "")
+    tpl['description'] = tpl.get('description', "")
+    tpl['git_branch'] = tpl.get('git_branch', "")
+    tpl['limit'] = tpl.get('limit', "")
+    tpl['tags'] = tpl.get('tags', "")
+    tpl['skip_tags'] = tpl.get('skip_tags', "")
+    tpl['vault_password'] = tpl.get('vault_password', "")
 
-    # Remove fields that should not be submitted if empty
-    for key in ["arguments", "vault_password", "tags", "skip_tags", "git_branch", "limit", "start_version"]:
-        if key in template and (template[key] is None or template[key] == ""):
-            template.pop(key)
+    tpl['allow_override_args_in_task'] = tpl.get('allow_override_args_in_task', False)
+    tpl['suppress_success_alerts'] = tpl.get('suppress_success_alerts', False)
+    tpl['autorun'] = tpl.get('autorun', False)
 
-    # Ensure proper data types
-    for field in ["inventory_id", "repository_id", "environment_id", "view_id", "build_template_id"]:
-        if field in template and template[field] not in [None, ""]:
-            try:
-                template[field] = int(template[field])
-            except Exception:
-                template[field] = 0
-
-    for list_field in ["vaults", "survey_vars"]:
-        if isinstance(template.get(list_field), str):
-            try:
-                template[list_field] = json.loads(template[list_field])
-            except Exception as e:
-                module.fail_json(msg=f"{list_field} must be valid JSON: {e}")
-
-    template["project_id"] = project_id
-    url = f"{host}:{port}/api/project/{project_id}/templates"
+    tpl['vaults'] = tpl.get('vaults') or []
+    tpl['survey_vars'] = tpl.get('survey_vars') or []
 
     headers = get_auth_headers(
         session_cookie=p.get("session_cookie"),
         api_token=p.get("api_token")
     )
     headers["Content-Type"] = "application/json"
+    url = f"{host}:{port}/api/project/{project_id}/templates"
 
     try:
-        body = json.dumps(template).encode("utf-8")
+        body = json.dumps(tpl).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url=url,
-            body=body,
-            headers=headers,
-            validate_certs=validate_certs
+            url=url, body=body, headers=headers, validate_certs=validate_certs
         )
 
         if status not in (200, 201):
@@ -156,6 +164,6 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 

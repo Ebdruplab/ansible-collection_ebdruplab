@@ -115,9 +115,7 @@
           inventory_id: "{{ inv_create.inventory.id }}"
           repository_id: "{{ repo_create.repository.id }}"
           environment_id: 1
-          type: "job"
           allow_override_args_in_task: false
-          survey_vars: '[]'
           prompt_limit: true
       register: tpl_create
 
