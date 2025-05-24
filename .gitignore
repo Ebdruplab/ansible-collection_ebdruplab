@@ -1,0 +1,5 @@
+*.vscode*
+*.tar.gz
+*.zip
+*.ansible*
+*.ansible/*.lock

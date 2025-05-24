@@ -1,0 +1,55 @@
+---
+- name: Integration test for project_delete module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "Integration_test_project"
+  tasks:
+
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Create project
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        demo: false
+      register: created_project
+
+    - name: Ensure project was created
+      ansible.builtin.assert:
+        that:
+          - created_project.project.id is defined
+
+    - name: Delete the created project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+      register: delete_result
+
+    - name: Assert deletion was successful
+      ansible.builtin.assert:
+        that:
+          - delete_result.deleted | bool
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

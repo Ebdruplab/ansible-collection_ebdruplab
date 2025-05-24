@@ -1,0 +1,128 @@
+- name: "Integration test for new semaphoreui modules with project setup"
+  hosts: localhost
+  gather_facts: true
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env','ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env','ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "ebdruplab integration test_multiple"
+    key_name: "Git - Reader User"
+    key_user: "git_reader"
+    key_password: "git_reader_Password01!"
+    repo_name: "ansible-semaphore_ebdruplab_examples"
+    repo_git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"
+    repo_branch: "main"
+    inventory_name: "Inventory from Git file"
+    inventory_file_path: "inventories/example/example.ini"
+  tasks:
+    - name: "Log in to Semaphore"
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: "Create a test project"
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: false
+        alert_chat: "Ansible"
+        max_parallel_tasks: 0
+        demo: false
+      register: create_project
+
+    - name: "Create a test login_password key"
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        name: "{{ key_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key_user }}"
+          password: "{{ key_password }}"
+      register: key_create
+
+    - name: "Retrieve the created key"
+      ebdruplab.semaphoreui.project_key_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        key_id: "{{ key_create.key.id }}"
+      register: key_get
+
+    - name: "Create a test repository"
+      ebdruplab.semaphoreui.project_repository_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        repository:
+          name: "{{ repo_name }}"
+          git_url: "{{ repo_git_url }}"
+          git_branch: "{{ repo_branch }}"
+          ssh_key_id: "{{ key_create.key.id }}"
+      register: repo_create
+
+    - name: "Create a test inventory from repo file"
+      ebdruplab.semaphoreui.project_inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        inventory:
+          name: "{{ inventory_name }}"
+          type: "file"
+          repository_id: "{{ repo_create.repository.id }}"
+          inventory_file: "{{ inventory_file_path }}"
+      register: inv_create
+
+    - name: "Retrieve the created inventory"
+      ebdruplab.semaphoreui.project_inventory_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        inventory_id: "{{ inv_create.inventory.id }}"
+      register: inv_get
+
+    - name: "Retrieve the created repository"
+      ebdruplab.semaphoreui.project_repository_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        repository_id: "{{ repo_create.repository.id }}"
+      register: repo_get
+
+    - name: "Create template to attach survey variable"
+      ebdruplab.semaphoreui.project_template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        template:
+          name: "Survey Template"
+          app: "ansible"
+          playbook: "playbooks/pb-semaphore-example.yml"
+          inventory_id: "{{ inv_create.inventory.id }}"
+          repository_id: "{{ repo_create.repository.id }}"
+          environment_id: null
+          type: "job"
+          allow_override_args_in_task: false
+          survey_vars: []
+      register: tpl_create
+
+    - name: "Log out of Semaphore"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+

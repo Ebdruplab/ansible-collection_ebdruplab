@@ -1,0 +1,51 @@
+---
+- name: Integration test for project_role module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get all projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: project_list
+
+    - name: Ensure we have at least one project
+      ansible.builtin.assert:
+        that:
+          - project_list.projects | length > 0
+        fail_msg: "No projects found. At least one project is required to test project_role."
+
+    - name: Fetch role info for first project
+      ebdruplab.semaphoreui.project_role:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_list.projects[0].id }}"
+      register: role_result
+
+    - name: Show role and permissions
+      ansible.builtin.debug:
+        msg:
+          - "Role: {{ role_result.role }}"
+          - "Permissions: {{ role_result.permissions }}"
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

@@ -1,0 +1,73 @@
+---
+- name: "Test create template with prompts and advanced options"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: "Log in"
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login
+
+    - name: "Get projects"
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"
+      register: projects
+
+    - name: "Create template with prompts and ansible options"
+      ebdruplab.semaphoreui.project_template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "Test Template"
+          description: "Hello, World!"
+          app: "ansible"
+          playbook: "test.yml"
+          git_branch: "main"
+          inventory_id: 1
+          repository_id: 1
+          environment_id: 1
+          view_id: 1
+          suppress_success_alerts: true
+          allow_override_args_in_task: false
+          type: "job"
+          start_version: "1.0.0"
+          build_template_id: 0
+          autorun: true
+          vaults: []
+          survey_vars: []
+          limit: "localhost"
+          tags: ""
+          skip_tags: ""
+          vault_password: ""
+          prompt_arguments: false
+          prompt_limit: true
+          prompt_tags: false
+          prompt_skip_tags: false
+          prompt_vault_password: true
+          prompt_inventory: false
+          prompt_branch: false
+          prompt_debug: true
+      register: result
+
+    - name: "Show result"
+      ansible.builtin.debug:
+        var: result.template
+
+    - name: "Log out"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login.session_cookie }}"
+

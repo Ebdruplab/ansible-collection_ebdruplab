@@ -1,0 +1,15 @@
+---
+- name: Test Semaphore API Ping Module
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: 'Ping the Semaphore API'
+      ebdruplab.semaphoreui.ping:
+        host: "http://localhost"
+        port: 3000
+        validate_certs: false
+      register: ping_result
+
+    - name: 'Show ping result'
+      ansible.builtin.debug:
+        var: ping_result.result

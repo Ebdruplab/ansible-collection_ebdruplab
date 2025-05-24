@@ -1,0 +1,86 @@
+---
+- name: Test updating inventory in Semaphore
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: 'edb_test_project_inventory004'
+    original_inventory_name: "Inventory Before Update"
+    updated_inventory_name: "Inventory After Update"
+    original_inventory_data: |
+      localhost ansible_connection=local
+    updated_inventory_data: |
+      127.0.0.1 ansible_connection=local ansible_user=root
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: 'Create project'
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        demo: false
+      register: create_result
+
+    - name: Create an inventory
+      ebdruplab.semaphoreui.project_inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        inventory:
+          name: "{{ original_inventory_name }}"
+          type: "static"
+          inventory: "{{ original_inventory_data }}"
+      register: created_inventory
+
+    - name: Update the inventory
+      ebdruplab.semaphoreui.project_inventory_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+        inventory:
+          name: "{{ updated_inventory_name }}"
+          type: "static"
+          inventory: "{{ updated_inventory_data }}"
+      register: updated_inventory
+
+    - name: Show updated inventory (if returned)
+      ansible.builtin.debug:
+        var: updated_inventory.inventory
+
+    - name: Delete updated inventory
+      ebdruplab.semaphoreui.project_inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: 'Delete project'
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+
+    - name: Log out
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

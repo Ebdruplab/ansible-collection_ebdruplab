@@ -1,0 +1,100 @@
+---
+- name: Integration test for project_repository_list module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "test_repo_list_project"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: 'Create project'
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: true
+        alert_chat: "Test"
+        max_parallel_tasks: 2
+        demo: false
+      register: create_result
+
+    - name: 'Create first key'
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "github repository login ebdruplab"
+        type: login_password
+        login_password:
+          login: "github user"
+          password: "ChangeMe"
+      register: created_key
+
+    - name: Ensure ssh_key_id resolves cleanly
+      ansible.builtin.set_fact:
+        resolved_ssh_key_id: "{{ created_key.key.id }}"
+
+    - name: Create dummy repository in the project
+      ebdruplab.semaphoreui.project_repository_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        repository:
+          name: "My Dotfiles Repo"
+          git_url: "https://github.com/Ebdruplab/dotfiles.git"
+          git_branch: "main"
+          # ssh_key_id: "{{ created_key.key.id }}"
+          # ssh_key_id: 2
+          ssh_key_id: "{{ resolved_ssh_key_id }}"
+      register: created_repository
+    
+    - name: List repositories in the project
+      ebdruplab.semaphoreui.project_repository_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+      register: repo_list
+
+    - name: Assert repository list includes created repo
+      assert:
+        that:
+          - repo_list is defined
+          - repo_list.failed is not defined or not repo_list.failed
+          - repo_list.repositories | selectattr('id', 'equalto', created_repository.repository.id) | list | length == 1
+    - debug:
+        var: created_repository
+
+    - name: Delete the created repository
+      ebdruplab.semaphoreui.project_repository_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        repository_id: "{{ created_repository.repository.id }}"
+ 
+    - name: Delete dummy project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

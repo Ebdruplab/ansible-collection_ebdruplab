@@ -1,0 +1,53 @@
+---
+- name: Integration test for project_get module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Fetch all projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: project_list
+
+    - name: Ensure there is at least one project
+      ansible.builtin.assert:
+        that:
+          - project_list.projects | length > 0
+        fail_msg: "No projects found to test project_get"
+
+    - name: Select first valid project ID
+      set_fact:
+        project_id: "{{ project_list.projects[0].id }}"
+
+    - name: Fetch project by ID
+      ebdruplab.semaphoreui.project_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_id }}"
+      register: project_result
+
+    - name: Show project info
+      ansible.builtin.debug:
+        var: project_result.project
+
+    - name: Log out of Semaphore
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

@@ -1,0 +1,15 @@
+---
+- name: "Backup project {{ project.name }} (ID: {{ project.id }})"
+  ebdruplab.semaphoreui.project_backup:
+    host: "{{ semaphore_host }}"
+    port: "{{ semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project.id }}"
+  register: backup_result
+
+- name: "Show backup for project {{ project.name }}"
+  ansible.builtin.debug:
+    msg:
+      - "Project ID: {{ project.id }}"
+      - "Project Name: {{ project.name }}"
+      - "Backup Data: {{ backup_result.backup }}"

@@ -1,0 +1,57 @@
+---
+- name: Test delete template
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+  tasks:
+    - name: Log in to Semaphore
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Get list of projects
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: projects
+
+    - name: Ensure at least one project exists
+      ansible.builtin.assert:
+        that: projects.projects | length > 0
+
+    - name: Create a template to delete
+      ebdruplab.semaphoreui.project_template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template:
+          name: "To Be Deleted"
+          playbook: "delete.yml"
+          inventory_id: 1
+          repository_id: 1
+          environment_id: 1
+          view_id: 1
+          description: "Temp"
+          app: "ansible"
+          git_branch: "main"
+          type: ""
+          arguments: "[]"
+          autorun: false
+      register: temp_template
+
+    - name: Delete the template
+      ebdruplab.semaphoreui.project_template_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ projects.projects[0].id }}"
+        template_id: "{{ temp_template.template.id }}"

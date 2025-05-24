@@ -1,0 +1,111 @@
+---
+- name: "Integration test for project environment modules"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    test_env_name: "Integration Env"
+    updated_env_name: "Updated Env"
+
+  tasks:
+    - name: "Log in to Semaphore"
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: "Create test project"
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "Integration Test Env Project"
+        alert: false
+        alert_chat: "test"
+        max_parallel_tasks: 1
+        demo: false
+      register: create_project
+
+    - name: "Create environment"
+      ebdruplab.semaphoreui.project_environment_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        environment:
+          name: "{{ test_env_name }}"
+          password: "testpass"
+          json:
+            key: "value"
+          env:
+            KEY: "value"
+          secrets:
+           - id: 0
+             name: "dummy"
+             secret: "value"
+             type: "env"
+             operation: "create"
+      register: env_create
+
+    - name: "Get created environment"
+      ebdruplab.semaphoreui.project_environment_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        environment_id: "{{ env_create.environment.id }}"
+      register: env_get
+
+    - name: "Update environment"
+      ebdruplab.semaphoreui.project_environment_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        environment_id: "{{ env_create.environment.id }}"
+        environment:
+          name: "{{ updated_env_name }}"
+          password: "updatedpass"
+          json: '{"key": "updated"}'
+          env: 'KEY=updated'
+          secrets: []
+      register: env_update
+
+    - name: "List all environments"
+      ebdruplab.semaphoreui.project_environment_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        sort: name
+        order: asc
+      register: env_list
+
+    - name: "Delete environment"
+      ebdruplab.semaphoreui.project_environment_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        environment_id: "{{ env_create.environment.id }}"
+      register: env_delete
+
+    - name: "Delete test project"
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+      register: project_delete
+
+    - name: "Log out"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+
