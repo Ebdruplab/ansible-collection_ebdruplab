@@ -114,10 +114,11 @@
           playbook: "playbooks/pb-semaphore-example.yml"
           inventory_id: "{{ inv_create.inventory.id }}"
           repository_id: "{{ repo_create.repository.id }}"
-          environment_id: null
+          environment_id: 1
           type: "job"
           allow_override_args_in_task: false
-          survey_vars: []
+          survey_vars: '[]'
+          prompt_limit: true
       register: tpl_create
 
     - name: "Log out of Semaphore"

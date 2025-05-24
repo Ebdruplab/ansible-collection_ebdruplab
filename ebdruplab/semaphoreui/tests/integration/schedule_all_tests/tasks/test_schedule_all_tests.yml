@@ -7,6 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "Ebdruplab test scheduled full"
     key_path: "/tmp/integration_test_key"
 
   tasks:
@@ -17,6 +18,18 @@
         username: "{{ semaphore_username }}"
         password: "{{ semaphore_password }}"
       register: login_result
+
+    - name: "Create a test project"
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: false
+        alert_chat: "Ansible"
+        max_parallel_tasks: 0
+        demo: false
+      register: create_project
 
     - name: "Get list of projects"
       ebdruplab.semaphoreui.project_list:
@@ -43,7 +56,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         name: "Integration Test Key"
         type: "ssh"
         ssh:
@@ -60,7 +73,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
       register: inventories
 
     - name: "Create a dummy inventory if none exists"
@@ -69,7 +82,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         inventory:
           name: "Integration Test Inventory"
           type: "static"
@@ -88,16 +101,15 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
       register: repos
 
     - name: "Create a dummy repository if none exists"
-      when: repos.repositories | length == 0
       ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         repository:
           name: "Integration Test Repository"
           git_url: "https://github.com/ebdruplab/semaphoreui.git"
@@ -116,7 +128,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         template:
           name: "Template for Schedule Lifecycle Test"
           app: "ansible"
@@ -135,7 +147,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule:
           name: "Test Schedule"
           cron_format: "* * * * *"
@@ -155,7 +167,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
       register: fetched_schedule
 
@@ -172,7 +184,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
         schedule:
           name: "Updated Schedule"
@@ -192,7 +204,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
       register: fetched_updated_schedule
 
@@ -209,7 +221,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
 
     - name: "Verify schedule deletion"
@@ -217,7 +229,7 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         schedule_id: "{{ created_schedule.schedule.id }}"
       register: fetch_after_delete
       failed_when: false
@@ -232,19 +244,27 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         template_id: "{{ created_template.template.id }}"
+
+    - name: "Delete the dummy repository if we created one"
+      ebdruplab.semaphoreui.project_repository_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        repository_id: "{{ repository_id }}"
 
     - name: "Wait briefly for Semaphore to release key usage"
       ansible.builtin.pause:
-        seconds: 3
+        seconds: 1
 
     - name: "Delete the SSH key in Semaphore"
       ebdruplab.semaphoreui.project_key_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ create_project.project.id }}"
         key_id: "{{ semaphore_key_id }}"
 
     - name: "Remove local SSH key files"
@@ -254,6 +274,13 @@
       loop:
         - "{{ key_path }}"
         - "{{ key_path }}.pub"
+
+    - name: 'Delete project'
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
 
     - name: "Log out"
       ebdruplab.semaphoreui.logout:

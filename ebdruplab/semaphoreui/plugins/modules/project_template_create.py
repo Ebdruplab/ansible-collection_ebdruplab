@@ -8,7 +8,7 @@ module: project_template_create
 short_description: Create a Semaphore template
 version_added: "1.0.0"
 description:
-  - Creates a new template in Semaphore.
+  - Creates a new template in Semaphore with support for all API fields like vaults, survey_vars, and metadata.
 options:
   host:
     type: str
@@ -22,81 +22,7 @@ options:
   template:
     type: dict
     required: true
-    description: Dictionary defining the template.
-    suboptions:
-      name:
-        type: str
-        required: true
-      app:
-        type: str
-        required: true
-      playbook:
-        type: str
-        required: true
-      inventory_id:
-        type: int
-        required: true
-      repository_id:
-        type: int
-        required: true
-      environment_id:
-        type: int
-        required: false
-      type:
-        type: str
-        default: "job"
-      view_id:
-        type: int
-        required: false
-      allow_override_args_in_task:
-        type: bool
-        default: false
-      suppress_success_alerts:
-        type: bool
-        default: false
-      survey_vars:
-        type: list
-        elements: dict
-        required: false
-      arguments:
-        type: str
-        required: false
-      limit:
-        type: str
-        required: false
-      tags:
-        type: str
-        required: false
-      skip_tags:
-        type: str
-        required: false
-      vault_password:
-        type: str
-        required: false
-      prompt_inventory:
-        type: bool
-        required: false
-      prompt_limit:
-        type: bool
-        required: false
-      prompt_tags:
-        type: bool
-        required: false
-      prompt_skip_tags:
-        type: bool
-        required: false
-      prompt_vault_password:
-        type: bool
-        required: false
-      prompt_arguments:
-        type: bool
-        required: false
-      prompt_branch:
-        type: bool
-        required: false
-      prompt_environment:
-        type: bool
-        required: false
+    description: Dictionary defining the template fields to submit to the API.
   session_cookie:
     type: str
     required: false
@@ -109,36 +35,28 @@ options:
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
-- name: Create a Semaphore template with runtime prompts
+- name: Create a template with full metadata
   ebdruplab.semaphoreui.project_template_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     template:
-      name: "My Template"
+      name: "Deploy App"
       app: "ansible"
-      playbook: "playbooks/site.yml"
+      playbook: "deploy.yml"
       inventory_id: 1
       repository_id: 1
       environment_id: 1
-      arguments: "--diff"
-      limit: "app*"
-      tags: "setup"
-      skip_tags: "debug"
-      vault_password: "my-vault"
-      prompt_inventory: true
-      prompt_limit: true
-      prompt_tags: true
-      prompt_skip_tags: true
-      prompt_vault_password: true
-      prompt_arguments: true
-      prompt_branch: true
-      prompt_environment: true
+      type: "deploy"
+      arguments: "[\"--limit app\"]"
+      description: "Deploy playbook with tagging"
+      vaults: []
+      survey_vars: []
 '''
 
 RETURN = r'''
@@ -160,49 +78,70 @@ def main():
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=False
+        supports_check_mode=False,
     )
 
-    host = module.params["host"].rstrip("/")
-    port = module.params["port"]
-    project_id = module.params["project_id"]
-    template = module.params["template"]
-    validate_certs = module.params["validate_certs"]
+    p = module.params
+    template = p["template"]
+    host = p["host"].rstrip("/")
+    port = p["port"]
+    project_id = p["project_id"]
+    validate_certs = p["validate_certs"]
 
     required_fields = ["name", "app", "playbook", "inventory_id", "repository_id"]
     missing = [f for f in required_fields if f not in template or template[f] in [None, ""]]
     if missing:
         module.fail_json(msg=f"Missing required fields in template: {', '.join(missing)}")
 
-    for field in ["inventory_id", "repository_id", "view_id", "environment_id"]:
-        if field in template and template[field] is not None:
-            template[field] = int(template[field])
-
+    # Defaults
     defaults = {
         "type": "job",
         "view_id": 1,
+        "environment_id": 1,
         "allow_override_args_in_task": False,
         "suppress_success_alerts": False,
+        "autorun": False,
         "survey_vars": [],
+        "vaults": [],
+        "description": "",
     }
 
     for key, val in defaults.items():
         template.setdefault(key, val)
 
-    template["project_id"] = project_id
+    # Remove fields that should not be submitted if empty
+    for key in ["arguments", "vault_password", "tags", "skip_tags", "git_branch", "limit", "start_version"]:
+        if key in template and (template[key] is None or template[key] == ""):
+            template.pop(key)
 
+    # Ensure proper data types
+    for field in ["inventory_id", "repository_id", "environment_id", "view_id", "build_template_id"]:
+        if field in template and template[field] not in [None, ""]:
+            try:
+                template[field] = int(template[field])
+            except Exception:
+                template[field] = 0
+
+    for list_field in ["vaults", "survey_vars"]:
+        if isinstance(template.get(list_field), str):
+            try:
+                template[list_field] = json.loads(template[list_field])
+            except Exception as e:
+                module.fail_json(msg=f"{list_field} must be valid JSON: {e}")
+
+    template["project_id"] = project_id
     url = f"{host}:{port}/api/project/{project_id}/templates"
 
     headers = get_auth_headers(
-        session_cookie=module.params.get("session_cookie"),
-        api_token=module.params.get("api_token")
+        session_cookie=p.get("session_cookie"),
+        api_token=p.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
     try:
         body = json.dumps(template).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url,
+            url=url,
             body=body,
             headers=headers,
             validate_certs=validate_certs
@@ -217,7 +156,6 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
