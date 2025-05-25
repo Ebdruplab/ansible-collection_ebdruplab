@@ -7,7 +7,7 @@ from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r"""
+DOCUMENTATION = r'''
 ---
 module: project_template_create
 short_description: Create a Semaphore template (task, deploy or build)
@@ -17,17 +17,17 @@ description:
 options:
   host:
     description:
-      - Hostname or IP of the Semaphore server (e.g. http://localhost).
+      - Full host address of the Semaphore server (including http or https).
     type: str
     required: true
   port:
     description:
-      - Port of the Semaphore API (e.g. 3000).
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
   project_id:
     description:
-      - Project ID that owns the template.
+      - ID of the project where the template will be created.
     type: int
     required: true
   template:
@@ -53,43 +53,36 @@ options:
     type: bool
     default: true
 author:
-  - "Kristian Ebdrup (@kris9854)"
-"""
+  - Kristian Ebdrup (@kris9854)
+'''
 
-EXAMPLES = r"""
-- name: Create a template with required fields
+EXAMPLES = r'''
+- name: Create a new Semaphore template
   ebdruplab.semaphoreui.project_template_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     template:
-      name: "Run Playbook"
-      app: "My App"
-      playbook: "site.yml"
+      name: "Deploy Web"
+      app: "ansible"
+      playbook: "deploy.yml"
       inventory_id: 1
       repository_id: 1
       environment_id: 1
+      type: "job"
+      view_id: 1
+      description: "A sample deployment"
+      vaults: []
       arguments: "[]"
-      vaults:
-        - id: 2
-          type: "ssh"
-"""
+'''
 
-RETURN = r"""
+RETURN = r'''
 template:
-  description: The created Semaphore template object.
-  returned: success
+  description: The created template object.
   type: dict
-  sample:
-    id: 42
-    name: Run Playbook
-    app: My App
-    playbook: site.yml
-    inventory_id: 1
-    repository_id: 1
-    environment_id: 1
-"""
+  returned: success
+'''
 
 def main():
     module = AnsibleModule(
@@ -110,16 +103,28 @@ def main():
     tpl = p['template']
     tpl['project_id'] = p['project_id']
 
-    for req in ['name', 'app', 'playbook', 'inventory_id', 'repository_id']:
-        if not tpl.get(req):
-            module.fail_json(msg=f"Missing required template field: {req}")
+    # Validate required fields
+    required_fields = ['name', 'app', 'playbook', 'inventory_id', 'repository_id']
+    for field in required_fields:
+        if not tpl.get(field):
+            module.fail_json(msg=f"Missing required template field: {field}")
 
-    tpl['inventory_id'] = int(tpl.get('inventory_id'))
-    tpl['repository_id'] = int(tpl.get('repository_id'))
-    tpl['environment_id'] = int(tpl.get('environment_id', 1))
-    tpl['view_id'] = int(tpl.get('view_id', 1))
-    tpl['build_template_id'] = int(tpl.get('build_template_id', 0))
+    # Safe type coercion for required integer fields
+    try:
+        tpl['inventory_id'] = int(tpl['inventory_id'])
+        tpl['repository_id'] = int(tpl['repository_id'])
+    except (ValueError, TypeError):
+        module.fail_json(msg="inventory_id and repository_id must be valid integers.")
 
+    # Optional integer fields with defaults
+    try:
+        tpl['environment_id'] = int(tpl.get('environment_id', 1) or 1)
+        tpl['view_id'] = int(tpl.get('view_id', 1) or 1)
+        tpl['build_template_id'] = int(tpl.get('build_template_id', 0) or 0)
+    except (ValueError, TypeError):
+        module.fail_json(msg="Optional IDs must be valid integers if provided.")
+
+    # Default field values
     defaults = {
         "type": "",
         "description": "",
@@ -143,23 +148,25 @@ def main():
         "vaults": [],
         "survey_vars": []
     }
-    for k, v in defaults.items():
-        tpl.setdefault(k, v)
+    for key, value in defaults.items():
+        tpl.setdefault(key, value)
 
+    # Validate and sanitize arguments
     tpl['arguments'] = tpl.get('arguments', "[]")
     try:
         json.loads(tpl['arguments'])
     except (TypeError, ValueError):
-        module.fail_json(msg="template.arguments must be a valid JSON string (e.g. '[]', '{}', etc.)")
+        module.fail_json(msg="template.arguments must be a valid JSON string (e.g. '[]').")
 
+    # Validate vaults
     validated_vaults = []
     for v in tpl.get("vaults", []):
         if not isinstance(v, dict) or "id" not in v or "type" not in v:
-            module.fail_json(msg="Vaults must be a list of dictionaries with 'id' and 'type'.")
+            module.fail_json(msg="Each vault must be a dictionary with 'id' and 'type'.")
         try:
             v["id"] = int(v["id"])
-        except ValueError:
-            module.fail_json(msg=f"Vault id must be an integer, got: {v['id']}")
+        except (ValueError, TypeError):
+            module.fail_json(msg=f"Vault 'id' must be an integer, got: {v['id']}")
         validated_vaults.append(v)
     tpl["vaults"] = validated_vaults
 
@@ -190,6 +197,6 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == '__main__':
     main()
-

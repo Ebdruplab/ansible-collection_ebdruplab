@@ -13,65 +13,65 @@ module: project_schedule_create
 short_description: Create a schedule for a Semaphore project
 version_added: "1.0.0"
 description:
-  - Sends a POST request to create a new schedule for a specified project in Semaphore.
+  - Creates a new scheduled task (cron job) in a specified Semaphore project using a defined template.
+  - Requires authentication via session cookie or API token.
 options:
   host:
     description:
-      - Hostname or IP of the Semaphore server (including protocol).
+      - Hostname or IP address of the Semaphore server (e.g. C(http://localhost)).
     type: str
     required: true
   port:
     description:
-      - Port on which the Semaphore API is listening.
+      - Port number where the Semaphore API is accessible (e.g. C(3000)).
     type: int
     required: true
   session_cookie:
     description:
-      - Session cookie used for authentication.
+      - Session cookie for authenticating the user session.
     type: str
     required: false
     no_log: true
   api_token:
     description:
-      - API token used for authentication.
+      - API token for authenticating the user instead of a session cookie.
     type: str
     required: false
     no_log: true
   project_id:
     description:
-      - ID of the project to associate the schedule with.
+      - ID of the Semaphore project in which to create the schedule.
     type: int
     required: true
   schedule:
     description:
-      - Dictionary containing schedule details.
+      - Dictionary containing the schedule details.
     type: dict
     required: true
     suboptions:
       cron_format:
         description:
-          - Cron format string defining the schedule (e.g., "* * * * *").
+          - Cron expression defining when the schedule runs.
         type: str
         required: true
       template_id:
         description:
-          - ID of the template to run with this schedule.
+          - ID of the template to be used when the schedule triggers.
         type: int
         required: true
       name:
         description:
-          - Name of the schedule.
+          - Human-readable name for the schedule.
         type: str
         required: true
       active:
         description:
           - Whether the schedule is active.
         type: bool
-        required: false
         default: true
   validate_certs:
     description:
-      - Whether to validate TLS certificates.
+      - Whether to validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:
@@ -95,7 +95,7 @@ EXAMPLES = r'''
 RETURN = r'''
 schedule:
   description:
-    - The created schedule object returned from the Semaphore API.
+    - The created schedule object as returned by the Semaphore API.
   type: dict
   returned: success
 '''
@@ -115,43 +115,42 @@ def main():
         supports_check_mode=False
     )
 
-    p = module.params
-    host = p["host"].rstrip("/")
-    port = p["port"]
-    project_id = p["project_id"]
-    schedule = p["schedule"]
-    validate_certs = p["validate_certs"]
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    project_id = module.params["project_id"]
+    schedule = module.params["schedule"]
+    validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/schedules"
 
     headers = get_auth_headers(
-        session_cookie=p.get("session_cookie"),
-        api_token=p.get("api_token")
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
     )
     headers["Content-Type"] = "application/json"
 
     try:
         payload = {
-            "cron_format": schedule["cron_format"],
-            "template_id": schedule["template_id"],
-            "name": schedule["name"],
-            "active": schedule.get("active", True)
+            "cron_format": str(schedule["cron_format"]),
+            "template_id": int(schedule["template_id"]),
+            "name": str(schedule["name"]),
+            "active": bool(schedule.get("active", True))
         }
 
         body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url=url,
+            url,
             body=body,
             headers=headers,
             validate_certs=validate_certs
         )
 
         if status not in (200, 201):
-            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            msg = response_body if isinstance(response_body, str) else response_body.decode()
             module.fail_json(msg=f"POST failed with status {status}: {msg}", status=status)
 
-        schedule_data = json.loads(response_body)
-        module.exit_json(changed=True, schedule=schedule_data)
+        schedule_response = json.loads(response_body)
+        module.exit_json(changed=True, schedule=schedule_response)
 
     except Exception as e:
         module.fail_json(msg=str(e))
