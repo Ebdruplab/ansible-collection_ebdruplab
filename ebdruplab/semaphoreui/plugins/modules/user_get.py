@@ -1,49 +1,65 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: user_get
 short_description: Fetch details of the logged-in user
+version_added: "1.0.0"
 description:
   - Retrieves information about the currently authenticated user in Semaphore.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is accessible (e.g., 3000).
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication instead of session cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Get the current user profile
   ebdruplab.semaphoreui.user_get:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 user:
-  description: Details about the authenticated user
-  returned: success
+  description: Details about the authenticated user.
   type: dict
-'''
+  returned: success
+"""
 
 def main():
     module = AnsibleModule(

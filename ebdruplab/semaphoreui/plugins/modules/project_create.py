@@ -1,69 +1,114 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_create
 short_description: Create a new Semaphore project
 version_added: "1.0.0"
 description:
-  - Sends a POST request to create a new Semaphore project.
+  - Sends a POST request to the Semaphore API to create a new project.
 options:
   host:
-    type: str
+    description:
+      - Hostname or IP address of the Semaphore server (including protocol).
     required: true
-    description: Hostname of the Semaphore server (without protocol).
+    type: str
   port:
-    type: int
+    description:
+      - Port of the Semaphore server (typically 3000).
     required: true
-    description: Port of the Semaphore server (typically 3000).
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   name:
-    type: str
+    description:
+      - Name of the project to be created.
     required: true
-    description: Name of the project to create.
+    type: str
   alert:
+    description:
+      - Whether to enable alert notifications for the project.
+    required: false
     type: bool
     default: false
   alert_chat:
+    description:
+      - Name of the chat integration for alerts.
+    required: false
     type: str
-    default: 'Ansible'
+    default: Ansible
   max_parallel_tasks:
+    description:
+      - Maximum number of parallel tasks allowed in the project.
+    required: false
     type: int
     default: 0
   demo:
+    description:
+      - Whether the project is a demo project.
+    required: false
     type: bool
     default: false
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Create a new Semaphore project
   ebdruplab.semaphoreui.project_create:
-    host: localhost
+    host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     name: "ebdruplab integration test"
-'''
 
-RETURN = r'''
+- name: Create project with token and custom settings
+  ebdruplab.semaphoreui.project_create:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_token }}"
+    name: "My Project"
+    alert: true
+    alert_chat: "#alerts"
+    max_parallel_tasks: 5
+    demo: false
+"""
+
+RETURN = r"""
 project:
-  description: Details of the created project.
+  description: The details of the created project.
   type: dict
   returned: success
-'''
+  sample:
+    id: 42
+    name: "My Project"
+    alert: true
+    alert_chat: "#alerts"
+    max_parallel_tasks: 5
+    demo: false
+"""
 
 def main():
     module = AnsibleModule(
@@ -122,3 +167,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

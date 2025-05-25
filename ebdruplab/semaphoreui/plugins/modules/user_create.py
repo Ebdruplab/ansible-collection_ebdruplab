@@ -1,59 +1,89 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: user_create
 short_description: Create a new user in Semaphore
+version_added: "1.0.0"
 description:
   - Creates a user with specified attributes in the Semaphore system.
   - Requires admin permissions.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description:
+      - Port on which the Semaphore API is listening.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication instead of session cookie.
     type: str
     required: false
     no_log: true
   name:
+    description:
+      - Full name of the user.
     type: str
     required: true
   username:
+    description:
+      - Username used to log in.
     type: str
     required: true
   email:
+    description:
+      - Email address of the user.
     type: str
     required: true
   password:
+    description:
+      - Password for the user.
     type: str
     required: true
     no_log: true
   alert:
+    description:
+      - Whether to send alerts to the user.
     type: bool
     default: false
   admin:
+    description:
+      - Whether the user has admin privileges.
     type: bool
     default: false
   external:
+    description:
+      - Whether the user is managed externally (e.g. LDAP).
     type: bool
     default: false
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Create a new user
   ebdruplab.semaphoreui.user_create:
     host: http://localhost
@@ -65,14 +95,14 @@ EXAMPLES = r'''
     password: "supersecure123"
     admin: true
     alert: true
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 user:
-  description: The created user object
-  returned: success
+  description: The created user object.
   type: dict
-'''
+  returned: success
+"""
 
 def main():
     module = AnsibleModule(

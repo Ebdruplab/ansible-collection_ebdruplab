@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_view_create
 short_description: Create a view in Semaphore
@@ -11,43 +16,54 @@ description:
   - Creates a new view within a Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (excluding protocol).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
   project_id:
+    description:
+      - ID of the project to associate the view with.
     type: int
     required: true
-    description: ID of the project to associate the view with.
   title:
+    description:
+      - Title of the view.
     type: str
     required: true
-    description: Title of the view.
   position:
+    description:
+      - Optional position of the view.
     type: int
     required: false
-    description: Optional position of the view. Default is 0.
     default: 0
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
+    required: false
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Create a view in Semaphore
   ebdruplab.semaphoreui.project_view_create:
     host: http://localhost
@@ -56,26 +72,26 @@ EXAMPLES = r'''
     project_id: 1
     title: "My View"
     position: 1
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 view:
   description: The created view object.
   type: dict
   returned: success
-'''
+"""
 
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            host=dict(type='str', required=True),
-            port=dict(type='int', required=True),
-            project_id=dict(type='int', required=True),
-            title=dict(type='str', required=True),
-            position=dict(type='int', required=False, default=0),
-            session_cookie=dict(type='str', required=False, no_log=True),
-            api_token=dict(type='str', required=False, no_log=True),
-            validate_certs=dict(type='bool', default=True),
+            host=dict(type="str", required=True),
+            port=dict(type="int", required=True),
+            project_id=dict(type="int", required=True),
+            title=dict(type="str", required=True),
+            position=dict(type="int", required=False, default=0),
+            session_cookie=dict(type="str", required=False, no_log=True),
+            api_token=dict(type="str", required=False, no_log=True),
+            validate_certs=dict(type="bool", default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
         supports_check_mode=False,
@@ -122,3 +138,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

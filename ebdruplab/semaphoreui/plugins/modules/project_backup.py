@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_backup
 short_description: Backup a Semaphore project
@@ -11,44 +16,69 @@ description:
   - Fetches a complete backup of a Semaphore project by project ID.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the project to back up.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Backup Semaphore project
   ebdruplab.semaphoreui.project_backup:
     host: http://localhost
     port: 3000
     project_id: 1
     api_token: "abcd1234"
-'''
+  register: project_backup
 
-RETURN = r'''
+- name: Show backup data
+  debug:
+    var: project_backup.backup
+"""
+
+RETURN = r"""
 backup:
-  description: Backup data of the project
-  returned: always
+  description: Backup data of the specified Semaphore project.
+  returned: success
   type: dict
-'''
+  sample:
+    project:
+      id: 1
+      name: MyProject
+    templates:
+      - id: 10
+        name: deploy
+"""
 
 def main():
     module = AnsibleModule(

@@ -1,62 +1,99 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_environment_list
 short_description: List environments in a Semaphore project
+version_added: "1.0.0"
 description:
   - Retrieves all environments associated with a given Semaphore project.
-version_added: "1.0.0"
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server, including protocol (e.g., http://localhost).
+    required: true
     type: str
-    required: true
   port:
-    type: int
+    description:
+      - Port where the Semaphore API is running.
     required: true
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the Semaphore project.
     required: true
+    type: int
   sort:
+    description:
+      - Field to sort the environments by.
     type: str
     default: name
-    choices: ['name']
+    choices: ["name"]
   order:
+    description:
+      - Sort order direction.
     type: str
     default: desc
-    choices: ['asc', 'desc']
+    choices: ["asc", "desc"]
   session_cookie:
-    type: str
+    description:
+      - Session authentication cookie.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - Bearer token for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
-author: Kristian Ebdrup (@kris9854)
-'''
+author:
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
-- name: List environments
+EXAMPLES = r"""
+- name: List environments in a project
   ebdruplab.semaphoreui.project_environment_list:
     host: http://localhost
     port: 3000
     project_id: 1
     session_cookie: "{{ login_result.session_cookie }}"
-'''
 
-RETURN = r'''
+- name: List environments sorted ascending
+  ebdruplab.semaphoreui.project_environment_list:
+    host: http://localhost
+    port: 3000
+    project_id: 1
+    order: asc
+    api_token: "{{ token }}"
+"""
+
+RETURN = r"""
 environments:
-  description: List of environment objects
-  returned: always
+  description: List of environment objects.
   type: list
   elements: dict
-'''
+  returned: success
+  sample:
+    - id: 4
+      name: "Development"
+      project_id: 1
+      env: '{"DEBUG": "true"}'
+      json: '{"extra": "data"}'
+"""
 
 def main():
     module = AnsibleModule(
@@ -64,8 +101,8 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            sort=dict(type='str', default='name'),
-            order=dict(type='str', default='desc'),
+            sort=dict(type='str', default='name', choices=['name']),
+            order=dict(type='str', default='desc', choices=['asc', 'desc']),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),

@@ -1,40 +1,53 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: ping
 short_description: Ping the Semaphore API
 version_added: "1.0.0"
 description:
-  - Sends a GET request to /api/ping to check if the Semaphore API is reachable.
+  - Sends a GET request to /api/ping to check if the Semaphore API is reachable and responding.
 options:
   host:
+    description:
+      - The URL or IP address of the Semaphore server.
+    required: true
     type: str
-    required: true
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Check connection to Semaphore
   ebdruplab.semaphoreui.ping:
     host: http://localhost
     port: 3000
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 result:
-  description: API response, typically "pong"
+  description: The expected response from the Semaphore API (typically "pong").
   type: str
-  returned: always
-'''
+  returned: success
+  sample: "pong"
+"""
 
 def main():
     module = AnsibleModule(

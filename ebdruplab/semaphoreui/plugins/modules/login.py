@@ -1,51 +1,72 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post
+import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: login
 short_description: Log into Semaphore UI
 version_added: "1.0.0"
 description:
-  - Logs in to Semaphore and returns a session cookie used for authenticated requests.
+  - Logs into the Semaphore UI and returns a session cookie used for authenticated requests.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
+    description:
+      - The port on which the Semaphore UI is running.
+    required: true
     type: int
-    required: true
   username:
-    type: str
+    description:
+      - Username for logging in.
     required: true
+    type: str
   password:
-    type: str
+    description:
+      - Password for the user.
     required: true
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Log in to Semaphore
   ebdruplab.semaphoreui.login:
     host: http://localhost
     port: 3000
     username: admin
     password: changeme
-'''
+  register: login_result
 
-RETURN = r'''
+- name: Use session cookie
+  debug:
+    msg: "Authenticated with cookie {{ login_result.session_cookie }}"
+"""
+
+RETURN = r"""
 session_cookie:
-  description: The session cookie used for further authenticated requests
+  description: The session cookie used for further authenticated requests.
   returned: success
   type: str
-'''
-
-import json
+  sample: "semaphore_session=abc123xyz;"
+"""
 
 def main():
     module = AnsibleModule(

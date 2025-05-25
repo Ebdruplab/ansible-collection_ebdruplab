@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_environment_get
 short_description: Retrieve a specific environment from a Semaphore project
@@ -11,40 +16,48 @@ description:
   - Fetches the details of a specific environment by ID within a Semaphore project.
 options:
   host:
-    type: str
+    description:
+      - Hostname or IP of the Semaphore server (including http/https).
     required: true
-    description: Hostname or IP of the Semaphore server (with protocol).
+    type: str
   port:
-    type: int
+    description:
+      - Port where the Semaphore API is running.
     required: true
-    description: Port where the Semaphore API is running.
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the Semaphore project.
     required: true
-    description: ID of the Semaphore project.
+    type: int
   environment_id:
-    type: int
+    description:
+      - ID of the environment to retrieve.
     required: true
-    description: ID of the environment to retrieve.
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session authentication cookie.
     required: false
+    type: str
     no_log: true
-    description: Session authentication cookie.
   api_token:
-    type: str
+    description:
+      - Bearer token for authentication.
     required: false
+    type: str
     no_log: true
-    description: Bearer token for authentication.
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Retrieve a project environment
   ebdruplab.semaphoreui.project_environment_get:
     host: http://localhost
@@ -54,21 +67,29 @@ EXAMPLES = r'''
     environment_id: 4
   register: env_info
 
-- name: Show environment
+- name: Show environment details
   debug:
     var: env_info.environment
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 environment:
   description: Details of the requested environment.
   type: dict
   returned: success
+  sample:
+    id: 4
+    name: "Production"
+    env: '{"KEY": "VALUE"}'
+    json: '{"config": "abc"}'
+    project_id: 1
+
 status:
   description: HTTP status code from the Semaphore API.
   type: int
   returned: always
-'''
+  sample: 200
+"""
 
 def main():
     module = AnsibleModule(
@@ -109,7 +130,8 @@ def main():
         if status != 200:
             module.fail_json(msg=f"Failed to retrieve environment: HTTP {status}", status=status)
 
-        module.exit_json(changed=False, environment=json.loads(response_body), status=status)
+        environment = json.loads(response_body)
+        module.exit_json(changed=False, environment=environment, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

@@ -1,50 +1,55 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: apps_list
 short_description: Get list of apps from Semaphore
+version_added: "1.0.0"
 description:
-  - This module retrieves all apps defined in a Semaphore instance.
+  - Retrieves all apps defined in a Semaphore instance.
 options:
   host:
     description:
-      - The URL or IP of the Semaphore server.
+      - The URL or IP address of the Semaphore server.
     required: true
     type: str
   port:
     description:
-      - The port on which Semaphore is running.
+      - The port on which the Semaphore API is running.
     required: true
     type: int
   session_cookie:
     description:
-      - Session cookie for authenticating with Semaphore.
+      - Session cookie used for authentication.
     required: false
     type: str
     no_log: true
   api_token:
     description:
-      - API token for authenticating with Semaphore.
+      - API token used for authentication.
     required: false
     type: str
     no_log: true
   validate_certs:
     description:
       - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
-- name: Get apps from Semaphore
+EXAMPLES = r"""
+- name: Get list of apps from Semaphore
   ebdruplab.semaphoreui.apps_list:
-    host: "http://localhost"
+    host: http://localhost
     port: 3000
     session_cookie: "{{ session_cookie }}"
   register: result
@@ -52,18 +57,18 @@ EXAMPLES = r'''
 - name: Show app names
   debug:
     var: result.apps
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 apps:
-  description: A list of app objects.
-  returned: always
+  description: A list of app objects retrieved from Semaphore.
   type: list
+  returned: success
   sample:
     - id: 1
       name: my-app
       git_url: https://github.com/example/repo.git
-'''
+"""
 
 def main():
     module = AnsibleModule(
@@ -94,3 +99,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

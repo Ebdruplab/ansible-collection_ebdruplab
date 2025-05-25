@@ -1,8 +1,9 @@
-from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
-import json
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_inventory_list
 short_description: List inventories for a Semaphore project
@@ -11,42 +12,52 @@ description:
   - Retrieves all inventories associated with a specific Semaphore project.
 options:
   host:
-    type: str
+    description:
+      - Full host address of the Semaphore server (including http or https).
     required: true
-    description: Full host address of the Semaphore server (including http/https).
+    type: str
   port:
-    type: int
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the project whose inventories you want to list.
     required: true
-    description: ID of the project whose inventories you want to list.
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: List inventories for a project
   ebdruplab.semaphoreui.project_inventory_list:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 inventories:
   description: List of inventory objects associated with the project
   type: list
@@ -55,8 +66,11 @@ inventories:
     - id: 1
       name: Default Inventory
       type: static
-      ...
-'''
+"""
+
+from ansible.module_utils.basic import AnsibleModule
+from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 def main():
     module = AnsibleModule(
@@ -101,3 +115,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

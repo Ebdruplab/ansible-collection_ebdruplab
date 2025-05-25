@@ -1,45 +1,64 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_environment_create
 short_description: Create a Semaphore environment
 version_added: "1.0.0"
 description:
-  - Creates an environment inside a Semaphore project.
+  - Creates an environment inside a Semaphore project using the project ID.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP of the Semaphore server (including http or https).
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   project_id:
+    description:
+      - ID of the Semaphore project to associate the environment with.
+    required: true
     type: int
-    required: true
   environment:
-    type: dict
+    description:
+      - A dictionary defining the environment including name, env, json, password, and secrets.
     required: true
-    description: Dictionary defining the environment, including name, env, json, password, and secrets.
+    type: dict
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
-- name: Create environment
+EXAMPLES = r"""
+- name: Create an environment in a project
   ebdruplab.semaphoreui.project_environment_create:
     host: http://localhost
     port: 3000
@@ -53,18 +72,27 @@ EXAMPLES = r'''
       json:
         foo: "bar"
       secrets: []
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 environment:
   description: The created environment object.
   type: dict
   returned: success
+  sample:
+    id: 5
+    name: Test Environment
+    project_id: 1
+    env: '{"KEY": "value"}'
+    json: '{"foo": "bar"}'
+    secrets: []
+
 status:
-  description: HTTP response status code.
+  description: HTTP response status code from the Semaphore API.
   type: int
   returned: always
-'''
+  sample: 201
+"""
 
 def main():
     module = AnsibleModule(

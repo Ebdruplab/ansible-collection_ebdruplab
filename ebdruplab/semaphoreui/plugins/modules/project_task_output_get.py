@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -6,30 +11,45 @@ DOCUMENTATION = r'''
 ---
 module: project_task_output_get
 short_description: Get output logs for a Semaphore task
+version_added: "1.0.0"
 description:
-  - Retrieves the log/output lines of a specific task in a project.
+  - Retrieves the output lines of a specific task in a Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server, including protocol.
     type: str
     required: true
   port:
+    description:
+      - Port number where Semaphore API is accessible.
     type: int
     required: true
   session_cookie:
+    description:
+      - Authentication session cookie.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
   project_id:
+    description:
+      - ID of the project the task belongs to.
     type: int
     required: true
   task_id:
+    description:
+      - ID of the task whose output to retrieve.
     type: int
     required: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -44,18 +64,27 @@ EXAMPLES = r'''
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     task_id: 23
+  register: task_output
+
+- name: Display output lines
+  debug:
+    var: task_output.output
 '''
 
 RETURN = r'''
 output:
-  description: List of output lines from the task
-  returned: success
+  description: List of output lines for the specified task.
   type: list
   elements: dict
+  returned: success
   sample:
     - task_id: 23
       time: "2025-04-24T19:29:26.672Z"
       output: "Started playbook execution"
+status:
+  description: HTTP response code from the API.
+  type: int
+  returned: always
 '''
 
 def main():
@@ -92,10 +121,16 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"GET failed with status {status}", response=response_body)
+            module.fail_json(msg=f"Failed to retrieve task output: HTTP {status}", status=status)
 
-        output_lines = json.loads(response_body)
-        module.exit_json(changed=False, output=output_lines)
+        try:
+            output_lines = json.loads(response_body)
+            if not isinstance(output_lines, list):
+                raise ValueError("Expected a list of output lines")
+        except Exception as e:
+            module.fail_json(msg=f"Failed to parse response: {e}", raw=response_body)
+
+        module.exit_json(changed=False, output=output_lines, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

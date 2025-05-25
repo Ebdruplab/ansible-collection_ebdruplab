@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -13,20 +18,25 @@ options:
   host:
     type: str
     required: true
+    description: Hostname of the Semaphore server (including protocol).
   port:
     type: int
     required: true
+    description: Port of the Semaphore API (e.g. 3000).
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie from login module.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token for authentication.
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup @kris9854
 """
@@ -69,19 +79,18 @@ def main():
     url = f"{host}:{port}/api/user/tokens"
 
     try:
-        headers = get_auth_headers(
-            session_cookie=session_cookie,
-            api_token=api_token
-        )
+        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
+        headers["Content-Type"] = "application/json"
 
         response_body, status, _ = semaphore_get(
-            url,
+            url=url,
             headers=headers,
             validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch tokens: HTTP {status} - {response_body}")
+            error = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"Failed to fetch tokens: HTTP {status} - {error}", status=status)
 
         tokens = json.loads(response_body)
         module.exit_json(changed=False, tokens=tokens)

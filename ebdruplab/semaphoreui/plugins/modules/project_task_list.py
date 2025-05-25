@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -6,27 +11,40 @@ DOCUMENTATION = r'''
 ---
 module: project_task_list
 short_description: List tasks in a Semaphore project
+version_added: "1.0.0"
 description:
   - Retrieves a list of all tasks related to the given project in chronological order.
 options:
   host:
+    description:
+      - Hostname or IP (including protocol) of the Semaphore server.
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is listening (e.g., 3000).
     type: int
     required: true
   session_cookie:
+    description:
+      - Session authentication cookie.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication.
     type: str
     required: false
     no_log: true
   project_id:
+    description:
+      - ID of the Semaphore project whose tasks to list.
     type: int
     required: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -40,14 +58,23 @@ EXAMPLES = r'''
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
+  register: task_list
+
+- name: Show task IDs
+  debug:
+    var: task_list.tasks | map(attribute='id') | list
 '''
 
 RETURN = r'''
 tasks:
-  description: List of tasks for the project
-  returned: success
+  description: List of tasks for the project.
   type: list
   elements: dict
+  returned: success
+status:
+  description: HTTP status code from the Semaphore API.
+  type: int
+  returned: always
 '''
 
 def main():
@@ -83,17 +110,16 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"GET failed with status {status}", response=response_body)
+            module.fail_json(msg=f"Failed to list tasks: HTTP {status}", status=status, response=response_body)
 
         try:
             tasks = json.loads(response_body)
-        except json.JSONDecodeError as e:
-            module.fail_json(msg=f"Failed to decode JSON: {e}", raw=response_body)
+            if not isinstance(tasks, list):
+                raise ValueError("Expected list")
+        except Exception as e:
+            module.fail_json(msg=f"Invalid response format: {str(e)}", raw=response_body)
 
-        if not isinstance(tasks, list):
-            module.fail_json(msg="Expected response to be a list of tasks", raw=response_body)
-
-        module.exit_json(changed=False, tasks=tasks)
+        module.exit_json(changed=False, tasks=tasks, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

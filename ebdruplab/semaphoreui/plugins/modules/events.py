@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: events
 short_description: Get events from Semaphore
@@ -11,31 +16,44 @@ description:
   - Retrieves events related to Semaphore and projects accessible to the user.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   last_only:
+    description:
+      - Whether to only fetch the last 200 events.
+    required: false
     type: bool
     default: false
-    description: Whether to only fetch the last 200 events
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Fetch all events
   ebdruplab.semaphoreui.events:
     host: http://localhost
@@ -48,15 +66,20 @@ EXAMPLES = r'''
     port: 3000
     api_token: "abcd1234"
     last_only: true
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 events:
-  description: List of events
-  returned: always
+  description: List of events retrieved from Semaphore.
+  returned: success
   type: list
   elements: dict
-'''
+  sample:
+    - id: 12
+      type: task_finished
+      project_id: 1
+      message: Task completed
+"""
 
 def main():
     module = AnsibleModule(
@@ -96,8 +119,8 @@ def main():
 
         try:
             events = json.loads(response_body) if response_body else []
-        except json.JSONDecodeError as e:
-            module.fail_json(msg=f"Invalid JSON response", raw=response_body)
+        except json.JSONDecodeError:
+            module.fail_json(msg="Invalid JSON response", raw=response_body)
 
         module.exit_json(changed=False, events=events)
 

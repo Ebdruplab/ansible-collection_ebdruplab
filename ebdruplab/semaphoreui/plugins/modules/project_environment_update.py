@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_environment_update
 short_description: Update an existing environment in a Semaphore project
@@ -11,37 +16,53 @@ description:
   - Updates the specified environment for a project in Semaphore.
 options:
   host:
-    type: str
+    description:
+      - Hostname or IP of the Semaphore server (including http or https).
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - Port where the Semaphore API is running.
     required: true
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the Semaphore project.
     required: true
+    type: int
   environment_id:
+    description:
+      - ID of the environment to update.
+    required: true
     type: int
-    required: true
   environment:
-    type: dict
+    description:
+      - Dictionary describing the environment to update.
     required: true
-    description: Dictionary describing the environment to update.
+    type: dict
   session_cookie:
-    type: str
+    description:
+      - Session authentication cookie.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - Bearer token for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Update an environment
   ebdruplab.semaphoreui.project_environment_update:
     host: http://localhost
@@ -57,18 +78,18 @@ EXAMPLES = r'''
       json:
         key: "updated"
       secrets: []
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 environment:
-  description: The updated environment object
-  returned: success
+  description: The updated environment object (if returned by the server).
   type: dict
+  returned: success
 status:
-  description: HTTP status code
+  description: HTTP response status code.
   type: int
   returned: always
-'''
+"""
 
 def serialize_json_field(field_value, field_name, module):
     """
@@ -79,11 +100,9 @@ def serialize_json_field(field_value, field_name, module):
         return json.dumps(field_value)
     elif isinstance(field_value, str):
         try:
-            # Check if it's a valid JSON string
             json.loads(field_value)
             return field_value
         except json.JSONDecodeError:
-            # Try to convert KEY=value format
             if "=" in field_value:
                 key, value = field_value.split("=", 1)
                 return json.dumps({key.strip(): value.strip()})
@@ -91,6 +110,7 @@ def serialize_json_field(field_value, field_name, module):
                 module.fail_json(msg=f"Invalid JSON string in field '{field_name}': {field_value}")
     else:
         module.fail_json(msg=f"Unsupported type for field '{field_name}': {type(field_value)}")
+
 
 def main():
     module = AnsibleModule(
@@ -115,7 +135,6 @@ def main():
     environment = module.params["environment"]
     validate_certs = module.params["validate_certs"]
 
-    # Ensure required fields are correct
     environment["project_id"] = project_id
     environment["id"] = environment_id
 
@@ -144,10 +163,12 @@ def main():
             error = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
             module.fail_json(msg=f"PUT failed with status {status}: {error}", status=status)
 
-        module.exit_json(changed=True, updated=True, status=status)
+        updated_env = json.loads(response_body) if response_body else {}
+        module.exit_json(changed=True, environment=updated_env, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))
+
 
 if __name__ == "__main__":
     main()

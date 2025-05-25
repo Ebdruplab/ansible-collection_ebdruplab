@@ -1,9 +1,12 @@
-# plugins/modules/project_delete.py
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_delete
 short_description: Delete a Semaphore project
@@ -12,48 +15,71 @@ description:
   - Deletes a project from the Semaphore server using the project ID.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the project to delete.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Delete a Semaphore project
   ebdruplab.semaphoreui.project_delete:
     host: http://localhost
     port: 3000
     api_token: "your_api_token"
     project_id: 1
-'''
 
-RETURN = r'''
+- name: Delete a project using session cookie
+  ebdruplab.semaphoreui.project_delete:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 2
+"""
+
+RETURN = r"""
 deleted:
-  description: Whether the project was successfully deleted
+  description: Whether the project was successfully deleted.
   type: bool
   returned: always
+  sample: true
+
 status:
-  description: HTTP response code
+  description: HTTP response code from the server.
   type: int
   returned: always
-'''
+  sample: 204
+"""
 
 def main():
     module = AnsibleModule(
@@ -92,3 +118,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

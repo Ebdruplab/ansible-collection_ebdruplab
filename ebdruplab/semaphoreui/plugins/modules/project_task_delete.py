@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
@@ -5,34 +10,49 @@ DOCUMENTATION = r'''
 ---
 module: project_task_delete
 short_description: Delete a task from a Semaphore project
+version_added: "1.0.0"
 description:
   - Deletes a task (including its output) from the specified Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (e.g. http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where Semaphore API is listening (e.g. 3000).
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication (optional if api_token is used).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication (optional if session_cookie is used).
     type: str
     required: false
     no_log: true
   project_id:
+    description:
+      - ID of the project the task belongs to.
     type: int
     required: true
   task_id:
+    description:
+      - ID of the task to delete.
     type: int
     required: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -47,9 +67,15 @@ EXAMPLES = r'''
 
 RETURN = r'''
 msg:
-  description: Status message
-  returned: always
+  description:
+    - A message indicating the result of the deletion operation.
   type: str
+  returned: always
+status:
+  description:
+    - HTTP status code returned by the Semaphore API.
+  type: int
+  returned: always
 '''
 
 def main():
@@ -74,6 +100,7 @@ def main():
     validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/tasks/{task_id}"
+
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
         api_token=module.params.get("api_token")
@@ -82,13 +109,15 @@ def main():
 
     try:
         _, status, _ = semaphore_delete(
-            url, headers=headers, validate_certs=validate_certs
+            url=url,
+            headers=headers,
+            validate_certs=validate_certs
         )
 
         if status != 204:
-            module.fail_json(msg=f"DELETE failed with status {status}")
+            module.fail_json(msg=f"DELETE failed with status {status}", status=status)
 
-        module.exit_json(changed=True, msg="Task deleted successfully.")
+        module.exit_json(changed=True, msg="Task deleted successfully.", status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

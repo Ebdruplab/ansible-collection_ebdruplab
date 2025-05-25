@@ -1,7 +1,12 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_template_list
 short_description: List templates in a Semaphore project
@@ -10,62 +15,71 @@ description:
   - Retrieves a list of templates from a specific Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (including protocol).
   port:
+    description:
+      - Port on which the Semaphore server is listening.
     type: int
     required: true
-    description: Port on which the Semaphore server is listening.
   project_id:
+    description:
+      - ID of the project to list templates for.
     type: int
     required: true
-    description: ID of the project to list templates for.
   session_cookie:
+    description:
+      - Session cookie for authentication (obtained from login module).
     type: str
     required: false
     no_log: true
-    description: Session cookie for authentication (obtained from login module).
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
-    description: API token for authentication.
   validate_certs:
+    description:
+      - Whether to validate SSL certificates.
     type: bool
+    required: false
     default: true
-    description: Whether to validate SSL certificates.
   sort:
+    description:
+      - Field to sort by (e.g., C(name), C(type), etc.).
     type: str
     required: false
-    description: Field to sort by (e.g., 'name', 'type', etc.).
   order:
+    description:
+      - Sort order (ascending or descending).
     type: str
     required: false
-    choices:
-      - asc
-      - desc
-    description: Sort order ('asc' or 'desc').
-'''
+    choices: ["asc", "desc"]
+author:
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: List templates in a project (sorted by name ascending)
   ebdruplab.semaphoreui.project_template_list:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
-    sort: "name"
-    order: "asc"
-'''
+    sort: name
+    order: asc
+"""
 
-RETURN = r'''
+RETURN = r"""
 templates:
   description: List of templates in the specified project.
   type: list
-  returned: success
   elements: dict
-'''
+  returned: success
+"""
 
 def main():
     module = AnsibleModule(

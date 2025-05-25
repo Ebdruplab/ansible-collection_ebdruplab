@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: user_password_update
 short_description: Update a user's password in Semaphore
@@ -11,34 +16,48 @@ description:
   - Updates the password for a specific Semaphore user.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description:
+      - Port number where the Semaphore API is running.
     type: int
     required: true
   user_id:
+    description:
+      - ID of the user whose password will be updated.
     type: int
     required: true
   password:
+    description:
+      - New password for the user.
     type: str
     required: true
     no_log: true
   session_cookie:
+    description:
+      - Authentication session cookie.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Update user password
   ebdruplab.semaphoreui.user_password_update:
     host: http://localhost
@@ -46,14 +65,14 @@ EXAMPLES = r'''
     user_id: 2
     session_cookie: "{{ login_result.session_cookie }}"
     password: "newpassword123"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 status:
   description: HTTP status code of the update response
-  returned: always
   type: int
-'''
+  returned: always
+"""
 
 def main():
     module = AnsibleModule(

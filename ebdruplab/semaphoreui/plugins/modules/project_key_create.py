@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -11,72 +16,95 @@ description:
   - Creates a new access key in Semaphore, supporting SSH or login/password types.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (excluding protocol).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
   project_id:
+    description:
+      - ID of the project to create the key in.
     type: int
     required: true
-    description: ID of the project to create the key in.
   name:
+    description:
+      - Name of the key.
     type: str
     required: true
-    description: Name of the key.
   type:
+    description:
+      - Type of the access key.
     type: str
-    required: true
     choices: ["ssh", "login_password"]
-    description: Type of the access key.
+    required: true
   ssh:
+    description:
+      - SSH key details (required if type is C(ssh)).
     type: dict
     required: false
     no_log: true
-    description: SSH key details (required if type is ssh).
-    options:
+    suboptions:
       login:
+        description:
+          - SSH login username.
         type: str
         required: true
       passphrase:
+        description:
+          - Optional SSH key passphrase.
         type: str
         required: false
         no_log: true
       private_key:
+        description:
+          - The private SSH key content.
         type: str
         required: true
         no_log: true
   login_password:
+    description:
+      - Login/password details (required if type is C(login_password)).
     type: dict
     required: false
     no_log: true
-    description: Login/password details (required if type is login_password).
-    options:
+    suboptions:
       login:
+        description:
+          - Login username.
         type: str
         required: true
       password:
+        description:
+          - Login password.
         type: str
         required: true
         no_log: true
   override_secret:
+    description:
+      - Whether to override the secret if one already exists.
     type: bool
     default: true
-    description: Whether to override the secret.
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
@@ -109,7 +137,8 @@ EXAMPLES = r'''
 
 RETURN = r'''
 key:
-  description: The created access key object.
+  description:
+    - The created access key object returned by the Semaphore API.
   type: dict
   returned: success
 '''
@@ -155,6 +184,7 @@ def main():
     port = params["port"]
     project_id = params["project_id"]
     key_type = params["type"]
+
     headers = get_auth_headers(
         session_cookie=params.get("session_cookie"),
         api_token=params.get("api_token")
@@ -174,7 +204,6 @@ def main():
         if not params.get("ssh"):
             module.fail_json(msg="Missing required ssh data when type is 'ssh'")
         payload["ssh"] = params["ssh"]
-
     elif key_type == "login_password":
         if not params.get("login_password"):
             module.fail_json(msg="Missing required login_password data when type is 'login_password'")

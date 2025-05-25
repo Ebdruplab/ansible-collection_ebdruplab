@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_template_update
 short_description: Update a Semaphore template
@@ -11,123 +16,52 @@ description:
   - Updates an existing template in a specified Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description:
+      - Port of the Semaphore server (typically 3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project the template belongs to.
     type: int
     required: true
   template_id:
+    description:
+      - ID of the template to update.
     type: int
     required: true
   template:
+    description:
+      - Template payload with updated fields.
     type: dict
     required: true
-    description: Template payload with updated fields.
-    suboptions:
-      name:
-        type: str
-        required: true
-      app:
-        type: str
-        required: true
-      playbook:
-        type: str
-        required: true
-      inventory_id:
-        type: int
-        required: true
-      repository_id:
-        type: int
-        required: true
-      environment_id:
-        type: int
-        required: false
-      type:
-        type: str
-        default: "job"
-      view_id:
-        type: int
-        required: false
-      allow_override_args_in_task:
-        type: bool
-        default: false
-      suppress_success_alerts:
-        type: bool
-        default: false
-      survey_vars:
-        type: list
-        elements: dict
-        required: false
-      arguments:
-        type: str
-        required: false
-      limit:
-        type: str
-        required: false
-      tags:
-        type: str
-        required: false
-      skip_tags:
-        type: str
-        required: false
-      vault_password:
-        type: str
-        required: false
-      prompt_arguments:
-        type: bool
-        required: false
-      prompt_limit:
-        type: bool
-        required: false
-      prompt_tags:
-        type: bool
-        required: false
-      prompt_skip_tags:
-        type: bool
-        required: false
-      prompt_vault_password:
-        type: bool
-        required: false
-      prompt_inventory:
-        type: bool
-        required: false
-      prompt_credential:
-        type: bool
-        required: false
-      prompt_environment:
-        type: bool
-        required: false
-      prompt_verbosity:
-        type: bool
-        required: false
-      prompt_job_type:
-        type: bool
-        required: false
-      prompt_branch:
-        type: bool
-        required: false
-      prompt_debug:
-        type: bool
-        required: false
   session_cookie:
+    description:
+      - Session cookie used to authenticate.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used to authenticate.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate SSL certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Update a Semaphore template
   ebdruplab.semaphoreui.project_template_update:
     host: http://localhost
@@ -152,18 +86,18 @@ EXAMPLES = r'''
       skip_tags: "db"
       vault_password: "vault"
       prompt_debug: true
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 updated:
-  description: Whether the template was updated
+  description: Whether the template was updated.
   type: bool
   returned: always
 status:
-  description: HTTP status code from the Semaphore API
+  description: HTTP status code from the Semaphore API.
   type: int
   returned: always
-'''
+"""
 
 def main():
     module = AnsibleModule(

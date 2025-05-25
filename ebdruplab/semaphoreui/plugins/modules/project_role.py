@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -11,27 +16,39 @@ description:
   - Fetches the current user's role and permission level for the specified project.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (with http or https).
     type: str
     required: true
   port:
+    description:
+      - Port number the Semaphore API is listening on.
     type: int
     required: true
   project_id:
+    description:
+      - ID of the Semaphore project.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -46,12 +63,12 @@ EXAMPLES = r'''
 RETURN = r'''
 role:
   description: The user's role in the project (e.g., owner, admin, etc.)
-  returned: always
   type: str
-permissions:
-  description: Bitmask integer describing user permissions
   returned: always
+permissions:
+  description: Bitmask integer describing user permissions.
   type: int
+  returned: always
 '''
 
 def main():
@@ -82,12 +99,23 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
-        response_body, status, _ = semaphore_get(url, headers=headers, validate_certs=validate_certs)
+        response_body, status, _ = semaphore_get(
+            url,
+            headers=headers,
+            validate_certs=validate_certs
+        )
 
         if status != 200:
             module.fail_json(msg=f"Failed to fetch project role: HTTP {status}", response=response_body)
 
-        role_data = json.loads(response_body)
+        try:
+            role_data = json.loads(response_body)
+        except json.JSONDecodeError:
+            module.fail_json(msg="Invalid JSON returned from server", raw=response_body)
+
+        if not isinstance(role_data, dict) or "role" not in role_data or "permissions" not in role_data:
+            module.fail_json(msg="Malformed project role data", response=role_data)
+
         module.exit_json(changed=False, **role_data)
 
     except Exception as e:

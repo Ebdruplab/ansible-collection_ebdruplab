@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
@@ -8,43 +13,54 @@ module: user_update
 short_description: Update a Semaphore user
 version_added: "1.0.0"
 description:
-  - Updates user information including name, email, alert, and admin flags.
+  - Updates user information including name, username, email, alert flag, and admin privileges.
 options:
   host:
     type: str
     required: true
+    description: Hostname of the Semaphore server (including protocol).
   port:
     type: int
     required: true
+    description: Port on which Semaphore API is accessible.
   user_id:
     type: int
     required: true
+    description: ID of the user to update.
   name:
     type: str
     required: true
+    description: Full name of the user.
   username:
     type: str
     required: true
+    description: Username for login.
   email:
     type: str
     required: true
+    description: User's email address.
   alert:
     type: bool
     default: false
+    description: Whether the user should receive alerts.
   admin:
     type: bool
     default: false
+    description: Whether the user has admin privileges.
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie for authentication.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token for authentication.
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup @kris9854
 '''
@@ -65,7 +81,7 @@ EXAMPLES = r'''
 
 RETURN = r'''
 updated:
-  description: Whether the user was successfully updated
+  description: Whether the user was successfully updated.
   type: bool
   returned: always
 '''
@@ -112,11 +128,14 @@ def main():
     try:
         body = json.dumps(payload).encode("utf-8")
         _, status, _ = semaphore_put(
-            url, body=body, headers=headers, validate_certs=validate_certs
+            url=url,
+            body=body,
+            headers=headers,
+            validate_certs=validate_certs
         )
 
         if status != 204:
-            module.fail_json(msg=f"PUT failed with status {status}")
+            module.fail_json(msg=f"Failed to update user: HTTP {status}", status=status)
 
         module.exit_json(changed=True, updated=True)
 

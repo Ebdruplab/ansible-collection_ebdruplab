@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_request, get_auth_headers
 import json
@@ -11,30 +16,37 @@ description:
   - Deletes a schedule from the specified Semaphore project by ID.
 options:
   host:
+    description: Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description: Port on which Semaphore is running.
     type: int
     required: true
   project_id:
+    description: ID of the Semaphore project.
     type: int
     required: true
   schedule_id:
+    description: ID of the schedule to delete.
     type: int
     required: true
   session_cookie:
+    description: Session cookie obtained from the login module.
     type: str
     required: false
     no_log: true
   api_token:
+    description: API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -69,9 +81,7 @@ def main():
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
-        required_one_of=[
-            ['session_cookie', 'api_token']
-        ],
+        required_one_of=[['session_cookie', 'api_token']],
         supports_check_mode=False
     )
 
@@ -81,7 +91,6 @@ def main():
     session_cookie = module.params.get('session_cookie')
     api_token = module.params.get('api_token')
 
-    # Validate numeric parameters
     try:
         project_id = int(module.params['project_id'])
         schedule_id = int(module.params['schedule_id'])
@@ -93,19 +102,30 @@ def main():
     headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
     headers['Content-Type'] = 'application/json'
 
-    # Include ID and project in body to ensure proper deletion
-    payload = { 'id': schedule_id, 'project_id': project_id }
-    body = json.dumps(payload).encode('utf-8')
+    # Including ID and project_id in DELETE body
+    payload = {
+        "id": schedule_id,
+        "project_id": project_id
+    }
 
     try:
-        response_body, status, _ = semaphore_request(
-            'DELETE', url, body=body, headers=headers, validate_certs=validate_certs
+        body = json.dumps(payload).encode("utf-8")
+        _, status, _ = semaphore_request(
+            method="DELETE",
+            url=url,
+            body=body,
+            headers=headers,
+            validate_certs=validate_certs
         )
+
         if status not in (200, 204):
             module.fail_json(msg=f"Failed to delete schedule: HTTP {status}", status=status)
+
         module.exit_json(changed=True, deleted=True, status=status)
+
     except Exception as e:
         module.fail_json(msg=str(e))
 
 if __name__ == '__main__':
     main()
+

@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
@@ -11,29 +16,45 @@ description:
   - Updates an existing inventory inside a Semaphore project.
 options:
   host:
+    description:
+      - Hostname of the Semaphore server (including http/https).
     type: str
     required: true
   port:
+    description:
+      - Port on which the Semaphore API is running.
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project containing the inventory.
     type: int
     required: true
   inventory_id:
+    description:
+      - ID of the inventory to update.
     type: int
     required: true
   inventory:
+    description:
+      - Dictionary containing the updated inventory fields.
     type: dict
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate SSL certificates.
     type: bool
     default: true
 author:
@@ -57,9 +78,13 @@ EXAMPLES = r'''
 
 RETURN = r'''
 inventory:
-  description: The updated inventory (if returned by the API).
+  description: The updated inventory object (if returned by the API).
   type: dict
   returned: when available
+status:
+  description: HTTP response code returned by the API.
+  type: int
+  returned: always
 '''
 
 def main():
@@ -105,11 +130,10 @@ def main():
         )
 
         if status == 204:
-            # Update succeeded, but no body returned
             module.exit_json(changed=True, inventory=None, status=status)
         elif status == 200:
-            inventory = json.loads(response_body) if isinstance(response_body, bytes) else json.loads(response_body)
-            module.exit_json(changed=True, inventory=inventory)
+            inventory = json.loads(response_body) if isinstance(response_body, (bytes, str)) else response_body
+            module.exit_json(changed=True, inventory=inventory, status=status)
         else:
             module.fail_json(msg=f"Failed to update inventory: HTTP {status} - {response_body}", status=status)
 
@@ -118,3 +142,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

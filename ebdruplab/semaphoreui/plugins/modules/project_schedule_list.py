@@ -1,5 +1,11 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 DOCUMENTATION = r'''
 ---
@@ -41,6 +47,8 @@ options:
       - Whether to validate SSL certificates.
     type: bool
     default: true
+author:
+  - Kristian Ebdrup @kris9854
 '''
 
 EXAMPLES = r'''
@@ -74,8 +82,8 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            session_cookie=dict(type='str', no_log=True),
-            api_token=dict(type='str', no_log=True),
+            session_cookie=dict(type='str', required=False, no_log=True),
+            api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[['session_cookie', 'api_token']],
@@ -102,9 +110,14 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to list schedules: HTTP {status}", status=status)
+            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"Failed to list schedules: HTTP {status} - {msg}", status=status)
 
-        module.exit_json(changed=False, schedules=response_body, status=status)
+        schedules = json.loads(response_body)
+        if not isinstance(schedules, list):
+            module.fail_json(msg="Unexpected response format: schedules is not a list")
+
+        module.exit_json(changed=False, schedules=schedules, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

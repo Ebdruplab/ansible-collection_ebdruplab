@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -11,26 +16,33 @@ description:
   - Retrieves a specific schedule from a Semaphore project.
 options:
   host:
+    description: Hostname or IP of the Semaphore server (with protocol).
     type: str
     required: true
   port:
+    description: Port number where the Semaphore API is listening.
     type: int
     required: true
   project_id:
+    description: ID of the project that the schedule belongs to.
     type: int
     required: true
   schedule_id:
+    description: ID of the schedule to retrieve.
     type: int
     required: true
   session_cookie:
+    description: Session authentication cookie.
     type: str
     required: false
     no_log: true
   api_token:
+    description: API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Whether to validate SSL/TLS certificates.
     type: bool
     default: true
 author:
@@ -49,9 +61,9 @@ EXAMPLES = r'''
 
 RETURN = r'''
 schedule:
-  description: The schedule object retrieved from the API
-  returned: always
+  description: The schedule object retrieved from the API.
   type: dict
+  returned: always
 '''
 
 def main():
@@ -72,21 +84,22 @@ def main():
     host = module.params["host"].rstrip("/")
     port = module.params["port"]
     validate_certs = module.params["validate_certs"]
-    session_cookie = module.params.get("session_cookie")
-    api_token = module.params.get("api_token")
 
     try:
         project_id = int(module.params["project_id"])
         schedule_id = int(module.params["schedule_id"])
     except Exception as e:
-        module.fail_json(msg=f"Invalid numeric input: {str(e)}")
+        module.fail_json(msg=f"Invalid numeric input: {e}")
 
     url = f"{host}:{port}/api/project/{project_id}/schedules/{schedule_id}"
 
-    try:
-        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
-        headers["Content-Type"] = "application/json"
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token")
+    )
+    headers["Content-Type"] = "application/json"
 
+    try:
         response_body, status, _ = semaphore_get(
             url=url,
             headers=headers,
@@ -94,14 +107,14 @@ def main():
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status}", status=status)
+            msg = response_body if isinstance(response_body, str) else response_body.decode()
+            module.fail_json(msg=f"Failed to fetch schedule: HTTP {status} - {msg}", status=status)
 
         schedule = json.loads(response_body)
         module.exit_json(changed=False, schedule=schedule)
 
     except Exception as e:
         module.fail_json(msg=str(e))
-
 
 if __name__ == '__main__':
     main()

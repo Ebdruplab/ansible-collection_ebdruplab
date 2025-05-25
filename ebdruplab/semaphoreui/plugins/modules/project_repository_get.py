@@ -1,8 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 DOCUMENTATION = r'''
 ---
@@ -49,6 +52,8 @@ options:
       - Whether to validate SSL certificates.
     type: bool
     default: true
+author:
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -97,16 +102,16 @@ def main():
     project_id = module.params['project_id']
     repository_id = module.params['repository_id']
     validate_certs = module.params['validate_certs']
-    session_cookie = module.params.get('session_cookie')
-    api_token = module.params.get('api_token')
 
-    # Use the plural 'repositories' in the path
     url = f"{host}:{port}/api/project/{project_id}/repositories/{repository_id}"
 
-    try:
-        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
-        headers['Content-Type'] = 'application/json'
+    headers = get_auth_headers(
+        session_cookie=module.params.get('session_cookie'),
+        api_token=module.params.get('api_token')
+    )
+    headers['Content-Type'] = 'application/json'
 
+    try:
         response_body, status, _ = semaphore_get(
             url,
             headers=headers,
@@ -116,7 +121,8 @@ def main():
         if status != 200:
             module.fail_json(msg=f"Failed to retrieve repository: HTTP {status}", status=status)
 
-        module.exit_json(changed=False, repository=response_body, status=status)
+        repo_data = json.loads(response_body)
+        module.exit_json(changed=False, repository=repo_data, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))

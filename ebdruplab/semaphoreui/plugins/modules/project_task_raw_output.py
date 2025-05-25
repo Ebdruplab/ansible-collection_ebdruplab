@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
@@ -12,7 +17,7 @@ options:
   host:
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
+    description: Hostname of the Semaphore server, including protocol (e.g., http://localhost).
   port:
     type: int
     required: true
@@ -46,7 +51,7 @@ author:
 EXAMPLES = r'''
 - name: Get raw output from task 8
   ebdruplab.semaphoreui.project_task_raw_output:
-    host: localhost
+    host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
@@ -58,6 +63,19 @@ raw_output:
   description: The raw output of the specified task.
   type: str
   returned: success
+  sample: |
+    PLAY [localhost] ***********************************************************
+
+    TASK [Gathering Facts] *****************************************************
+    ok: [localhost]
+
+    TASK [Print Hello World] ***************************************************
+    ok: [localhost] => {
+        "msg": "Hello World"
+    }
+
+    PLAY RECAP *****************************************************************
+    localhost                  : ok=2    changed=0    unreachable=0    failed=0   
 '''
 
 def main():
@@ -87,6 +105,8 @@ def main():
         session_cookie=module.params.get("session_cookie"),
         api_token=module.params.get("api_token")
     )
+    headers["Content-Type"] = "application/json"
+    headers["Accept"] = "text/plain"
 
     try:
         response_body, status, _ = semaphore_get(
@@ -109,3 +129,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

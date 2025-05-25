@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
@@ -46,6 +51,8 @@ options:
       - Whether to validate SSL certificates.
     type: bool
     default: true
+author:
+  - Kristian Ebdrup (@kris9854)
 '''
 
 EXAMPLES = r'''
@@ -116,7 +123,6 @@ def main():
 
     except Exception as e:
         module.fail_json(msg=str(e))
-
 
 if __name__ == '__main__':
     main()

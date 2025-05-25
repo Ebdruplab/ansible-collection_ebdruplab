@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -6,37 +11,46 @@ DOCUMENTATION = r'''
 ---
 module: project_repository_list
 short_description: List repositories in a Semaphore project
+version_added: "1.0.0"
 description:
   - Retrieves a list of all repositories configured under a specific Semaphore project.
 options:
   host:
     type: str
     required: true
+    description: Hostname or IP of the Semaphore server (including http or https).
   port:
     type: int
     required: true
+    description: Port on which the Semaphore API is accessible.
   session_cookie:
     type: str
     required: false
     no_log: true
+    description: Session cookie for authentication.
   api_token:
     type: str
     required: false
     no_log: true
+    description: API token for authentication.
   project_id:
     type: int
     required: true
+    description: ID of the Semaphore project.
   sort:
     type: str
     required: false
     choices: ["name", "git_url"]
+    description: Field to sort the results by.
   order:
     type: str
     required: false
     choices: ["asc", "desc"]
+    description: Sort order.
   validate_certs:
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
@@ -48,6 +62,8 @@ EXAMPLES = r'''
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
+    sort: name
+    order: asc
 '''
 
 RETURN = r'''
@@ -79,8 +95,9 @@ def main():
     project_id = module.params["project_id"]
     sort = module.params.get("sort")
     order = module.params.get("order")
+    validate_certs = module.params["validate_certs"]
 
-    # Build query string
+    # Construct query string
     query = []
     if sort:
         query.append(f"sort={sort}")
@@ -98,18 +115,22 @@ def main():
 
     try:
         response_body, status, _ = semaphore_get(
-            url, headers=headers, validate_certs=module.params["validate_certs"]
+            url=url,
+            headers=headers,
+            validate_certs=validate_certs
         )
 
         if status != 200:
-            msg = response_body if isinstance(response_body, str) else response_body.decode()
-            module.fail_json(msg=f"GET failed with status {status}: {msg}", status=status)
+            error = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+            module.fail_json(msg=f"GET failed with status {status}: {error}", status=status)
 
-        data = json.loads(response_body) if response_body else []
-        module.exit_json(changed=False, repositories=data)
+        repositories = json.loads(response_body) if response_body else []
+        module.exit_json(changed=False, repositories=repositories)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
+
 if __name__ == "__main__":
     main()
+

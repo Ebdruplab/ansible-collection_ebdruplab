@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
@@ -10,35 +15,42 @@ description:
   - Deletes an access key stored in Semaphore.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (excluding protocol).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
   project_id:
+    description:
+      - ID of the project the key belongs to.
     type: int
     required: true
-    description: ID of the project the key belongs to.
   key_id:
+    description:
+      - ID of the access key to delete.
     type: int
     required: true
-    description: ID of the access key to delete.
   session_cookie:
+    description:
+      - Session cookie from a previous login.
     type: str
     required: false
     no_log: true
-    description: Session cookie from a previous login.
   api_token:
+    description:
+      - API token to authenticate instead of session cookie.
     type: str
     required: false
     no_log: true
-    description: API token to authenticate instead of session cookie.
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
@@ -46,7 +58,7 @@ author:
 EXAMPLES = r'''
 - name: Delete an access key in Semaphore
   ebdruplab.semaphoreui.project_key_delete:
-    host: localhost
+    host: http://localhost
     port: 3000
     project_id: 1
     key_id: 42
@@ -106,3 +118,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

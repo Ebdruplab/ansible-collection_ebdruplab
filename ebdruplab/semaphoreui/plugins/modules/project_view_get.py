@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_view_get
 short_description: Get a specific view from a Semaphore project
@@ -11,38 +16,47 @@ description:
   - Retrieves a view object by its ID within a given project in Semaphore.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (excluding protocol).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
-    description: Port of the Semaphore server (e.g., 3000).
   project_id:
+    description:
+      - ID of the project containing the view.
     type: int
     required: true
-    description: ID of the project containing the view.
   view_id:
+    description:
+      - ID of the view to retrieve.
     type: int
     required: true
-    description: ID of the view to retrieve.
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Get a view from a project
   ebdruplab.semaphoreui.project_view_get:
     host: http://localhost
@@ -50,14 +64,14 @@ EXAMPLES = r'''
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     view_id: 10
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 view:
   description: The view object retrieved from the project.
   type: dict
   returned: success
-'''
+"""
 
 def main():
     module = AnsibleModule(
@@ -106,3 +120,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

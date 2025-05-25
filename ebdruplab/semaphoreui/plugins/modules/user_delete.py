@@ -1,53 +1,70 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: user_delete
 short_description: Delete a user in Semaphore
+version_added: "1.0.0"
 description:
   - Deletes a user by user ID in the Semaphore system.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (including protocol).
     type: str
     required: true
   port:
+    description:
+      - Port on which the Semaphore API is listening (e.g., 3000).
     type: int
     required: true
   user_id:
+    description:
+      - The ID of the user to delete.
     type: int
     required: true
-    description: The ID of the user to delete
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication instead of session cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Delete a user by ID
   ebdruplab.semaphoreui.user_delete:
     host: http://localhost
     port: 3000
     user_id: 5
     session_cookie: "{{ login_result.session_cookie }}"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 deleted:
-  description: Whether the user was successfully deleted
-  returned: always
+  description: Whether the user was successfully deleted.
   type: bool
-'''
+  returned: always
+"""
 
 def main():
     module = AnsibleModule(

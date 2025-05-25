@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -12,27 +17,40 @@ description:
   - Supports static text, static YAML, or file-based inventory from a repository.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (with protocol).
     type: str
     required: true
   port:
+    description:
+      - Port of the Semaphore server (e.g., 3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the Semaphore project.
     type: int
     required: true
   inventory:
+    description:
+      - Dictionary describing the inventory.
     type: dict
     required: true
-    description: Dictionary describing the inventory.
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -108,17 +126,15 @@ def main():
     inventory_data = module.params["inventory"]
     inventory_data["project_id"] = project_id
 
-    # Normalize inventory_file to inventory for type "file"
     if inventory_data.get("type") == "file" and "inventory_file" in inventory_data:
         inventory_data["inventory"] = inventory_data.pop("inventory_file")
 
-    # Validate type
     valid_types = ["static", "static-yaml", "file"]
     inventory_type = inventory_data.get("type")
+
     if inventory_type not in valid_types:
         module.fail_json(msg=f"Invalid or missing inventory type. Must be one of: {', '.join(valid_types)}")
 
-    # Configure inventory_mode and validate required fields
     if inventory_type == "static":
         if "inventory" not in inventory_data:
             module.fail_json(msg="Missing 'inventory' content for type 'static'")

@@ -1,49 +1,72 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: logout
 short_description: Logout of Semaphore UI
 version_added: "1.0.0"
 description:
-  - Destroys the current session or invalidates the API token session.
+  - Destroys the current session or invalidates the API token session in Semaphore.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore UI is running.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie to invalidate.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
-- name: Logout from Semaphore
+EXAMPLES = r"""
+- name: Logout from Semaphore using session cookie
   ebdruplab.semaphoreui.logout:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
-'''
 
-RETURN = r'''
+- name: Logout from Semaphore using API token
+  ebdruplab.semaphoreui.logout:
+    host: http://localhost
+    port: 3000
+    api_token: "abcd1234"
+"""
+
+RETURN = r"""
 changed:
-  description: Whether the logout request was accepted
+  description: Whether the logout request was accepted.
   returned: always
   type: bool
-'''
+  sample: true
+"""
 
 def main():
     module = AnsibleModule(

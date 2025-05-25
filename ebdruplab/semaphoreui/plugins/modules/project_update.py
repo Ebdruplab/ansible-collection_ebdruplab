@@ -1,10 +1,13 @@
-# plugins/modules/project_update.py
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_update
 short_description: Update a Semaphore project
@@ -13,33 +16,47 @@ description:
   - Updates metadata for an existing Semaphore project by ID.
 options:
   host:
+    description:
+      - Hostname or IP address of the Semaphore server (e.g., http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where Semaphore API is listening (e.g., 3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project to update.
     type: int
     required: true
   project:
+    description:
+      - Dictionary defining updated project fields.
     type: dict
     required: true
   session_cookie:
+    description:
+      - Session cookie from login module.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate SSL certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Update Semaphore project
   ebdruplab.semaphoreui.project_update:
     host: http://localhost
@@ -53,18 +70,18 @@ EXAMPLES = r'''
       max_parallel_tasks: 2
       type: "test"
       demo: false
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 updated:
-  description: Whether the project was successfully updated
+  description: Whether the project was successfully updated.
   type: bool
   returned: always
 status:
-  description: HTTP response code
+  description: HTTP response code.
   type: int
   returned: always
-'''
+"""
 
 def main():
     module = AnsibleModule(
@@ -114,3 +131,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

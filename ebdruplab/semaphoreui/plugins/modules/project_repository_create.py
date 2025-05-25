@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
@@ -8,42 +13,60 @@ module: project_repository_create
 short_description: Create a repository in a Semaphore project
 version_added: "1.0.0"
 description:
-  - This module sends a POST request to Semaphore to create a new repository under a specified project.
+  - Sends a POST request to Semaphore to create a new repository under a specific project.
 options:
   host:
+    description:
+      - Hostname (including protocol) of the Semaphore server.
     type: str
     required: true
   port:
+    description:
+      - Port on which Semaphore is running.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   project_id:
+    description:
+      - ID of the project in which to create the repository.
     type: int
     required: true
   repository:
+    description:
+      - Repository details to create.
     type: dict
     required: true
     options:
       name:
+        description: Name of the repository.
         type: str
         required: true
       git_url:
+        description: Git URL of the repository.
         type: str
         required: true
       git_branch:
+        description: Branch to use.
         type: str
         required: true
       ssh_key_id:
+        description: ID of the SSH key to associate with the repository.
         type: int
         required: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -66,7 +89,7 @@ EXAMPLES = r'''
 
 RETURN = r'''
 repository:
-  description: Created repository object
+  description: Created repository object.
   returned: success
   type: dict
 '''

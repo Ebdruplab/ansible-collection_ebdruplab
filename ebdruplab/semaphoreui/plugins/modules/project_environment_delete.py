@@ -1,68 +1,92 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_environment_delete
 short_description: Delete an environment in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Deletes a specific environment from a Semaphore project.
+  - Deletes a specific environment from a Semaphore project using its environment ID.
 options:
   host:
-    type: str
+    description:
+      - Hostname or IP address of the Semaphore server, including protocol (e.g., http://localhost).
     required: true
-    description: Hostname or IP of the Semaphore server (with protocol).
+    type: str
   port:
-    type: int
+    description:
+      - Port where the Semaphore API is running.
     required: true
-    description: Port where the Semaphore API is listening.
+    type: int
   project_id:
-    type: int
+    description:
+      - ID of the Semaphore project.
     required: true
-    description: ID of the Semaphore project.
+    type: int
   environment_id:
-    type: int
+    description:
+      - ID of the environment to delete.
     required: true
-    description: ID of the environment to delete.
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session authentication cookie.
     required: false
+    type: str
     no_log: true
-    description: Session authentication cookie.
   api_token:
-    type: str
+    description:
+      - Bearer token for authentication.
     required: false
+    type: str
     no_log: true
-    description: Bearer token for authentication.
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
-- name: Delete a project environment
+EXAMPLES = r"""
+- name: Delete a Semaphore project environment
   ebdruplab.semaphoreui.project_environment_delete:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: 1
     environment_id: 5
-'''
 
-RETURN = r'''
+- name: Delete environment with API token
+  ebdruplab.semaphoreui.project_environment_delete:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ token }}"
+    project_id: 2
+    environment_id: 10
+"""
+
+RETURN = r"""
 deleted:
   description: Whether the environment was successfully deleted.
   type: bool
   returned: always
+  sample: true
+
 status:
   description: HTTP status code returned by the Semaphore API.
   type: int
   returned: always
-'''
+  sample: 204
+"""
 
 def main():
     module = AnsibleModule(

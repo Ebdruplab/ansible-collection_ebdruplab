@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_task_start
 short_description: Start a task using a Semaphore template
@@ -11,39 +16,49 @@ description:
   - Starts a new task/job in Semaphore by triggering a run based on a template.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (e.g. http://localhost).
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (e.g. http://localhost).
   port:
+    description:
+      - Port of the Semaphore API (e.g. 3000).
     type: int
     required: true
-    description: Port of the Semaphore API (e.g. 3000).
   project_id:
+    description:
+      - Project ID that owns the template and task.
     type: int
     required: true
-    description: Project ID that owns the template and task.
   task:
+    description:
+      - Dictionary with task options.
+      - Must include C(template_id), C(inventory_id), C(repository_id), and C(environment_id).
+      - Optional fields include C(debug), C(override_args), and C(start_version).
     type: dict
     required: true
-    description:
-      Dictionary with task options. Must include template_id, inventory_id,
-      repository_id, and environment_id. Optional: debug, override_args, start_version.
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token to authenticate instead of session cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Start a task using a template
   ebdruplab.semaphoreui.project_task_start:
     host: http://localhost
@@ -58,14 +73,14 @@ EXAMPLES = r'''
       debug: true
       override_args: ""
       start_version: ""
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 task:
-  description: The started task object
-  returned: success
+  description: The started task object returned by Semaphore.
   type: dict
-'''
+  returned: success
+"""
 
 def main():
     module = AnsibleModule(

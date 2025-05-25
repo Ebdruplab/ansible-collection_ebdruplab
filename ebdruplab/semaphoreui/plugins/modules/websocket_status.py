@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 
@@ -7,24 +12,29 @@ module: websocket_status
 short_description: Check WebSocket support on the Semaphore server
 version_added: "1.0.0"
 description:
-  - Sends GET to /ws and checks if it's reachable.
-  - Authentication is now required as of Semaphore 2.x.
+  - Sends a GET request to the /ws endpoint to determine if WebSocket is reachable.
+  - Authentication is required as of Semaphore 2.x and above.
 options:
   host:
+    description: Hostname or IP address (with protocol) of the Semaphore server.
     type: str
     required: true
   port:
+    description: Port number where the Semaphore API is exposed.
     type: int
     required: true
   session_cookie:
+    description: Session authentication cookie.
     type: str
     required: false
     no_log: true
   api_token:
+    description: API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Whether to validate SSL/TLS certificates.
     type: bool
     default: true
 author:
@@ -41,13 +51,13 @@ EXAMPLES = r'''
 
 RETURN = r'''
 reachable:
-  description: Whether the /ws endpoint responded successfully
-  returned: always
+  description: Whether the /ws endpoint responded with HTTP 200 OK.
   type: bool
-status:
-  description: HTTP status code
   returned: always
+status:
+  description: HTTP status code from the GET request to /ws.
   type: int
+  returned: always
 '''
 
 def main():
@@ -79,6 +89,7 @@ def main():
         _, status, _ = semaphore_get(
             url, headers=headers, validate_certs=validate_certs
         )
+
         module.exit_json(changed=False, reachable=(status == 200), status=status)
 
     except Exception as e:

@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
@@ -10,30 +15,40 @@ description:
   - Deletes an inventory from a Semaphore project.
 options:
   host:
+    description:
+      - Hostname of the Semaphore server, including protocol (e.g. http://localhost).
     type: str
     required: true
-    description: Hostname of the Semaphore server, including protocol (e.g. http://localhost).
   port:
+    description:
+      - Port of the Semaphore server (e.g. 3000).
     type: int
     required: true
-    description: Port of the Semaphore server (e.g. 3000).
   project_id:
+    description:
+      - The ID of the project the inventory belongs to.
     type: int
     required: true
-    description: The ID of the project the inventory belongs to.
   inventory_id:
+    description:
+      - The ID of the inventory to delete.
     type: int
     required: true
-    description: The ID of the inventory to delete.
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -105,3 +120,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
@@ -43,10 +48,14 @@ author:
 EXAMPLES = r'''
 - name: List access keys in Semaphore for a project
   ebdruplab.semaphoreui.project_key_list:
-    host: localhost
+    host: http://localhost
     port: 3000
     project_id: 1
     session_cookie: "{{ login_result.session_cookie }}"
+
+- name: Display access keys
+  debug:
+    var: result.keys
 '''
 
 RETURN = r'''
@@ -93,7 +102,7 @@ def main():
         if status != 200:
             module.fail_json(msg=f"Failed to list keys: HTTP {status}", status=status)
 
-        keys = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        keys = json.loads(response_body.decode() if isinstance(response_body, bytes) else response_body)
 
         if not isinstance(keys, list):
             module.fail_json(msg="Invalid response format: expected a list")
@@ -106,3 +115,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

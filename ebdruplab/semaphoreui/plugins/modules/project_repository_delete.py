@@ -1,3 +1,8 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
 
@@ -5,37 +10,47 @@ DOCUMENTATION = r'''
 ---
 module: project_repository_delete
 short_description: Delete a repository from a Semaphore project
+version_added: "1.0.0"
 description:
   - Sends a DELETE request to remove a specific repository from a Semaphore project.
 options:
   host:
+    description:
+      - Hostname or IP address (including protocol) of the Semaphore server.
     type: str
     required: true
-    description: Hostname or IP of the Semaphore server (excluding protocol).
   port:
+    description:
+      - Port on which Semaphore is running.
     type: int
     required: true
-    description: Port on which Semaphore is running.
   session_cookie:
+    description:
+      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication.
     type: str
     required: false
     no_log: true
   project_id:
+    description:
+      - ID of the project the repository belongs to.
     type: int
     required: true
-    description: ID of the project the repository belongs to.
   repository_id:
+    description:
+      - ID of the repository to delete.
     type: int
     required: true
-    description: ID of the repository to delete.
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
-    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
@@ -51,10 +66,14 @@ EXAMPLES = r'''
 '''
 
 RETURN = r'''
-msg:
-  description: Status message
+changed:
+  description: Indicates whether the repository was deleted.
+  type: bool
   returned: always
+msg:
+  description: Status message of the operation.
   type: str
+  returned: always
 '''
 
 def main():
@@ -78,7 +97,6 @@ def main():
     project_id = p["project_id"]
     repository_id = p["repository_id"]
 
-    # FIX: correct plural 'repositories'
     url = f"{host}:{port}/api/project/{project_id}/repositories/{repository_id}"
 
     headers = get_auth_headers(
@@ -95,7 +113,7 @@ def main():
         )
 
         if status != 204:
-            module.fail_json(msg=f"DELETE failed with status {status}")
+            module.fail_json(msg=f"DELETE failed with status {status}", status=status)
 
         module.exit_json(changed=True, msg="Repository deleted successfully.")
 
@@ -105,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

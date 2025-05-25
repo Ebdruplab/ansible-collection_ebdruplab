@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: project_template_create
 short_description: Create a Semaphore template (task, deploy or build)
@@ -11,32 +16,80 @@ description:
   - Creates a new template in Semaphore with support for full configuration including build linkage, arguments, vaults, and survey variables.
 options:
   host:
+    description:
+      - Hostname or IP of the Semaphore server (e.g. http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port of the Semaphore API (e.g. 3000).
     type: int
     required: true
   project_id:
+    description:
+      - Project ID that owns the template.
     type: int
     required: true
   template:
+    description:
+      - Template definition dictionary.
     type: dict
     required: true
-    description: Template definition dictionary.
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token used for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup (@kris9854)
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
+
+EXAMPLES = r"""
+- name: Create a template with required fields
+  ebdruplab.semaphoreui.project_template_create:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 1
+    template:
+      name: "Run Playbook"
+      app: "My App"
+      playbook: "site.yml"
+      inventory_id: 1
+      repository_id: 1
+      environment_id: 1
+      arguments: "[]"
+      vaults:
+        - id: 2
+          type: "ssh"
+"""
+
+RETURN = r"""
+template:
+  description: The created Semaphore template object.
+  returned: success
+  type: dict
+  sample:
+    id: 42
+    name: Run Playbook
+    app: My App
+    playbook: site.yml
+    inventory_id: 1
+    repository_id: 1
+    environment_id: 1
+"""
 
 def main():
     module = AnsibleModule(
@@ -57,19 +110,16 @@ def main():
     tpl = p['template']
     tpl['project_id'] = p['project_id']
 
-    # Validate required fields
     for req in ['name', 'app', 'playbook', 'inventory_id', 'repository_id']:
         if not tpl.get(req):
             module.fail_json(msg=f"Missing required template field: {req}")
 
-    # Type coercion for numeric fields
     tpl['inventory_id'] = int(tpl.get('inventory_id'))
     tpl['repository_id'] = int(tpl.get('repository_id'))
     tpl['environment_id'] = int(tpl.get('environment_id', 1))
     tpl['view_id'] = int(tpl.get('view_id', 1))
     tpl['build_template_id'] = int(tpl.get('build_template_id', 0))
 
-    # Set defaults
     defaults = {
         "type": "",
         "description": "",
@@ -96,14 +146,12 @@ def main():
     for k, v in defaults.items():
         tpl.setdefault(k, v)
 
-    # Ensure arguments is valid JSON string
     tpl['arguments'] = tpl.get('arguments', "[]")
     try:
         json.loads(tpl['arguments'])
     except (TypeError, ValueError):
         module.fail_json(msg="template.arguments must be a valid JSON string (e.g. '[]', '{}', etc.)")
 
-    # Validate vaults format
     validated_vaults = []
     for v in tpl.get("vaults", []):
         if not isinstance(v, dict) or "id" not in v or "type" not in v:

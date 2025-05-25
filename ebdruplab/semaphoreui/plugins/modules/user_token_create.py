@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: user_token_create
 short_description: Create an API token for the logged-in user
@@ -11,36 +16,44 @@ description:
   - Sends a POST request to create a new API token for the currently authenticated user in Semaphore.
 options:
   host:
+    description:
+      - Full hostname or IP of the Semaphore server (e.g., http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port on which the Semaphore API is available.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie used for authentication.
     type: str
     required: true
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Create API token
   ebdruplab.semaphoreui.user_token_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 token:
-  description: The created API token object
+  description: The created API token object.
   returned: success
   type: dict
-'''
+"""
 
 def main():
     module = AnsibleModule(
@@ -66,7 +79,7 @@ def main():
     try:
         response_body, status, _ = semaphore_post(
             url,
-            body=None,  # No payload required for this endpoint
+            body=None,
             headers=headers,
             validate_certs=validate_certs
         )

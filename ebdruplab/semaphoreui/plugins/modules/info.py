@@ -1,52 +1,70 @@
-# plugins/modules/info.py
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: info
-short_description: Fetches information about Semaphore
+short_description: Fetch information about Semaphore
 version_added: "1.0.0"
 description:
-  - Returns current version and update info for the Semaphore server
+  - Returns the current version and update info for the Semaphore server.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Get Semaphore info
   ebdruplab.semaphoreui.info:
     host: http://localhost
     port: 3000
     api_token: "abcd1234"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 version:
-  description: Semaphore version info
-  returned: always
+  description: Information about the Semaphore server version.
+  returned: success
   type: dict
-'''
+  sample:
+    build: "release"
+    version: "2.9.48"
+    update_available: false
+"""
 
 def main():
     module = AnsibleModule(

@@ -1,8 +1,13 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
+
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
 
-DOCUMENTATION = r'''
+DOCUMENTATION = r"""
 ---
 module: events_last
 short_description: Get last 200 events from Semaphore
@@ -11,41 +16,57 @@ description:
   - Fetches the last 200 events related to Semaphore and projects the user is part of.
 options:
   host:
-    type: str
+    description:
+      - The URL or IP address of the Semaphore server.
     required: true
+    type: str
   port:
-    type: int
+    description:
+      - The port on which the Semaphore API is running.
     required: true
+    type: int
   session_cookie:
-    type: str
+    description:
+      - Session cookie used for authentication.
     required: false
+    type: str
     no_log: true
   api_token:
-    type: str
+    description:
+      - API token used for authentication.
     required: false
+    type: str
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates.
+    required: false
     type: bool
     default: true
 author:
-  - Kristian Ebdrup @kris9854
-'''
+  - "Kristian Ebdrup (@kris9854)"
+"""
 
-EXAMPLES = r'''
+EXAMPLES = r"""
 - name: Fetch last 200 events
   ebdruplab.semaphoreui.events_last:
     host: http://localhost
     port: 3000
     api_token: "abcd1234"
-'''
+"""
 
-RETURN = r'''
+RETURN = r"""
 events:
-  description: List of the last 200 events
-  returned: always
+  description: List of the last 200 events retrieved from Semaphore.
+  returned: success
   type: list
   elements: dict
-'''
+  sample:
+    - id: 42
+      type: project_created
+      project_id: 5
+      message: Project created successfully
+"""
 
 def main():
     module = AnsibleModule(
