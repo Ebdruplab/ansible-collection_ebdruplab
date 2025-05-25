@@ -117,6 +117,9 @@
           environment_id: 1
           allow_override_args_in_task: false
           prompt_limit: true
+          vaults:
+            - type: "password"
+              id: "{{ key_create.key.id }}"
       register: tpl_create
 
     - name: "Log out of Semaphore"

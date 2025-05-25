@@ -13,15 +13,12 @@ options:
   host:
     type: str
     required: true
-    description: Hostname or IP address of the Semaphore server.
   port:
     type: int
     required: true
-    description: Port of the Semaphore server.
   project_id:
     type: int
     required: true
-    description: ID of the Semaphore project to create the template under.
   template:
     type: dict
     required: true
@@ -37,58 +34,8 @@ options:
   validate_certs:
     type: bool
     default: true
-    description: Whether to verify SSL certificates.
 author:
   - Kristian Ebdrup (@kris9854)
-'''
-
-EXAMPLES = r'''
-- name: Create a basic template
-  ebdruplab.semaphoreui.project_template_create:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
-    project_id: 1
-    template:
-      name: "Deploy Web"
-      app: "ansible"
-      playbook: "deploy.yml"
-      inventory_id: 1
-      repository_id: 1
-
-- name: Create a full-featured build template
-  ebdruplab.semaphoreui.project_template_create:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
-    project_id: 1
-    template:
-      name: "Build Pipeline"
-      app: "ansible"
-      playbook: "build.yml"
-      inventory_id: 1
-      repository_id: 1
-      environment_id: 1
-      view_id: 1
-      description: "Pipeline to build and deploy"
-      git_branch: "main"
-      arguments: "[]"
-      vault_password: ""
-      allow_override_args_in_task: false
-      suppress_success_alerts: false
-      autorun: false
-      type: "build"
-      start_version: ""
-      build_template_id: 0
-      vaults: []
-      survey_vars: []
-'''
-
-RETURN = r'''
-template:
-  description: The created template object.
-  returned: success
-  type: dict
 '''
 
 def main():
@@ -107,52 +54,83 @@ def main():
     )
 
     p = module.params
-    host = p['host'].rstrip('/')
-    port = p['port']
-    project_id = p['project_id']
     tpl = p['template']
-    validate_certs = p['validate_certs']
+    tpl['project_id'] = p['project_id']
 
-    # Required fields
-    required = ['name', 'app', 'playbook', 'inventory_id', 'repository_id']
-    missing = [k for k in required if not tpl.get(k)]
-    if missing:
-        module.fail_json(msg=f"Missing required fields in template: {', '.join(missing)}")
+    # Validate required fields
+    for req in ['name', 'app', 'playbook', 'inventory_id', 'repository_id']:
+        if not tpl.get(req):
+            module.fail_json(msg=f"Missing required template field: {req}")
 
-    # Type conversions and defaults
-    tpl['project_id'] = project_id
-    tpl['type'] = tpl.get('type', '') or ''  # default to ""
-    tpl['view_id'] = int(tpl.get('view_id') or 1)
-    tpl['environment_id'] = int(tpl.get('environment_id') or 1)
-    tpl['build_template_id'] = int(tpl.get('build_template_id') or 0)
+    # Type coercion for numeric fields
+    tpl['inventory_id'] = int(tpl.get('inventory_id'))
+    tpl['repository_id'] = int(tpl.get('repository_id'))
+    tpl['environment_id'] = int(tpl.get('environment_id', 1))
+    tpl['view_id'] = int(tpl.get('view_id', 1))
+    tpl['build_template_id'] = int(tpl.get('build_template_id', 0))
 
+    # Set defaults
+    defaults = {
+        "type": "",
+        "description": "",
+        "git_branch": "",
+        "limit": "",
+        "tags": "",
+        "skip_tags": "",
+        "vault_password": "",
+        "start_version": "",
+        "allow_override_args_in_task": False,
+        "suppress_success_alerts": False,
+        "autorun": False,
+        "prompt_inventory": False,
+        "prompt_limit": False,
+        "prompt_tags": False,
+        "prompt_skip_tags": False,
+        "prompt_vault_password": False,
+        "prompt_arguments": False,
+        "prompt_branch": False,
+        "prompt_environment": False,
+        "vaults": [],
+        "survey_vars": []
+    }
+    for k, v in defaults.items():
+        tpl.setdefault(k, v)
+
+    # Ensure arguments is valid JSON string
     tpl['arguments'] = tpl.get('arguments', "[]")
-    tpl['start_version'] = tpl.get('start_version', "")
-    tpl['description'] = tpl.get('description', "")
-    tpl['git_branch'] = tpl.get('git_branch', "")
-    tpl['limit'] = tpl.get('limit', "")
-    tpl['tags'] = tpl.get('tags', "")
-    tpl['skip_tags'] = tpl.get('skip_tags', "")
-    tpl['vault_password'] = tpl.get('vault_password', "")
+    try:
+        json.loads(tpl['arguments'])
+    except (TypeError, ValueError):
+        module.fail_json(msg="template.arguments must be a valid JSON string (e.g. '[]', '{}', etc.)")
 
-    tpl['allow_override_args_in_task'] = tpl.get('allow_override_args_in_task', False)
-    tpl['suppress_success_alerts'] = tpl.get('suppress_success_alerts', False)
-    tpl['autorun'] = tpl.get('autorun', False)
-
-    tpl['vaults'] = tpl.get('vaults') or []
-    tpl['survey_vars'] = tpl.get('survey_vars') or []
+    # Validate vaults format
+    validated_vaults = []
+    for v in tpl.get("vaults", []):
+        if not isinstance(v, dict) or "id" not in v or "type" not in v:
+            module.fail_json(msg="Vaults must be a list of dictionaries with 'id' and 'type'.")
+        try:
+            v["id"] = int(v["id"])
+        except ValueError:
+            module.fail_json(msg=f"Vault id must be an integer, got: {v['id']}")
+        validated_vaults.append(v)
+    tpl["vaults"] = validated_vaults
 
     headers = get_auth_headers(
         session_cookie=p.get("session_cookie"),
         api_token=p.get("api_token")
     )
     headers["Content-Type"] = "application/json"
-    url = f"{host}:{port}/api/project/{project_id}/templates"
+
+    base_url = p['host'].replace('http://', '').replace('https://', '').rstrip('/')
+    url = f"http://{base_url}:{p['port']}/api/project/{p['project_id']}/templates"
 
     try:
         body = json.dumps(tpl).encode("utf-8")
         response_body, status, _ = semaphore_post(
-            url=url, body=body, headers=headers, validate_certs=validate_certs
+            url=url,
+            body=body,
+            headers=headers,
+            validate_certs=p["validate_certs"]
         )
 
         if status not in (200, 201):
