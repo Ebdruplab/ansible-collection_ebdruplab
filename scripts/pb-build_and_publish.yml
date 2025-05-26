@@ -1,0 +1,92 @@
+# Description:
+#   This playbook builds an Ansible Galaxy collection from the specified source directory
+#   and publishes it to Ansible Galaxy using the provided API token.
+#
+# Usage:
+#   1. Export your collection path and token:
+#        export COLLECTION_PATH="./my_namespace-my_collection"
+#        export GALAXY_TOKEN="YOUR_API_TOKEN"
+#
+#   2. Run the playbook:
+#        ansible-playbook publish_collection.yml
+#
+#   3. To build only:
+#        ansible-playbook publish_collection.yml --tags build
+#
+#   4. To publish only:
+#        ansible-playbook publish_collection.yml --tags publish
+
+---
+- name: 'Build and publish Ansible Galaxy collection'
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    # Path to your collection root (must contain galaxy.yml)
+    collection_src_path: "{{ lookup('env','COLLECTION_PATH') | default('../ebdruplab/semaphoreui', true) }}"
+    # Your Galaxy API token (set via env var or --extra-vars)
+    galaxy_token: "{{ lookup('env','GALAXY_TOKEN') }}"
+
+  tasks:
+    - name: 'Verify collection source path exists'
+      ansible.builtin.stat:
+        path: "{{ collection_src_path }}"
+      register: src_stat
+      tags:
+        - build
+
+    - name: 'Abort if collection_src_path does not exist'
+      ansible.builtin.fail:
+        msg: "Collection source path {{ collection_src_path }} not found."
+      when: not src_stat.stat.exists
+      tags:
+        - build
+
+    - name: 'Build the collection artifact'
+      ansible.builtin.command:
+        cmd: >
+          ansible-galaxy collection build {{ collection_src_path }} --force
+      args:
+        chdir: "{{ collection_src_path }}"
+      register: build_result
+      tags:
+        - build
+
+    - name: 'Extract path to generated archive'
+      ansible.builtin.set_fact:
+        collection_archive: >-
+          {{
+            (build_result.stdout
+             | regex_search('Created collection artifact at (.+)$', '\\1'))
+          }}
+      tags:
+        - build
+
+    - name: 'Fail if we could not parse the built archive path'
+      ansible.builtin.fail:
+        msg: "Could not find built collection artifact in build output."
+      when: collection_archive is not defined
+      tags:
+        - build
+
+    - name: 'Publish the collection to Galaxy'
+      ansible.builtin.command:
+        cmd: >
+          ansible-galaxy collection publish {{ collection_archive }}
+          --api-key {{ galaxy_token }}
+      environment:
+        ANSIBLE_GALAXY_TOKEN: "{{ galaxy_token }}"
+      when: galaxy_token is defined
+      tags:
+        - publish
+
+    - name: 'Warn if no Galaxy token provided'
+      ansible.builtin.debug:
+        msg: |
+          No Galaxy token was found in env var GALAXY_TOKEN.
+          Skipping publish step.
+      when: galaxy_token is not defined
+      tags:
+        - publish
+
