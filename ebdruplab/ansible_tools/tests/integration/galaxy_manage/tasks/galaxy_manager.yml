@@ -1,0 +1,366 @@
+# Integration tests for ebdruplab.ansible_tools.galaxy_manage module.
+#
+# Exercises each action:
+#   1) install (using a test requirements file)
+#   2) build_collection (using the local collection source)
+#   3) build_role (using a local test role directory)
+#   4) publish_collection (optional; default: skipped)
+#   5) import_role (conditional on ROLE_NAMESPACE, ROLE_NAME, SERVER)
+#
+# By default, publish_collection is not run. To enable, set run_publish_collection=true.
+#
+# Usage (defaults run install, build_collection, build_role only):
+#   ansible-playbook test/integration/galaxy_manage/task/galaxy_manager.yml
+#
+# To also test publish_collection and import_role, set these extra-vars or env vars:
+#   -e run_publish_collection=true
+#   -e GALAXY_TOKEN="your_token_here"
+#   -e SERVER="https://galaxy.ansible.com"       # optional, defaults to community Galaxy
+#   -e ROLE_NAMESPACE="your_namespace" -e ROLE_NAME="your_role"
+#
+# Prerequisites:
+#   • requirements_test.yml placed alongside this file
+#   • collections/ansible_collections/ebdruplab/ansible_tools exists
+#   • roles/test_role exists with meta/main.yml (for build_role)
+#
+# Example requirements_test.yml:
+#   ---
+#   collections:
+#     - name: community.general
+#       version: 3.4.0
+#   roles:
+#     - geerlingguy.ping
+
+---
+
+- name: Integration Test for galaxy_manage module
+  hosts: localhost
+  gather_facts: false
+  vars:
+    # 1) For install:
+    requirements_file: "{{ playbook_dir }}/requirements_test.yml"
+    install_dest: "/tmp/galaxy_manage_test_deps"
+
+    # 2) For build_collection:
+    collection_source_dir: "{{ playbook_dir }}/collections/ansible_collections/ebdruplab/ansible_tools"
+    build_output_dir: "/tmp/galaxy_manage_test_dist"
+
+    # 3) For build_role:
+    role_source_dir: "{{ playbook_dir }}/roles/test_role"
+    role_build_output_dir: "/tmp/galaxy_manage_test_roles_dist"
+
+    # 4) For publish_collection:
+    run_publish_collection: false
+    galaxy_token: "{{ lookup('env','GALAXY_TOKEN') | default(omit) }}"
+    server: "{{ lookup('env','SERVER') | default(omit) }}"
+
+    # 5) For import_role:
+    role_namespace: "{{ lookup('env','ROLE_NAMESPACE') | default(omit) }}"
+    role_name: "{{ lookup('env','ROLE_NAME') | default(omit) }}"
+
+  tasks:
+
+    - name: Cleanup previous install_dest
+      tags:
+        - integration
+        - install
+      ansible.builtin.file:
+        path: "{{ install_dest }}"
+        state: absent
+
+    - name: Test “install” action with galaxy_manage
+      tags:
+        - integration
+        - install
+      block:
+        - name: Run galaxy_manage action=install
+          tags:
+            - integration
+            - install
+          ebdruplab.ansible_tools.galaxy_manage:
+            action: install
+            requirements_file: "{{ requirements_file }}"
+            dest: "{{ install_dest }}"
+            force: false
+          register: install_result
+
+        - name: Assert that install returned rc == 0
+          tags:
+            - integration
+            - install
+          ansible.builtin.assert:
+            that:
+              - install_result.rc == 0
+            fail_msg: "ebdruplab.ansible_tools.galaxy_manage install failed (rc={{ install_result.rc }})"
+
+        - name: Assert that “installed” list is not empty
+          tags:
+            - integration
+            - install
+          ansible.builtin.assert:
+            that:
+              - install_result.installed | length > 0
+            fail_msg: "Expected at least one item in install_result.installed"
+
+        - name: Debug installed items
+          tags:
+            - integration
+            - install
+          ansible.builtin.debug:
+            msg: "Installed: {{ install_result.installed }}"
+      rescue:
+        - name: Fail the test if install block errors
+          tags:
+            - integration
+            - install
+          ansible.builtin.fail:
+            msg: "Integration test: install block failed unexpectedly."
+
+    - name: Cleanup previous build_output_dir
+      tags:
+        - integration
+        - build_collection
+      ansible.builtin.file:
+        path: "{{ build_output_dir }}"
+        state: absent
+
+    - name: Test “build_collection” action with galaxy_manage
+      tags:
+        - integration
+        - build_collection
+      block:
+        - name: Run galaxy_manage action=build_collection
+          tags:
+            - integration
+            - build_collection
+          ebdruplab.ansible_tools.galaxy_manage:
+            action: build_collection
+            source_dir: "{{ collection_source_dir }}"
+            output_path: "{{ build_output_dir }}"
+            force: true
+          register: build_collection_result
+
+        - name: Assert that build_collection returned rc == 0
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.assert:
+            that:
+              - build_collection_result.rc == 0
+            fail_msg: "ebdruplab.ansible_tools.galaxy_manage build_collection failed (rc={{ build_collection_result.rc }})"
+
+        - name: Assert that artifact_path exists in build_collection result
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.assert:
+            that:
+              - build_collection_result.artifact_path is defined
+            fail_msg: "Expected artifact_path in build_collection_result but none was returned"
+
+        - name: Check that the built collection tarball exists on disk
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.stat:
+            path: "{{ build_collection_result.artifact_path }}"
+          register: built_collection_stat
+
+        - name: Assert that collection tarball exists and is a file
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.assert:
+            that:
+              - built_collection_stat.stat.exists
+              - built_collection_stat.stat.isreg
+            fail_msg: "Expected built collection tarball at {{ build_collection_result.artifact_path }}"
+
+        - name: Debug built collection artifact path
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.debug:
+            msg: "Built collection at: {{ build_collection_result.artifact_path }}"
+      rescue:
+        - name: Fail the test if build_collection block errors
+          tags:
+            - integration
+            - build_collection
+          ansible.builtin.fail:
+            msg: "Integration test: build_collection block failed unexpectedly."
+
+    - name: Cleanup previous role_build_output_dir
+      tags:
+        - integration
+        - build_role
+      ansible.builtin.file:
+        path: "{{ role_build_output_dir }}"
+        state: absent
+
+    - name: Test “build_role” action with galaxy_manage
+      tags:
+        - integration
+        - build_role
+      block:
+        - name: Run galaxy_manage action=build_role
+          tags:
+            - integration
+            - build_role
+          ebdruplab.ansible_tools.galaxy_manage:
+            action: build_role
+            role_dir: "{{ role_source_dir }}"
+            role_output_path: "{{ role_build_output_dir }}"
+            force: true
+          register: build_role_result
+
+        - name: Assert that build_role returned rc == 0
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.assert:
+            that:
+              - build_role_result.rc == 0
+            fail_msg: "ebdruplab.ansible_tools.galaxy_manage build_role failed (rc={{ build_role_result.rc }})"
+
+        - name: Assert that artifact_path exists in build_role result
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.assert:
+            that:
+              - build_role_result.artifact_path is defined
+            fail_msg: "Expected artifact_path in build_role_result but none was returned"
+
+        - name: Check that the built role tarball exists on disk
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.stat:
+            path: "{{ build_role_result.artifact_path }}"
+          register: built_role_stat
+
+        - name: Assert that role tarball exists and is a file
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.assert:
+            that:
+              - built_role_stat.stat.exists
+              - built_role_stat.stat.isreg
+            fail_msg: "Expected built role tarball at {{ build_role_result.artifact_path }}"
+
+        - name: Debug built role artifact path
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.debug:
+            msg: "Built role at: {{ build_role_result.artifact_path }}"
+      rescue:
+        - name: Fail the test if build_role block errors
+          tags:
+            - integration
+            - build_role
+          ansible.builtin.fail:
+            msg: "Integration test: build_role block failed unexpectedly."
+
+    - name: Conditionally test “publish_collection” if enabled and galaxy_token provided
+      when: run_publish_collection and galaxy_token is defined
+      tags:
+        - integration
+        - publish_collection
+      block:
+        - name: Run galaxy_manage action=publish_collection
+          tags:
+            - integration
+            - publish_collection
+          ebdruplab.ansible_tools.galaxy_manage:
+            action: publish_collection
+            collection_archive: "{{ build_collection_result.artifact_path }}"
+            server: "{{ server | default(omit) }}"
+            api_token: "{{ galaxy_token }}"
+          register: publish_collection_result
+
+        - name: Assert that publish_collection returned rc == 0
+          tags:
+            - integration
+            - publish_collection
+          ansible.builtin.assert:
+            that:
+              - publish_collection_result.rc == 0
+            fail_msg: "ebdruplab.ansible_tools.galaxy_manage publish_collection failed (rc={{ publish_collection_result.rc }})"
+
+        - name: Debug publish_collection stdout
+          tags:
+            - integration
+            - publish_collection
+          ansible.builtin.debug:
+            msg: "Publish collection stdout: {{ publish_collection_result.stdout }}"
+      rescue:
+        - name: Fail the test if publish_collection block errors
+          tags:
+            - integration
+            - publish_collection
+          ansible.builtin.fail:
+            msg: "Integration test: publish_collection block failed unexpectedly."
+      always:
+        - name: Notify that publish_collection was skipped because not enabled or GALAXY_TOKEN missing
+          tags:
+            - integration
+            - publish_collection
+          ansible.builtin.debug:
+            msg: "Skipping publish_collection: either run_publish_collection is false or GALAXY_TOKEN not provided."
+          when: not (run_publish_collection and galaxy_token is defined)
+
+    - name: Conditionally test “import_role” if role_namespace & role_name are provided
+      when:
+        - role_namespace is defined
+        - role_name is defined
+      tags:
+        - integration
+        - import_role
+      block:
+        - name: Run galaxy_manage action=import_role
+          tags:
+            - integration
+            - import_role
+          ebdruplab.ansible_tools.galaxy_manage:
+            action: import_role
+            namespace: "{{ role_namespace }}"
+            role_name: "{{ role_name }}"
+            server: "{{ server | default(omit) }}"
+            api_token: "{{ galaxy_token }}"
+          register: import_role_result
+
+        - name: Assert that import_role returned rc == 0
+          tags:
+            - integration
+            - import_role
+          ansible.builtin.assert:
+            that:
+              - import_role_result.rc == 0
+            fail_msg: "ebdruplab.ansible_tools.galaxy_manage import_role failed (rc={{ import_role_result.rc }})"
+
+        - name: Debug import_role stdout
+          tags:
+            - integration
+            - import_role
+          ansible.builtin.debug:
+            msg: "Import role stdout: {{ import_role_result.stdout }}"
+      rescue:
+        - name: Fail the test if import_role block errors
+          tags:
+            - integration
+            - import_role
+          ansible.builtin.fail:
+            msg: "Integration test: import_role block failed unexpectedly."
+      always:
+        - name: Notify that import_role was skipped because ROLE_NAMESPACE or ROLE_NAME not provided
+          tags:
+            - integration
+            - import_role
+          ansible.builtin.debug:
+            msg: "Skipping import_role: ROLE_NAMESPACE or ROLE_NAME not provided."
+          when:
+            - role_namespace is not defined or role_name is not defined
+
