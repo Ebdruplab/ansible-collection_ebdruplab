@@ -1,0 +1,63 @@
+name: "🐛 Bug Report"
+description: Report a bug related to Ansible playbooks or modules
+title: "[BUG] <short description>"
+labels: [bug]
+body:
+  - type: input
+    id: short-desc
+    attributes:
+      label: Short Description
+      placeholder: "e.g., Failed to create Semaphore environment"
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary of the Problem
+      description: Briefly explain what you were trying to do and what went wrong
+      placeholder: |
+        I tried to use the `ebdruplab.<COLLECTION_NAME>.<MODULE_NAME>` module to create an environment,
+        but the API returned a 400 error due to invalid payload structure.
+    validations:
+      required: true
+
+  - type: input
+    id: ansible-version
+    attributes:
+      label: Ansible Version
+      placeholder: "e.g., 2.16.5"
+    validations:
+      required: false
+
+  - type: input
+    id: module
+    attributes:
+      label: Module Used
+      placeholder: "e.g., ebdruplab.<COLLECTION_NAME>.<MODULE_NAME>"
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error Output (with -vv)
+      description: Paste the relevant section of output from `ansible-playbook -vv`
+      placeholder: |
+        TASK [Create environment] ***
+        fatal: [localhost]: FAILED! => {"changed": false, "msg": "HTTP Error 400: Bad Request"}
+    validations:
+      required: false
+
+  - type: textarea
+    id: playbook
+    attributes:
+      label: (Optional) Playbook Snippet
+      description: Provide the relevant task/playbook code if possible
+      placeholder: |
+        - name: "<NAME OF TASK>"
+          ebdruplab.<COLLECTION_NAME>.<MODULE_NAME":
+            <ENV ITEMS>
+            ...
+    validations:
+      required: false

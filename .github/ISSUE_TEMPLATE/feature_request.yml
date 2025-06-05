@@ -1,0 +1,55 @@
+name: "✨ Feature Request"
+description: Suggest a new module, role, feature, or capability for this Ansible collection
+title: "[FEAT] <short description>"
+labels: [enhancement]
+body:
+  - type: input
+    id: short-desc
+    attributes:
+      label: Short Description
+      placeholder: "e.g., Add support for creating Semaphore project schedules"
+    validations:
+      required: true
+
+  - type: textarea
+    id: feature
+    attributes:
+      label: What do you want to add or improve?
+      placeholder: |
+        I’d like to add a new module called `ebdruplab.semaphore.project_schedule_create`
+        that allows creating project schedules via the Semaphore API.
+    validations:
+      required: true
+
+  - type: textarea
+    id: usecase
+    attributes:
+      label: Why is this feature useful?
+      description: Explain the problem this solves or what it enables for users.
+      placeholder: |
+        This would allow users to automate scheduled tasks in Semaphore,
+        which is currently only possible manually via the UI.
+
+  - type: checkboxes
+    id: compatibility
+    attributes:
+      label: Affected Scenarios
+      options:
+        - label: Requires changes to existing module(s)
+        - label: Adds a new module
+        - label: Involves a new role or playbook example
+        - label: API behavior or version-specific
+        - label: Would require documentation updates
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: (Optional) Example Playbook Snippet
+      description: If applicable, show how this feature would be used in a playbook
+      placeholder: |
+        - name: "Create project schedule"
+          ebdruplab.semaphore.project_schedule_create:
+            name: "Daily Build"
+            cron: "0 3 * * *"
+            project_id: 42
+            template_id: 7
