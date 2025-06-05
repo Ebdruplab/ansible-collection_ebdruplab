@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/yamllint.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test yamllint` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/yamllint.html)] failed with 9 errors:", 
+            "output": "galaxy.yml:70:1: empty-lines: too many blank lines (1 > 0)\nplugins/modules/ansible_test.py:29:9: error: DOCUMENTATION: syntax error: found character '`' that cannot start any token (syntax)\nplugins/modules/ansible_test.py:29:9: unparsable-with-libyaml: DOCUMENTATION: while scanning for the next token - found character that cannot start any token\nplugins/modules/galaxy_manage.py:23:9: error: DOCUMENTATION: syntax error: found character '`' that cannot start any token (syntax)\nplugins/modules/galaxy_manage.py:23:9: unparsable-with-libyaml: DOCUMENTATION: while scanning for the next token - found character that cannot start any token\nplugins/modules/galaxy_manage.py:225:83: error: RETURN: syntax error: mapping values are not allowed here (syntax)\nplugins/modules/galaxy_manage.py:225:83: unparsable-with-libyaml: RETURN: None - mapping values are not allowed in this context\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:366:1: empty-lines: too many blank lines (1 > 0)\ntests/scripts/pb-test-ansible_tools_collection.yml:69:1: empty-lines: too many blank lines (1 > 0)"
+        }
+    ], 
+    "verified": false
+}

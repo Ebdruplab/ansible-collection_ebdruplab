@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/shebang.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test shebang` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/shebang.html)] failed with 2 errors:", 
+            "output": "tests/scripts/run_all_tests.sh:1:1: unexpected non-module shebang: b'#!/bin/bash'\ntests/scripts/set_env_for_integration.sh:1:1: unexpected non-module shebang: b'#!/bin/bash'"
+        }
+    ], 
+    "verified": false
+}

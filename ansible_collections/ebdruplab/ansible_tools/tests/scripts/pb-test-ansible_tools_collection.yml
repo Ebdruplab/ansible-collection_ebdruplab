@@ -1,0 +1,69 @@
+# ansible-playbook pb-test-ansible_tools_collection.yml -i {localhost,}
+#
+---
+- hosts: localhost
+  gather_facts: false
+
+  vars:
+    # adjust these two variables to point at your collection’s source and desired output folder
+    collection_src_dir: "/home/kristian/git/ebdruplab/ansible-collection_ebdruplab/ebdruplab/ansible_tools"
+    collection_dist_dir: "/tmp/build_dir/collection"
+
+  tasks:
+    - name: Ensure the collection dist directory exists
+      ansible.builtin.file:
+        path: "{{ collection_dist_dir }}"
+        state: directory
+        recurse: true
+      tags:
+        - create_directory
+
+    - name: Build the collection tarball
+      ebdruplab.ansible_tools.galaxy_manage:
+        action: build_collection
+        source_dir: "{{ collection_src_dir }}"
+        output_path: "{{ collection_dist_dir }}"
+        force: true
+      register: build_result
+      tags:
+        - build_collection
+
+    - name: Find the newly built collection tarball
+      ansible.builtin.find:
+        paths: "{{ collection_dist_dir }}"
+        patterns: "*.tar.gz"
+        recurse: false
+      register: found_artifacts
+
+    - name: Fail if no artifact was found
+      ansible.builtin.fail:
+        msg: "No collection tarball found under {{ collection_dist_dir }} after build!"
+      when: found_artifacts.files | length == 0
+
+    - name: Set artifact_path to the newest tarball
+      ansible.builtin.set_fact:
+        artifact_path: "{{ (found_artifacts.files | sort(attribute='mtime'))[-1].path }}"
+
+    - name: Show where the collection was created
+      ansible.builtin.debug:
+        var: artifact_path
+
+    - name: Install the newly built collection force overwrite
+      ebdruplab.ansible_tools.galaxy_manage:
+        action: install_artifact
+        artifact_path: "{{ artifact_path }}"
+        artifact_type: "collection"
+        force: true
+      register: install_result
+      tags:
+        - install_collection
+
+    - name: Show install stdout and stderr
+      ansible.builtin.debug:
+        msg:
+          - "RC: {{ install_result.rc }}"
+          - "STDOUT: {{ install_result.stdout | trim }}"
+          - "STDERR: {{ install_result.stderr | trim }}"
+      tags:
+        - debug
+

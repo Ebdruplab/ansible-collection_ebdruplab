@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/no-smart-quotes.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test no-smart-quotes` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/no-smart-quotes.html)] failed with 7 errors:", 
+            "output": "tests/integration/galaxy_manage/tasks/galaxy_manager.yml:71:18: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:96:29: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:127:18: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:201:18: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:267:32: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/integration/galaxy_manage/tasks/galaxy_manager.yml:315:32: use ASCII quotes `'` and `\"` instead of Unicode quotes\ntests/scripts/pb-test-ansible_tools_collection.yml:8:61: use ASCII quotes `'` and `\"` instead of Unicode quotes"
+        }
+    ], 
+    "verified": false
+}

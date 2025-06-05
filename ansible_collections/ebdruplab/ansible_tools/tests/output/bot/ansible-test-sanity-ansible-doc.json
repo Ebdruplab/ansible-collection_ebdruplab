@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/ansible-doc.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test ansible-doc` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/ansible-doc.html)] failed with the error:", 
+            "output": "Command \"ansible-doc -t module ebdruplab.ansible_tools.ansible_test ebdruplab.ansible_tools.doc_lint ebdruplab.ansible_tools.galaxy_manage ebdruplab.ansible_tools.lint_playbook\" returned exit status 1.\n>>> Standard Error\nERROR! module ebdruplab.ansible_tools.ansible_test missing documentation (or could not parse documentation): ebdruplab.ansible_tools.ansible_test did not contain a DOCUMENTATION attribute (/home/kristian/git/ebdruplab/ansible-collection_ebdruplab/ansible_collections/ebdruplab/ansible_tools/plugins/modules/ansible_test.py). Unable to parse documentation in python file '/home/kristian/git/ebdruplab/ansible-collection_ebdruplab/ansible_collections/ebdruplab/ansible_tools/plugins/modules/ansible_test.py': while scanning for the next token\nfound character that cannot start any token\n  in \"<unicode string>\", line 20, column 9. while scanning for the next token\nfound character that cannot start any token\n  in \"<unicode string>\", line 20, column 9"
+        }
+    ], 
+    "verified": false
+}

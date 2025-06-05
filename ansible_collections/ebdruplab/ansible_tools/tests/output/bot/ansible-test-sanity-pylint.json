@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/pylint.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test pylint` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/pylint.html)] failed with 5 errors:", 
+            "output": "plugins/modules/ansible_test.py:155:0: trailing-newlines: Trailing newlines\nplugins/modules/doc_lint.py:174:0: trailing-newlines: Trailing newlines\nplugins/modules/galaxy_manage.py:9:0: unused-import: Unused import json\nplugins/modules/galaxy_manage.py:582:0: trailing-newlines: Trailing newlines\nplugins/modules/lint_playbook.py:160:0: trailing-newlines: Trailing newlines"
+        }
+    ], 
+    "verified": false
+}

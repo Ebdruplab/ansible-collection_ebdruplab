@@ -1,0 +1,10 @@
+{
+    "docs": "https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/yamllint.html", 
+    "results": [
+        {
+            "message": "The test `ansible-test sanity --test yamllint` [[explain](https://docs.ansible.com/ansible-core/2.18/dev_guide/testing/sanity/yamllint.html)] failed with 6 errors:", 
+            "output": "tests/integration/multiple_tests/tasks/test_multiple_tests.yml:130:1: empty-lines: too many blank lines (1 > 0)\ntests/integration/project_environments/tasks/test_project_environments.yml:111:1: empty-lines: too many blank lines (1 > 0)\ntests/integration/project_repository_list/repository_list/tasks/test_repository_list.yml:120:1: empty-lines: too many blank lines (1 > 0)\ntests/integration/schedule_all_tests/tasks/test_schedule_all_tests.yml:290:1: empty-lines: too many blank lines (1 > 0)\ntests/integration/template_create/tasks/test_template_create.yml:73:1: empty-lines: too many blank lines (1 > 0)\ntests/integration/template_get/tasks/test_template_get.yml:83:1: empty-lines: too many blank lines (1 > 0)"
+        }
+    ], 
+    "verified": false
+}
