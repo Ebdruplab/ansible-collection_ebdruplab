@@ -42,6 +42,20 @@ options:
       - Default behavior fails immediately on any lint error (non-zero return code).
     type: bool
     default: false
+  fix:
+    description:
+      - If true, run ansible-lint in autofix mode (pass `--fix`).
+    type: bool
+    default: false
+  fix_list:
+    description:
+      - List of specific rule IDs or tags to auto-fix.
+      - If omitted (and `fix` is true), the module will default to fixing *all* available issues.
+      - When provided, this list is joined with commas and passed as `--fix=<comma-separated>`.
+    type: list
+    elements: str
+    required: false
+    default: []
 
 author:
   - "Kristian Ebdrup (@kris9854)"
@@ -75,6 +89,23 @@ EXAMPLES = r"""
       - "-q"
       - "-r"
       - "custom_rules/"
+  register: lint_result
+
+# 4) Lint and autofix all issues
+- name: Auto-fix all lint issues
+  lint_playbook:
+    path: "./playbooks/"
+    fix: true
+  register: lint_result
+
+# 5) Lint and autofix only YAML and Jinja rules
+- name: Auto-fix specific rules
+  lint_playbook:
+    path: "./playbooks/"
+    fix: true
+    fix_list:
+      - yaml
+      - jinja
   register: lint_result
 """
 
@@ -118,12 +149,16 @@ def run_subprocess(cmd, module):
     except OSError as e:
         module.fail_json(msg=f"Failed to execute {cmd[0]}: {e}")
 
+
 def main():
+    # Define module arguments
     module_args = dict(
         path=dict(type="path", required=True),
         extra_args=dict(type="list", elements="str", required=False, default=[]),
         exclude=dict(type="list", elements="str", required=False, default=[]),
         force=dict(type="bool", default=False),
+        fix=dict(type="bool", default=False),
+        fix_list=dict(type="list", elements="str", required=False, default=[]),
     )
     module = AnsibleModule(
         argument_spec=module_args,
@@ -134,26 +169,48 @@ def main():
     extra_args = module.params["extra_args"]
     exclude = module.params["exclude"]
     force = module.params["force"]
+    fix = module.params["fix"]
+    fix_list = module.params["fix_list"]
 
+    # Ensure the specified path exists
     if not os.path.exists(path):
         module.fail_json(msg=f"Specified path not found: {path}")
 
-    # Build ansible-lint command
+    # Build the ansible-lint command
     cmd = ["ansible-lint", path]
+
+    # Exclude patterns
     for pattern in exclude:
         cmd.extend(["-x", pattern])
+
+    # Extra user-provided args
     if extra_args:
         cmd.extend(extra_args)
 
+    # Autofix support: if fix is true, append --fix
+    # If fix_list is non-empty, use --fix=<comma-separated list>
+    if fix:
+        if fix_list:
+            # Join the list of rules/tags to fix
+            joined = ",".join(fix_list)
+            cmd.append(f"--fix={joined}")
+        else:
+            # No specific list provided: fix all issues
+            cmd.append("--fix")
+
+    # Run ansible-lint
     rc, stdout, stderr = run_subprocess(cmd, module)
 
+    # Prepare result dictionary
     result = dict(rc=rc, stdout=stdout, stderr=stderr)
 
-    # If force is False, fail on non-zero rc; else return rc and let caller decide
+    # If not forcing, fail on any lint errors (rc != 0)
     if rc != 0 and not force:
         module.fail_json(msg=f"ansible-lint detected issues (rc={rc})", **result)
 
+    # Exit normally; caller can inspect rc
     module.exit_json(changed=False, **result)
+
 
 if __name__ == "__main__":
     main()
