@@ -1,0 +1,4 @@
+- name: Fail if no project_deploy_vars defined
+  ansible.builtin.fail:
+    msg: "project_deploy_vars must be provided as a list of projects to deploy."
+  when: project_deploy_vars | length == 0

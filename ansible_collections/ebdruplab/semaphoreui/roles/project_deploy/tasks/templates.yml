@@ -1,0 +1,14 @@
+- name: Create templates
+  ebdruplab.semaphoreui.template_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ project_deploy_login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    name: "{{ item.name }}"
+    playbook: "{{ item.playbook }}"
+    inventory_name: "{{ item.inventory }}"
+    environment_name: "{{ item.environment }}"
+    arguments: "{{ item.arguments | default('') }}"
+  loop: "{{ project_item.templates }}"
+  loop_control:
+    label: "{{ item.name }}"

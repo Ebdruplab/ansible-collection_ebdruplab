@@ -1,0 +1,8 @@
+- name: Create environments
+  ebdruplab.semaphoreui.project_environment_create:
+    project_id: "{{ current_project_id }}"
+    name: "{{ item.name }}"
+    variables: "{{ item.variables | default([]) }}"
+  loop: "{{ project_item.environments }}"
+  loop_control:
+    label: "{{ item.name }}"

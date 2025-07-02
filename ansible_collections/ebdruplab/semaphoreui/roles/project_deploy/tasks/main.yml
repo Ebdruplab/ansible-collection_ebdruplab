@@ -1,0 +1,35 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for ebdruplab.semaphoreui.project_deploy
+
+# Assert Import
+- name: "Import task assert.yml"
+  ansible.builtin.include_tasks:
+    file: assert.yml
+  tags:
+    - semaphoreui
+    - assert
+
+# Login Import
+- name: "Import task login.yml"
+  ansible.builtin.include_tasks:
+    file: login.yml
+  tags:
+    - semaphoreui
+    - login
+
+# deploy_project Import
+- name: "Import tasks in deploy_project.yml"
+  ansible.builtin.include_tasks:
+    file: deploy_project.yml
+  tags:
+    - semaphoreui
+    - deploy_project
+
+# Logout Import
+- name: "Login to sempahoreui"
+  ansible.builtin.include_tasks:
+    file: login.yml
+  tags:
+    - semaphoreui
+    - logout

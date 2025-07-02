@@ -1,0 +1,47 @@
+---
+- name: 'Create a new project'
+  ebdruplab.semaphoreui.project_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ project_deploy_login_result.session_cookie }}"
+    name: "{{ project_item.project.name }}"
+    alert: true
+    alert_chat: "{{ project_item.project.alert_chat }}"
+    max_parallel_tasks: "{{ project_item.project.max_parallel_tasks }}"
+    demo: false
+  register: created_project
+  tags:
+    - semaphoreui
+    - deploy_project
+
+- name: Deploy repositories if present
+  when: project_item.repositories is defined
+  ansible.builtin.include_tasks:
+    file: repositories.yml
+  tags:
+    - semaphoreui
+    - deploy_project
+
+- name: Deploy environments if present
+  when: project_item.environments is defined
+  ansible.builtin.include_tasks:
+    file: environments.yml
+  tags:
+    - semaphoreui
+    - deploy_project
+
+- name: Deploy inventories if present
+  when: project_item.inventories is defined
+  ansible.builtin.include_tasks:
+    file: inventories.yml
+  tags:
+    - semaphoreui
+    - deploy_project
+
+- name: Deploy templates if present
+  when: project_item.templates is defined
+  ansible.builtin.include_tasks:
+    file: templates.yml
+  tags:
+    - semaphoreui
+    - deploy_project

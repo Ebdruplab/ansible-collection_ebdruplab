@@ -1,0 +1,7 @@
+- name: Log in to Semaphore
+  ebdruplab.semaphoreui.login:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    username: "{{ project_deploy_semaphore_username }}"
+    password: "{{ project_deploy_semaphore_password }}"
+  register: project_deploy_login_result
