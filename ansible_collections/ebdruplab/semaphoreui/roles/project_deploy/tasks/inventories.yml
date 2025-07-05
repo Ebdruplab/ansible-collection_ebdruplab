@@ -1,12 +1,15 @@
-- name: Create inventories
+---
+- name: "Create project inventories"
   ebdruplab.semaphoreui.project_inventory_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ project_deploy_login_result.session_cookie }}"
+    session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
-    name: "{{ item.name }}"
-    type: "{{ item.type }}"
-    inventory: "{{ item.inventory }}"
-  loop: "{{ project_item.inventories }}"
-  loop_control:
-    label: "{{ item.name }}"
+    inventory: "{{ item | combine({'repository_id': created_repos_by_name[item.repository_name].id}) if item.type == 'file' else item }}"
+  loop: "{{ project_deploy_config.inventories }}"
+  register: created_inventories_result
+
+- name: "Set created inventories fact"
+  ansible.builtin.set_fact:
+    created_inventories_by_name: "{{ created_inventories_by_name | default({}) | combine({ item.item.name: item.inventory }) }}"
+  loop: "{{ created_inventories_result.results }}"

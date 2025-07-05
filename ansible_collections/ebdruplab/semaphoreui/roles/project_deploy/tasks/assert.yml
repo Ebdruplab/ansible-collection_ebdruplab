@@ -1,4 +1,23 @@
-- name: Fail if no project_deploy_vars defined
-  ansible.builtin.fail:
-    msg: "project_deploy_vars must be provided as a list of projects to deploy."
-  when: project_deploy_vars | length == 0
+---
+- name: "Validate project configuration"
+  ansible.builtin.assert:
+    that:
+      - project_deploy_config.project.name is defined and project_deploy_config.project.name != ""
+    msg: "project_deploy_config.project.name must be defined."
+
+- name: "Validate repository key dependencies"
+  ansible.builtin.assert:
+    that:
+      - item.key_name in (project_deploy_config.keys | map(attribute='name') | list)
+    msg: "Repository '{{ item.name }}' references key '{{ item.key_name }}' which is not defined in project_deploy_config.keys."
+  loop: "{{ project_deploy_config.repositories }}"
+  when: item.key_name is defined
+
+- name: "Validate template dependencies"
+  ansible.builtin.assert:
+    that:
+      - item.inventory_name in (project_deploy_config.inventories | map(attribute='name') | list)
+      - item.repository_name in (project_deploy_config.repositories | map(attribute='name') | list)
+      - (item.environment_name is not defined) or (item.environment_name in (project_deploy_config.environments | map(attribute='name') | list))
+    msg: "Template '{{ item.name }}' has an unresolved dependency. Check inventory_name, repository_name, and environment_name."
+  loop: "{{ project_deploy_config.templates }}"

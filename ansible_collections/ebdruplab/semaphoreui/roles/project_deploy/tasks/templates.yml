@@ -1,14 +1,30 @@
-- name: Create templates
-  ebdruplab.semaphoreui.template_create:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ project_deploy_login_result.session_cookie }}"
-    project_id: "{{ current_project_id }}"
-    name: "{{ item.name }}"
-    playbook: "{{ item.playbook }}"
-    inventory_name: "{{ item.inventory }}"
-    environment_name: "{{ item.environment }}"
-    arguments: "{{ item.arguments | default('') }}"
-  loop: "{{ project_item.templates }}"
+---
+- name: "Prepare and create project templates"
+  loop: "{{ project_deploy_config.templates }}"
   loop_control:
     label: "{{ item.name }}"
+  block:
+    - name: "Prepare template data for {{ item.name }}"
+      ansible.builtin.set_fact:
+        current_template: "{{ item }}"
+        
+    - name: "Add inventory ID to template data"
+      ansible.builtin.set_fact:
+        current_template: "{{ current_template | combine({'inventory_id': created_inventories_by_name[item.inventory_name].id}) }}"
+
+    - name: "Add repository ID to template data"
+      ansible.builtin.set_fact:
+        current_template: "{{ current_template | combine({'repository_id': created_repos_by_name[item.repository_name].id}) }}"
+
+    - name: "Add environment ID to template data if defined"
+      ansible.builtin.set_fact:
+        current_template: "{{ current_template | combine({'environment_id': created_environments_by_name[item.environment_name].id}) }}"
+      when: item.environment_name is defined and item.environment_name in created_environments_by_name
+
+    - name: "Create project template {{ item.name }}"
+      ebdruplab.semaphoreui.project_template_create:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ current_project_id }}"
+        template: "{{ current_template }}"

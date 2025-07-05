@@ -1,8 +1,15 @@
-- name: Create environments
+---
+- name: "Create project environments"
   ebdruplab.semaphoreui.project_environment_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
-    name: "{{ item.name }}"
-    variables: "{{ item.variables | default([]) }}"
-  loop: "{{ project_item.environments }}"
-  loop_control:
-    label: "{{ item.name }}"
+    environment: "{{ item }}"
+  loop: "{{ project_deploy_config.environments }}"
+  register: created_environments_result
+
+- name: "Set created environments fact"
+  ansible.builtin.set_fact:
+    created_environments_by_name: "{{ created_environments_by_name | default({}) | combine({ item.item.name: item.environment }) }}"
+  loop: "{{ created_environments_result.results }}"

@@ -1,0 +1,18 @@
+---
+- name: "Create project keys"
+  ebdruplab.semaphoreui.project_key_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    name: "{{ item.name }}"
+    type: "{{ item.type }}"
+    ssh: "{{ item.ssh | default(omit) }}"
+    login_password: "{{ item.login_password | default(omit) }}"
+  loop: "{{ project_deploy_config.keys }}"
+  register: created_keys_result
+
+- name: "Set created keys fact"
+  ansible.builtin.set_fact:
+    created_keys_by_name: "{{ created_keys_by_name | default({}) | combine({ item.item.name: item.key }) }}"
+  loop: "{{ created_keys_result.results }}"

@@ -1,5 +1,0 @@
-- name: Log out of Semaphore
-  ebdruplab.semaphoreui.logout:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ project_deploy_login_result.session_cookie }}"

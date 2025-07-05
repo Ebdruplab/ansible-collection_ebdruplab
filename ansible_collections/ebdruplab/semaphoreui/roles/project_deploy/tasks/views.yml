@@ -1,0 +1,10 @@
+---
+- name: "Create project views"
+  ebdruplab.semaphoreui.project_view_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    title: "{{ item.title }}"
+    position: "{{ item.position | default(omit) }}"
+  loop: "{{ project_deploy_config.views }}"

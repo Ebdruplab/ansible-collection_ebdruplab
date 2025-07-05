@@ -1,96 +1,95 @@
-Role Name
-=========
+# Ansible Role: ebdruplab.semaphoreui.project_deploy
 
-A brief description of the role goes here.
+This role deploys a complete Semaphore project from a set of structured, namespaced variables. It handles the creation and linking of all associated resources like keys, repositories, inventories, environments, views, and templates. The role is idempotent, meaning it can be run multiple times without causing errors.
 
-Requirements
-------------
+## Features
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+- **Idempotent Project Creation:** Checks if a project with the same name exists before creating it.
+- **Declarative Configuration:** Define your entire project, including all resources, in a single YAML structure.
+- **Dependency Validation:** Performs pre-flight checks to ensure all resource references (e.g., keys for repositories, inventories for templates) are valid before attempting deployment.
+- **Automated Login/Logout:** Handles session management securely.
 
-Role Variables
---------------
+## Requirements
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+- Ansible 2.10+
+- `ebdruplab.semaphoreui` collection installed.
 
-Dependencies
-------------
+## Role Variables
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+The role is configured using a set of `project_deploy_` prefixed variables.
 
-Example Playbook
-----------------
+### Connection & Authentication
+- `project_deploy_semaphore_host`: URL of the Semaphore server. (Default: `http://localhost`)
+- `project_deploy_semaphore_port`: Port of the Semaphore server. (Default: `3000`)
+- `project_deploy_semaphore_username`: Username for authentication. (Default: `admin`)
+- `project_deploy_semaphore_password`: Password for authentication. (Default: `changeme`)
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+### Project & Resource Definitions
+- `project_deploy_config`: A dictionary containing all resource definitions for the project.
+  - `project`: A dictionary defining the project to be created.
+  - `keys`: A list of access keys to create.
+  - `repositories`: A list of repositories to create.
+  - `inventories`: A list of inventories to create.
+  - `environments`: A list of environments to create.
+  - `views`: A list of views to create.
+  - `templates`: A list of templates to create.
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+## Example Playbook
+
 ```yaml
-project_deploy_vars:
-  - host: semaphore.example.com
-    port: 3000
-    username: admin
-    password: changeme
+- hosts: localhost
+  roles:
+    - role: ebdruplab.semaphoreui.project_deploy
+      vars:
+        project_deploy_semaphore_host: "http://semaphore.example.com"
+        project_deploy_semaphore_port: 3000
+        project_deploy_semaphore_username: "admin"
+        project_deploy_semaphore_password: "changeme"
 
-    project:
-      name: MyProject
-      description: This is a demo project
-      key_id: 1
-      repository_id: 1
+        project_deploy_config:
+          project:
+            name: "My Awesome Project"
+            alert: true
+            alert_chat: "ops-channel"
 
-    repositories:
-      - name: main-repo
-        url: git@github.com:myorg/main.git
-        ssh_key_id: 1
-        branch: main
+          keys:
+            - name: "deploy-key"
+              type: "ssh"
+              ssh:
+                login: "git"
+                private_key: "{{ lookup('file', '~/.ssh/id_rsa') }}"
 
-    environments:
-      - name: dev
-        variables:
-          - key: ENV
-            value: development
+          repositories:
+            - name: "my-app-repo"
+              git_url: "git@github.com:example/my-app.git"
+              git_branch: "main"
+              key_name: "deploy-key"
 
-      - name: prod
-        variables:
-          - key: ENV
-            value: production
+          inventories:
+            - name: "static-inventory"
+              type: "static"
+              inventory: "localhost ansible_connection=local"
 
-    inventories:
-      - name: staging
-        type: static
-        inventory: |
-          [web]
-          web1.example.com
+          environments:
+            - name: "production"
+              json: '{"foo": "bar"}'
 
-      - name: prod
-        type: static
-        inventory: |
-          [db]
-          db1.example.com
+          views:
+            - title: "Dashboard"
+              position: 1
 
-    templates:
-      - name: Build App
-        playbook: build.yml
-        inventory: staging
-        environment: dev
-        arguments: "--tags build"
-
-      - name: Deploy App
-        playbook: deploy.yml
-        inventory: prod
-        environment: prod
-        arguments: "--limit prod"
-
+          templates:
+            - name: "Deploy App"
+              playbook: "deploy.yml"
+              inventory_name: "static-inventory"
+              repository_name: "my-app-repo"
+              environment_name: "production"
 ```
 
+## License
 
-License
--------
+MIT
 
-BSD
+## Author Information
 
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+Kristian Ebdrup

@@ -1,5 +1,24 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for ebdruplab.semaphoreui.project_deploy
-project_deploy_vars: []
 
+# Connection and authentication variables
+project_deploy_semaphore_host: "http://localhost"
+project_deploy_semaphore_port: 3000
+project_deploy_semaphore_username: "admin"
+project_deploy_semaphore_password: "changeme"
+
+# Project and resource definitions
+project_deploy_config:
+  project:
+    name: ""
+    alert: false
+    alert_chat: ""
+    max_parallel_tasks: 0
+    demo: false
+  keys: []
+  repositories: []
+  inventories: []
+  environments: []
+  templates: []
+  views: []
