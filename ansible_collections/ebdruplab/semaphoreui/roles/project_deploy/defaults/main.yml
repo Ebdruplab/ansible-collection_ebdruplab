@@ -11,12 +11,25 @@ project_deploy_semaphore_password: "changeme"
 # Project and resource definitions
 project_deploy_config:
   project:
-    name: ""
+    name: "Ebdruplab Example Project"
     alert: false
     alert_chat: ""
     max_parallel_tasks: 0
     demo: false
-  keys: []
+  keys:
+    project_ssh_key_ebdlab:
+      name: "Ebdruplab example ssh key"
+      ssh:
+        type: ssh
+        login: "ansibleuser"
+        passphrase: "INSERT_VALUT_ENCRYPTED_SECRET"
+        private_key: "ssh-rsa vaultencryptedsecretkey"
+    project_login_user_ebdlab:
+      name: "Ebdruplab Example User"
+      type: login_password
+      login_password:
+        login: "Example User1"
+        password: "vaultencryptedsecretpassword"
   repositories: []
   inventories: []
   environments: []
