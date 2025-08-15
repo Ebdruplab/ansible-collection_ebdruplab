@@ -1,9 +1,11 @@
 ---
+
 - name: "Create project repositories"
   ebdruplab.semaphoreui.project_repository_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     repository:
       name: "{{ item.name }}"

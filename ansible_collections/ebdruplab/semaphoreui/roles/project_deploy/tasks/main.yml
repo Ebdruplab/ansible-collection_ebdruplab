@@ -2,82 +2,56 @@
 ---
 # tasks file for ebdruplab.semaphoreui.project_deploy
 
-- name: "Include validation tasks"
+- name: "Include assert tasks"
   ansible.builtin.include_tasks:
     file: assert.yml
 
-- name: "Log in to Semaphore"
-  ebdruplab.semaphoreui.login:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
-    username: "{{ project_deploy_semaphore_username }}"
-    password: "{{ project_deploy_semaphore_password }}"
-  register: login_result
-  no_log: true
+- name: "Include Login to Semaphoreui"
+  ansible.builtin.include_tasks:
+    file: login.yml
+  when: project_deploy_semaphore_api_token is not defined
 
-- name: "Check if project already exists"
-  ebdruplab.semaphoreui.project_list:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
-  register: existing_projects
+- name: "Include project_preflight tasks"
+  ansible.builtin.include_tasks:
+    file: project_preflight.yml
 
-- name: "Set existing project fact"
-  ansible.builtin.set_fact:
-    existing_project: "{{ existing_projects.projects | selectattr('name', 'equalto', project_deploy_config.project.name) | list | first }}"
-
-- name: "Create Semaphore Project if it does not exist"
-  ebdruplab.semaphoreui.project_create:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
-    name: "{{ project_deploy_config.project.name }}"
-    alert: "{{ project_deploy_config.project.alert }}"
-    alert_chat: "{{ project_deploy_config.project.alert_chat }}"
-    max_parallel_tasks: "{{ project_deploy_config.project.max_parallel_tasks }}"
-    demo: "{{ project_deploy_config.project.demo }}"
-  register: created_project
-  when: existing_project is not defined
-
-- name: "Set project ID fact"
-  ansible.builtin.set_fact:
-    current_project_id: "{{ existing_project.id if existing_project is defined else created_project.project.id }}"
-
-- name: "Deploy project resources"
+- name: "Proeced with project deployment and creation of ressources"
   block:
-    - name: "Include keys deployment"
+
+    - name: "Include project file"
+      ansible.builtin.include_tasks:
+        file: project.yml
+
+    - name: "Include keys file"
       ansible.builtin.include_tasks:
         file: keys.yml
-      when: project_deploy_config.keys | length > 0
 
-    - name: "Include repositories deployment"
+    - name: "Include repositories file"
       ansible.builtin.include_tasks:
         file: repositories.yml
-      when: project_deploy_config.repositories | length > 0
 
-    - name: "Include inventories deployment"
-      ansible.builtin.include_tasks:
-        file: inventories.yml
-      when: project_deploy_config.inventories | length > 0
-
-    - name: "Include environments deployment"
-      ansible.builtin.include_tasks:
-        file: environments.yml
-      when: project_deploy_config.environments | length > 0
-
-    - name: "Include views deployment"
+    - name: "Include views file"
       ansible.builtin.include_tasks:
         file: views.yml
-      when: project_deploy_config.views | length > 0
 
-    - name: "Include templates deployment"
+    - name: "Include inventories file"
+      ansible.builtin.include_tasks:
+        file: inventories.yml
+
+    - name: "Include environments file"
+      ansible.builtin.include_tasks:
+        file: environments.yml
+
+    - name: "Include templates file"
       ansible.builtin.include_tasks:
         file: templates.yml
-      when: project_deploy_config.templates | length > 0
 
+    - name: "Include schedules file"
+      ansible.builtin.include_tasks:
+        file: schedules.yml
   always:
-    - name: "Log out of Semaphore"
-      ebdruplab.semaphoreui.logout:
-        host: "{{ project_deploy_semaphore_host }}"
-        port: "{{ project_deploy_semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
+
+    - name: "Include Logout to Semaphoreui"
+      ansible.builtin.include_tasks:
+        file: logout.yml
+      when: project_deploy_semaphore_api_token is not defined

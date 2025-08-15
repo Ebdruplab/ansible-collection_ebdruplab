@@ -34,8 +34,37 @@ options:
   inventory:
     description:
       - Dictionary describing the inventory.
+      - Must include ssh_key_id (user credentials) and may include become_key_id (sudo credentials).
+      - For type 'file', include repository_id and inventory_file (or inventory path).
     type: dict
     required: true
+    suboptions:
+      name:
+        description: Name of the inventory.
+        type: str
+      type:
+        description: Inventory type.
+        type: str
+        choices: [static, static-yaml, file]
+        required: true
+      inventory:
+        description: For static/static-yaml, the content. For file, the file path.
+        type: str
+      inventory_file:
+        description: Alias for file path when type is 'file'.
+        type: str
+      repository_id:
+        description: Repository ID when type is 'file'.
+        type: int
+      ssh_key_id:
+        description: SSH key (user credentials) to use.
+        type: int
+        required: true
+        version_added: 2.0.0
+      become_key_id:
+        description: Become (sudo) key to use.
+        type: int
+        version_added: 2.0.0
   session_cookie:
     description:
       - Session cookie used for authentication.
@@ -68,8 +97,10 @@ EXAMPLES = r'''
       name: "Local Static Inventory"
       type: "static"
       inventory: "localhost ansible_connection=local"
+      ssh_key_id: 42
+      become_key_id: 7
 
-- name: Create YAML static inventory
+- name: Create YAML static inventory (no become)
   ebdruplab.semaphoreui.project_inventory_create:
     host: http://localhost
     port: 3000
@@ -83,6 +114,7 @@ EXAMPLES = r'''
           hosts:
             localhost:
               ansible_connection: local
+      ssh_key_id: 42
 
 - name: Create repository file-based inventory
   ebdruplab.semaphoreui.project_inventory_create:
@@ -95,6 +127,8 @@ EXAMPLES = r'''
       type: "file"
       repository_id: 12
       inventory_file: "inventories/production.ini"
+      ssh_key_id: 42
+      become_key_id: 7
 '''
 
 RETURN = r'''
@@ -110,7 +144,19 @@ def main():
             host=dict(type='str', required=True),
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
-            inventory=dict(type='dict', required=True),
+            inventory=dict(
+                type='dict',
+                required=True,
+                options=dict(
+                    name=dict(type='str', required=False),
+                    type=dict(type='str', required=True, choices=['static', 'static-yaml', 'file']),
+                    inventory=dict(type='str', required=False),
+                    inventory_file=dict(type='str', required=False),
+                    repository_id=dict(type='int', required=False),
+                    ssh_key_id=dict(type='int', required=True),
+                    become_key_id=dict(type='int', required=False),
+                ),
+            ),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
@@ -123,10 +169,13 @@ def main():
     port = module.params["port"]
     project_id = module.params["project_id"]
     validate_certs = module.params["validate_certs"]
-    inventory_data = module.params["inventory"]
+
+    # Work directly with the provided dict (Ansible has already validated presence/types)
+    inventory_data = dict(module.params["inventory"])
     inventory_data["project_id"] = project_id
 
-    if inventory_data.get("type") == "file" and "inventory_file" in inventory_data:
+    # Normalize file path alias if provided
+    if inventory_data.get("type") == "file" and inventory_data.get("inventory_file"):
         inventory_data["inventory"] = inventory_data.pop("inventory_file")
 
     valid_types = ["static", "static-yaml", "file"]
@@ -148,10 +197,7 @@ def main():
     elif inventory_type == "file":
         if "repository_id" not in inventory_data or "inventory" not in inventory_data:
             module.fail_json(msg="Missing 'repository_id' or 'inventory' (file path) for type 'file'")
-        try:
-            inventory_data["repository_id"] = int(inventory_data["repository_id"])
-        except ValueError:
-            module.fail_json(msg="'repository_id' must be an integer")
+        # repository_id already typed as int by Ansible
         inventory_data["inventory_mode"] = "file"
 
     url = f"{host}:{port}/api/project/{project_id}/inventory"
@@ -175,7 +221,8 @@ def main():
             error = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
             module.fail_json(msg=f"Failed to create inventory: HTTP {status} - {error}")
 
-        result = json.loads(response_body)
+        # response_body may be bytes; json.loads accepts str
+        result = json.loads(response_body.decode() if isinstance(response_body, (bytes, bytearray)) else response_body)
         module.exit_json(changed=True, inventory=result)
 
     except Exception as e:
@@ -183,4 +230,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

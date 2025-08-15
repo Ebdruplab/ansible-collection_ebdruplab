@@ -14,6 +14,9 @@
       localhost ansible_connection=local
     updated_inventory_data: |
       127.0.0.1 ansible_connection=local ansible_user=root
+    key_name: "Test_login"
+    key_password: "changeme"
+    key_login: "admin"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -35,6 +38,19 @@
         demo: false
       register: create_result
 
+    - name: 'Create first key'
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "{{ key_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key_login }}"
+          password: "{{ key_password }}"
+      register: created_key
+
     - name: Create an inventory
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
@@ -45,7 +61,13 @@
           name: "{{ original_inventory_name }}"
           type: "static"
           inventory: "{{ original_inventory_data }}"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_inventory
+
+
+    - name: Show created inventory
+      debug:
+        var: created_inventory.inventory
 
     - name: Update the inventory
       ebdruplab.semaphoreui.project_inventory_update:
@@ -58,6 +80,7 @@
           name: "{{ updated_inventory_name }}"
           type: "static"
           inventory: "{{ updated_inventory_data }}"
+          become_key_id: "{{ created_key.key.id }}"
       register: updated_inventory
 
     - name: Show updated inventory (if returned)
@@ -71,6 +94,14 @@
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: 'Delete first key'
+      ebdruplab.semaphoreui.project_key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        key_id: "{{ created_key.key.id }}"
 
     - name: 'Delete project'
       ebdruplab.semaphoreui.project_delete:

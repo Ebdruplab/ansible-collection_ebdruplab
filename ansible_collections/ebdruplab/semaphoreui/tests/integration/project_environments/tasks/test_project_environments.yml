@@ -40,16 +40,16 @@
         environment:
           name: "{{ test_env_name }}"
           password: "testpass"
-          json:
+          extra_variables:
             key: "value"
           env:
             KEY: "value"
           secrets:
-           - id: 0
-             name: "dummy"
-             secret: "value"
-             type: "env"
-             operation: "create"
+            - id: 0
+              name: "dummy"
+              secret: "value"
+              type: "env"
+
       register: env_create
 
     - name: "Get created environment"
@@ -72,8 +72,15 @@
           name: "{{ updated_env_name }}"
           password: "updatedpass"
           json: '{"key": "updated"}'
-          env: 'KEY=updated'
-          secrets: []
+          env:
+            KEY: "updated"
+          secrets:
+            - name: "DB_PASSWORD"          # goes to env vars
+              secret: "Update_db_password"
+              type: env
+            - name: "API_TOKEN"            # goes to extra vars
+              secret: "updated_api_token"
+              type: extra_variables        # alias for 'json'
       register: env_update
 
     - name: "List all environments"
@@ -108,4 +115,3 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-

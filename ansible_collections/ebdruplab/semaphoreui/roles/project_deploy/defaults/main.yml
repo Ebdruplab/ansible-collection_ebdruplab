@@ -1,37 +1,35 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for ebdruplab.semaphoreui.project_deploy
+## Safety flags used by the role’s pre-checks
+# No log sensitive data
+project_deploy_sensitive_data_no_log: true
 
-# Connection and authentication variables
+# Will force create a new project creating a new id (projects can be named the same)
+project_deploy_force_project_creation: false
+
+# Will find the project named xyz and just recreate everything
+project_deploy_force_project_update: false
+
+# If set to true it will delete a project named the given name
+project_deploy_force_project_delete: false
+# A timer for what to wait before deleting the project so a user can interrupt the play
+project_deploy_force_project_delete_timer: 5
+
+## Connection and authentication variables
 project_deploy_semaphore_host: "http://localhost"
 project_deploy_semaphore_port: 3000
 project_deploy_semaphore_username: "admin"
 project_deploy_semaphore_password: "changeme"
+# project_deploy_semaphore_api_token: "KEY"
 
-# Project and resource definitions
+## Project and resource definitions
 project_deploy_config:
-  project:
-    name: "Ebdruplab Example Project"
-    alert: false
-    alert_chat: ""
-    max_parallel_tasks: 0
-    demo: false
-  keys:
-    project_ssh_key_ebdlab:
-      name: "Ebdruplab example ssh key"
-      ssh:
-        type: ssh
-        login: "ansibleuser"
-        passphrase: "INSERT_VALUT_ENCRYPTED_SECRET"
-        private_key: "ssh-rsa vaultencryptedsecretkey"
-    project_login_user_ebdlab:
-      name: "Ebdruplab Example User"
-      type: login_password
-      login_password:
-        login: "Example User1"
-        password: "vaultencryptedsecretpassword"
+  project: []
+  keys: []
   repositories: []
+  views: []
   inventories: []
   environments: []
   templates: []
-  views: []
+  schedules: []

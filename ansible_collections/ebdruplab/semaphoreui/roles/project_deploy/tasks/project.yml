@@ -1,0 +1,35 @@
+---
+
+- name: "Create Semaphore Project if it does not exist (or after deletion / forced create)"
+  ebdruplab.semaphoreui.project_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    name: "{{ project_deploy_config.project.name }}"
+    alert: "{{ project_deploy_config.project.alert | default(false) }}"
+    alert_chat: "{{ project_deploy_config.project.alert_chat | default('') }}"
+    max_parallel_tasks: "{{ project_deploy_config.project.max_parallel_tasks | default(0) }}"
+    demo: "{{ project_deploy_config.project.demo | default(false) }}"
+  register: created_project
+  when:
+    - (not project_exists)
+      or (project_deploy_force_project_creation | bool)
+      or (project_deploy_force_project_delete | bool)
+
+# If we created it just now, take the ID from the result
+- name: "Set project ID (created)"
+  ansible.builtin.set_fact:
+    current_project_id: "{{ created_project.project.id }}"
+  when:
+    - created_project is defined
+    - created_project.project is defined
+
+# Otherwise we’re updating: use the first matching existing project’s ID
+- name: "Set project ID (existing)"
+  ansible.builtin.set_fact:
+    current_project_id: "{{ matching_projects[0].id }}"
+  when:
+    - current_project_id is not defined
+    - project_exists
+    - (project_deploy_force_project_update | bool)

@@ -1,15 +1,17 @@
 ---
+
 - name: "Create project keys"
   ebdruplab.semaphoreui.project_key_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     name: "{{ item.name }}"
     type: "{{ item.type }}"
     ssh: "{{ item.ssh | default(omit) }}"
     login_password: "{{ item.login_password | default(omit) }}"
-  loop: "{{ project_deploy_config.keys }}"
+  loop: "{{ project_deploy_config['keys'].values() }}"
   register: created_keys_result
 
 - name: "Set created keys fact"

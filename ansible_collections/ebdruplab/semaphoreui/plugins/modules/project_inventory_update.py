@@ -38,8 +38,35 @@ options:
   inventory:
     description:
       - Dictionary containing the updated inventory fields.
+      - May include ssh_key_id (user credentials) and become_key_id (sudo credentials).
+      - For type 'file', include repository_id and inventory_file (or inventory path).
     type: dict
     required: true
+    suboptions:
+      name:
+        description: Name of the inventory.
+        type: str
+      type:
+        description: Inventory type.
+        type: str
+        choices: [static, static-yaml, file]
+      inventory:
+        description: For static/static-yaml, the content. For file, the file path.
+        type: str
+      inventory_file:
+        description: Alias for file path when type is 'file'.
+        type: str
+      repository_id:
+        description: Repository ID when type is 'file'.
+        type: int
+      ssh_key_id:
+        description: SSH key (user credentials) to use.
+        type: int
+        version_added: 2.0.0
+      become_key_id:
+        description: Become (sudo) key to use.
+        type: int
+        version_added: 2.0.0
   session_cookie:
     description:
       - Session cookie for authentication.
@@ -62,7 +89,7 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Update an inventory
+- name: Update an inventory (change name and attach creds)
   ebdruplab.semaphoreui.project_inventory_update:
     host: http://localhost
     port: 3000
@@ -71,16 +98,15 @@ EXAMPLES = r'''
     inventory_id: 2
     inventory:
       name: "Updated Inventory"
-      type: "static"
-      inventory: |
-        localhost ansible_connection=local
+      ssh_key_id: 42
+      become_key_id: 7
 '''
 
 RETURN = r'''
 inventory:
-  description: The updated inventory object (if returned by the API).
+  description: The updated inventory object (if returned by the API, or the payload for 204 responses).
   type: dict
-  returned: when available
+  returned: success
 status:
   description: HTTP response code returned by the API.
   type: int
@@ -94,7 +120,19 @@ def main():
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
             inventory_id=dict(type='int', required=True),
-            inventory=dict(type='dict', required=True),
+            inventory=dict(
+                type='dict',
+                required=True,
+                options=dict(
+                    name=dict(type='str', required=False),
+                    type=dict(type='str', required=False, choices=['static', 'static-yaml', 'file']),
+                    inventory=dict(type='str', required=False),
+                    inventory_file=dict(type='str', required=False),
+                    repository_id=dict(type='int', required=False),
+                    ssh_key_id=dict(type='int', required=False),
+                    become_key_id=dict(type='int', required=False),
+                ),
+            ),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True)
@@ -103,24 +141,40 @@ def main():
         supports_check_mode=False
     )
 
-    host = module.params["host"]
-    port = module.params["port"]
-    project_id = module.params["project_id"]
-    inventory_id = module.params["inventory_id"]
-
-    url = f"{host}:{port}/api/project/{project_id}/inventory/{inventory_id}"
-
-    headers = get_auth_headers(
-        session_cookie=module.params.get("session_cookie"),
-        api_token=module.params.get("api_token")
-    )
-    headers["Content-Type"] = "application/json"
-
-    payload = module.params["inventory"]
-    payload["project_id"] = project_id
-    payload["id"] = inventory_id
-
     try:
+        host = module.params["host"].rstrip("/")
+        port = module.params["port"]
+        project_id = module.params["project_id"]
+        inventory_id = module.params["inventory_id"]
+
+        url = f"{host}:{port}/api/project/{project_id}/inventory/{inventory_id}"
+
+        headers = get_auth_headers(
+            session_cookie=module.params.get("session_cookie"),
+            api_token=module.params.get("api_token")
+        )
+        headers["Content-Type"] = "application/json"
+
+        # Start with validated dict
+        payload = dict(module.params["inventory"] or {})
+        payload["project_id"] = project_id
+        payload["id"] = inventory_id
+
+        # Normalize file path alias if provided
+        if payload.get("type") == "file" and payload.get("inventory_file"):
+            payload["inventory"] = payload.pop("inventory_file")
+
+        # Only set inventory_mode if 'type' is being updated
+        if "type" in payload:
+            inv_type = payload["type"]
+            if inv_type == "static":
+                payload["inventory_mode"] = "text"
+            elif inv_type == "static-yaml":
+                payload["inventory_mode"] = "yaml"
+            elif inv_type == "file":
+                payload["inventory_mode"] = "file"
+
+        # Do the PUT
         body = json.dumps(payload).encode("utf-8")
         response_body, status, _ = semaphore_put(
             url,
@@ -130,16 +184,27 @@ def main():
         )
 
         if status == 204:
-            module.exit_json(changed=True, inventory=None, status=status)
-        elif status == 200:
-            inventory = json.loads(response_body) if isinstance(response_body, (bytes, str)) else response_body
-            module.exit_json(changed=True, inventory=inventory, status=status)
+            # No content, return what we sent
+            module.exit_json(changed=True, inventory=payload, status=status)
+
+        if isinstance(response_body, (bytes, bytearray)):
+            text = response_body.decode() or ""
+        elif isinstance(response_body, str):
+            text = response_body
         else:
-            module.fail_json(msg=f"Failed to update inventory: HTTP {status} - {response_body}", status=status)
+            module.exit_json(changed=True, inventory=response_body, status=status)
+
+        if status == 200:
+            try:
+                inventory = json.loads(text) if text else {}
+            except Exception:
+                inventory = {"raw": text}
+            module.exit_json(changed=True, inventory=inventory, status=status)
+
+        module.fail_json(msg=f"Failed to update inventory: HTTP {status} - {text}", status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
 if __name__ == '__main__':
     main()
-

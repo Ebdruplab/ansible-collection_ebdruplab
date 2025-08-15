@@ -1,23 +1,263 @@
 ---
+# --- Top-level sanity ---------------------------------------------------------
+
+- name: "Validate base connection variables"
+  ansible.builtin.assert:
+    that:
+      - project_deploy_semaphore_host is defined
+      - project_deploy_semaphore_host | length > 0
+      - project_deploy_semaphore_port is defined
+      - (project_deploy_semaphore_port | int) > 0
+    fail_msg: "Semaphore host/port must be set."
+    quiet: true
+
+- name: "Validate authentication (token OR username+password)"
+  ansible.builtin.assert:
+    that:
+      - >
+        (project_deploy_semaphore_api_token is defined and project_deploy_semaphore_api_token | length > 0)
+        or
+        (
+          project_deploy_semaphore_username is defined and project_deploy_semaphore_username | length > 0
+          and
+          project_deploy_semaphore_password is defined and project_deploy_semaphore_password | length > 0
+        )
+    fail_msg: "Provide either project_deploy_semaphore_api_token OR username+password."
+    quiet: true
+
+- name: "Validate safety flags"
+  ansible.builtin.assert:
+    that:
+      - project_deploy_sensitive_data_no_log in [true, false]
+      - project_deploy_force_project_creation in [true, false]
+      - project_deploy_force_project_update   in [true, false]
+      - project_deploy_force_project_delete   in [true, false]
+      - (project_deploy_force_project_delete_timer | int) >= 0
+    fail_msg: "Safety flags must be booleans; timer must be a non-negative integer."
+    quiet: true
+
+# --- Project ------------------------------------------------------------------
+
 - name: "Validate project configuration"
   ansible.builtin.assert:
     that:
-      - project_deploy_config.project.name is defined and project_deploy_config.project.name != ""
-    msg: "project_deploy_config.project.name must be defined."
+      - project_deploy_config is defined
+      - project_deploy_config is mapping
+      - project_deploy_config.project is defined
+      - project_deploy_config.project.name is defined
+      - project_deploy_config.project.name | length > 0
+    fail_msg: "project_deploy_config.project.name must be defined."
+    quiet: true
 
-- name: "Validate repository key dependencies"
+# --- Keys ---------------------------------------------------------------------
+
+- name: "Validate keys (if any)"
   ansible.builtin.assert:
     that:
-      - item.key_name in (project_deploy_config.keys | map(attribute='name') | list)
-    msg: "Repository '{{ item.name }}' references key '{{ item.key_name }}' which is not defined in project_deploy_config.keys."
-  loop: "{{ project_deploy_config.repositories }}"
-  when: item.key_name is defined
+      - item.value.name is defined
+      - item.value.name | length > 0
+      - item.value.type is defined
+      - item.value.type in ['ssh', 'login_password']
+      # SSH key requirements
+      - >
+        (item.value.type != 'ssh')
+        or
+        (
+          item.value.ssh is defined
+          and item.value.ssh.login is defined and item.value.ssh.login | length > 0
+          and item.value.ssh.private_key is defined and item.value.ssh.private_key | length > 0
+        )
+      # Login/password requirements
+      - >
+        (item.value.type != 'login_password')
+        or
+        (
+          item.value.login_password is defined
+          and item.value.login_password.login is defined and item.value.login_password.login | length > 0
+          and item.value.login_password.password is defined and item.value.login_password.password | length > 0
+        )
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('keys', {}) | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name }}"
+  when: (project_deploy_config | default({})).get('keys', {}) | length > 0
 
-- name: "Validate template dependencies"
+# --- Repositories -------------------------------------------------------------
+
+- name: "Validate repositories (if any)"
   ansible.builtin.assert:
     that:
-      - item.inventory_name in (project_deploy_config.inventories | map(attribute='name') | list)
-      - item.repository_name in (project_deploy_config.repositories | map(attribute='name') | list)
-      - (item.environment_name is not defined) or (item.environment_name in (project_deploy_config.environments | map(attribute='name') | list))
-    msg: "Template '{{ item.name }}' has an unresolved dependency. Check inventory_name, repository_name, and environment_name."
-  loop: "{{ project_deploy_config.templates }}"
+      - item.name is defined
+      - item.name | length > 0
+      - item.git_url is defined
+      - item.git_url | length > 0
+      - (item.key_id is defined) or (item.key_name is defined)
+    fail_msg: "Repo must have name, git_url and either key_id or key_name."
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('repositories', []) }}"
+  loop_control:
+    label: "{{ item.name if (item.name is defined) else 'unnamed-repo' }}"
+  when: (project_deploy_config | default({})).get('repositories', []) | length > 0
+
+# --- Views --------------------------------------------------------------------
+
+- name: "Validate views (if any)"
+  ansible.builtin.assert:
+    that:
+      - item.value.title is defined
+      - item.value.title | length > 0
+      - (item.value.position | default(0) | int) >= 0
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('views', {}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }} -> {{ item.value.title | default('') }}"
+  when: (project_deploy_config | default({})).get('views', {}) | length > 0
+
+- name: "Ensure view titles are unique"
+  ansible.builtin.assert:
+    that:
+      - (view_titles | unique | length) == (view_titles | length)
+    fail_msg: "Duplicate view titles detected in project_deploy_config.views."
+    quiet: true
+  vars:
+    view_titles: >-
+      {{ (project_deploy_config | default({})).get('views', {})
+         | dict2items | map(attribute='value') | map(attribute='title') | list }}
+  when: (project_deploy_config | default({})).get('views', {}) | length > 0
+
+# --- Inventories --------------------------------------------------------------
+
+- name: "Validate inventories (if any)"
+  ansible.builtin.assert:
+    that:
+      - item.value.name is defined
+      - item.value.name | length > 0
+      - item.value.type is defined
+      - item.value.type in ['static', 'static-yaml', 'file']
+      - (item.value.ssh_key_id is defined) or (item.value.ssh_key_name is defined)
+      # static/static-yaml require 'inventory' content
+      - >
+        (item.value.type not in ['static','static-yaml'])
+        or
+        (item.value.inventory is defined and item.value.inventory | length > 0)
+      # file requires repo ref and inventory_file
+      - >
+        (item.value.type != 'file')
+        or
+        (
+          (item.value.repository_id is defined) or (item.value.repository_name is defined)
+        )
+      - >
+        (item.value.type != 'file') or
+        (item.value.inventory_file is defined and item.value.inventory_file | length > 0)
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('inventories', {}) | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name }}"
+  when: (project_deploy_config | default({})).get('inventories', {}) | length > 0
+
+- name: "Ensure inventory names are unique"
+  ansible.builtin.assert:
+    that:
+      - (inv_names | unique | length) == (inv_names | length)
+    fail_msg: "Duplicate inventory names detected."
+    quiet: true
+  vars:
+    inv_names: >-
+      {{ (project_deploy_config | default({})).get('inventories', {})
+         | dict2items | map(attribute='value') | map(attribute='name') | list }}
+  when: (project_deploy_config | default({})).get('inventories', {}) | length > 0
+
+# --- Environments -------------------------------------------------------------
+
+- name: "Validate environments (if any)"
+  ansible.builtin.assert:
+    that:
+      - item.value.name is defined
+      - item.value.name | length > 0
+      # Must NOT set both json and extra_variables
+      - not ( (item.value.json is defined) and (item.value.extra_variables is defined) )
+      # env/json/extra_variables must be dict or JSON string if provided
+      - >
+        (item.value.env is not defined)
+        or (item.value.env is mapping)
+        or (item.value.env is string)
+      - >
+        (item.value.json is not defined)
+        or (item.value.json is mapping)
+        or (item.value.json is string)
+      - >
+        (item.value.extra_variables is not defined)
+        or (item.value.extra_variables is mapping)
+        or (item.value.extra_variables is string)
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('environments', {}) | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name }}"
+  when: (project_deploy_config | default({})).get('environments', {}) | length > 0
+
+- name: "Validate environment secrets (if any)"
+  ansible.builtin.assert:
+    that:
+      - item.name is defined and item.name | length > 0
+      - item.secret is defined and item.secret | length > 0
+      - item.type is defined
+      - item.type in ['env','json','extra_vars','extra_variables']
+    fail_msg: "Each secret needs name, secret, and type (env/json/extra_vars/extra_variables)."
+    quiet: true
+  loop: >-
+    {{
+      (project_deploy_config | default({})).get('environments', {}) | dict2items
+      | map(attribute='value') | selectattr('secrets','defined')
+      | map(attribute='secrets') | list | flatten
+    }}
+  loop_control:
+    label: "{{ item.name | default('unnamed-secret') }}"
+  when: (project_deploy_config | default({})).get('environments', {}) | length > 0
+
+# --- Templates ----------------------------------------------------------------
+
+- name: "Validate templates (if any)"
+  ansible.builtin.assert:
+    that:
+      - item.name is defined and item.name | length > 0
+      - item.type is defined and item.type in ['job']   # extend as your module supports
+      - item.playbook is defined and item.playbook | length > 0
+      - item.repository_name is defined and item.repository_name | length > 0
+      # Optional references by name; they’ll be resolved later
+      - (item.inventory_name is not defined) or (item.inventory_name | length > 0)
+      - (item.environment_name is not defined) or (item.environment_name | length > 0)
+      - (item.view_title is not defined) or (item.view_title | length > 0)
+    quiet: true
+  loop: "{{ (project_deploy_config | default({})).get('templates', {}) | dict2items | map(attribute='value') | list }}"
+  loop_control:
+    label: "{{ item.name if (item.name is defined) else 'unnamed-template' }}"
+  when: (project_deploy_config | default({})).get('templates', {}) | length > 0
+
+- name: "Ensure template names are unique"
+  ansible.builtin.assert:
+    that:
+      - (tpl_names | unique | length) == (tpl_names | length)
+    fail_msg: "Duplicate template names detected."
+    quiet: true
+  vars:
+    tpl_names: >-
+      {{ (project_deploy_config | default({})).get('templates', {})
+         | dict2items | map(attribute='value') | map(attribute='name') | list }}
+  when: (project_deploy_config | default({})).get('templates', {}) | length > 0
+
+# --- Schedules ----------------------------------------------------------------
+- name: Validate schedules (active must be boolean if provided)
+  ansible.builtin.assert:
+    that:
+      - project_deploy_config.schedules is defined
+      - item.value.name is defined
+      - item.value.cron_format is defined
+      - (item.value.template_id is defined) or (item.value.template_name is defined)
+      - (item.value.active is not defined) or (item.value.active in [true, false])
+    fail_msg: "Each schedule needs name, cron_format, template_id|template_name; if 'active' is set it must be true/false."
+    quiet: true
+  loop: "{{ project_deploy_config.schedules | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name | default('unnamed-schedule') }}"
+  when: project_deploy_config.schedules is defined

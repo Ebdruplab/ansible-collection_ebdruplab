@@ -1,10 +1,23 @@
 ---
+
 - name: "Create project views"
   ebdruplab.semaphoreui.project_view_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     title: "{{ item.title }}"
     position: "{{ item.position | default(omit) }}"
-  loop: "{{ project_deploy_config.views }}"
+  loop: "{{ project_deploy_config['views'].values() }}"
+  loop_control:
+    label: "{{ item.title }}"
+  register: created_project_views_result
+
+- name: "Set created project views fact"
+  ansible.builtin.set_fact:
+    created_project_view_by_title: "{{ created_project_view_by_title | default({}) | combine({ item.item.title: item.view }) }}"
+  loop: "{{ created_project_views_result.results }}"
+
+- debug:
+    var: created_project_view_by_title
