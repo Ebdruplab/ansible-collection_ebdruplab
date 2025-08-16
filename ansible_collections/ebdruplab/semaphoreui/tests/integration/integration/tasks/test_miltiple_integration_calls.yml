@@ -1,0 +1,322 @@
+---
+- name: "Integration test: integrations, matchers, extracted values (create → list/get → update → delete)"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env','ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env','ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "ebdruplab integration test_all"
+    key_name: "Git - Reader User"
+    key_user: "git_reader"
+    key_password: "git_reader_Password01!"
+    repo_name: "ansible-semaphore_ebdruplab_examples"
+    repo_git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"
+    repo_branch: "main"
+    inventory_name: "Inventory from Git file"
+    inventory_file_path: "inventories/example/example.ini"
+    template_name: "Integration Template"
+
+  tasks:
+    - name: Login
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+
+    - name: Create project
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: false
+        alert_chat: "Ansible"
+        max_parallel_tasks: 0
+        demo: false
+      register: project_create
+
+    - name: Create login_password key
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        name: "{{ key_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key_user }}"
+          password: "{{ key_password }}"
+      register: key_create
+
+    - name: Create repository
+      ebdruplab.semaphoreui.project_repository_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        repository:
+          name: "{{ repo_name }}"
+          git_url: "{{ repo_git_url }}"
+          git_branch: "{{ repo_branch }}"
+          ssh_key_id: "{{ key_create.key.id }}"
+      register: repo_create
+
+    - name: Create inventory from repo file
+      ebdruplab.semaphoreui.project_inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        inventory:
+          name: "{{ inventory_name }}"
+          type: "file"
+          repository_id: "{{ repo_create.repository.id }}"
+          inventory_file: "{{ inventory_file_path }}"
+          ssh_key_id: "{{ key_create.key.id }}"
+      register: inv_create
+
+    - name: Create template
+      ebdruplab.semaphoreui.project_template_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        template:
+          name: "{{ template_name }}"
+          app: "ansible"
+          playbook: "playbooks/pb-semaphore-example.yml"
+          inventory_id: "{{ inv_create.inventory.id }}"
+          repository_id: "{{ repo_create.repository.id }}"
+          environment_id: 1
+          type: "job"
+          description: "Template for integration tests"
+          allow_override_args_in_task: false
+          prompt_limit: false
+          vaults: []
+          arguments: "[]"
+      register: tpl_create
+
+    # ---------------- Integrations ----------------
+    - name: Create integration (HMAC; diff=true, dry_run=false)
+      ebdruplab.semaphoreui.project_integration_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration:
+          name: "Example Integration name"
+          template_id: "{{ tpl_create.template.id }}"
+          auth_method: "HMAC"
+          auth_header: "token"
+          auth_secret_id: "{{ key_create.key.id }}"
+          task_params:
+            diff: true
+            dry_run: false
+      register: integ_create
+
+    - name: List integrations
+      ebdruplab.semaphoreui.project_integration_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+      register: integ_list
+
+    - name: Get integration
+      ebdruplab.semaphoreui.project_integration_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+      register: integ_get
+
+    - name: Update integration (diff=false, dry_run=true)
+      ebdruplab.semaphoreui.project_integration_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        integration:
+          name: "Example Integration name (updated)"
+          template_id: "{{ tpl_create.template.id }}"
+          auth_method: "HMAC"
+          auth_header: "token"
+          auth_secret_id: "{{ key_create.key.id }}"
+          task_params:
+            diff: false
+            dry_run: true
+      register: integ_update
+
+    # ---------------- Matchers ----------------
+    - name: Create matcher
+      ebdruplab.semaphoreui.project_integration_matcher_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        matcher:
+          name: "body equals check"
+          match_type: "body"
+          method: "equals"
+          body_data_type: "json"
+          key: "event"
+          value: "deploy"
+      register: matcher_create
+
+    - name: Set matcher id (from create)
+      ansible.builtin.set_fact:
+        my_matcher_id: "{{ matcher_create.matcher.id | int }}"
+
+    - name: Assert matcher id is present
+      ansible.builtin.assert:
+        that:
+          - my_matcher_id is defined
+          - my_matcher_id | int > 0
+        quiet: true
+
+    - name: Pause briefly before updating matcher
+      ansible.builtin.pause:
+        seconds: 1
+
+    - name: Update matcher
+      ebdruplab.semaphoreui.project_integration_matcher_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        matcher_id: "{{ my_matcher_id }}"
+        matcher:
+          name: "body equals check (updated)"
+          match_type: "body"
+          method: "equals"
+          body_data_type: "json"
+          key: "action"
+          value: "deploy"
+      register: matcher_update
+
+    - name: List matchers
+      ebdruplab.semaphoreui.project_integration_matcher_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+      register: matcher_list
+
+    - name: Delete matcher
+      ebdruplab.semaphoreui.project_integration_matcher_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        matcher_id: "{{ my_matcher_id }}"
+      register: matcher_delete
+
+    # ------------- Extracted Values -------------
+    - name: Create extracted value
+      ebdruplab.semaphoreui.project_integration_extraction_value_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        value:
+          name: "grab message"
+          value_source: "body"
+          body_data_type: "json"
+          key: "message"
+          variable: "MSG"
+          variable_type: "environment"
+      register: extract_create
+
+    - name: List extracted values
+      ebdruplab.semaphoreui.project_integration_extraction_value_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+      register: extract_list
+
+    - name: Extract extracted-value id by name
+      ansible.builtin.set_fact:
+        my_extract_id: >-
+          {{ (extract_list['values'] | default([]))
+             | selectattr('name','equalto','grab message')
+             | map(attribute='id') | list | first }}
+
+    - name: Fail if extracted value id not found
+      ansible.builtin.fail:
+        msg: "Extracted value 'grab message' not found."
+      when: my_extract_id is not defined or my_extract_id is none
+
+    - name: Update extracted value
+      ebdruplab.semaphoreui.project_integration_extraction_value_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        extractvalue_id: "{{ my_extract_id }}"
+        value:
+          name: "grab message (updated)"
+          value_source: "body"
+          body_data_type: "json"
+          key: "msg"
+          variable: "MSG"
+          variable_type: "environment"
+      register: extract_update
+
+    # ---------------- Cleanup ----------------
+    - name: Delete extracted value
+      ebdruplab.semaphoreui.project_integration_extraction_value_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        extractvalue_id: "{{ my_extract_id }}"
+      register: extract_delete
+
+    - name: Delete matcher
+      ebdruplab.semaphoreui.project_integration_matcher_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+        matcher_id: "{{ my_matcher_id }}"
+      register: matcher_delete
+
+    - name: Delete integration
+      ebdruplab.semaphoreui.project_integration_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        integration_id: "{{ integ_create.integration.id }}"
+      register: integ_delete
+
+    - name: Delete project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+      register: project_delete
+
+    - name: Logout
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"

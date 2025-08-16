@@ -1,5 +1,5 @@
 ---
-- name: "Test deleting inventory semaphore"
+- name: Test deleting inventory semaphore
   hosts: localhost
   gather_facts: false
   vars:
@@ -11,6 +11,7 @@
     project_name: 'edb_test_project002'
     inventory_data: |
       localhost ansible_connection=local
+
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -20,7 +21,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: 'Create project'
+    - name: Create project
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -32,7 +33,20 @@
         demo: false
       register: create_result
 
-    - name: Create inventory
+    - name: Create a login/password key to satisfy inventory ssh_key_id
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "Temp Inventory Key"
+        type: login_password
+        login_password:
+          login: "noop-user"
+          password: "noop-pass"
+      register: key_create
+
+    - name: Create inventory (static) using the key id
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -42,6 +56,7 @@
           name: "{{ test_inventory_name }}"
           type: "static"
           inventory: "{{ inventory_data }}"
+          ssh_key_id: "{{ key_create.key.id }}"
       register: created_inventory
 
     - name: Show created inventory
@@ -56,7 +71,7 @@
         project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
 
-    - name: 'Delete project'
+    - name: Delete project
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"

@@ -11,10 +11,13 @@ DOCUMENTATION = r"""
 ---
 module: project_integration_update
 short_description: Update a Semaphore project integration
-version_added: "1.0.0"
+version_added: "2.0.0"
 description:
   - Updates an existing integration under a Semaphore project.
-  - Supports changing name, template, optional auth settings, and task parameters.
+  - Auth methods match the UI: C(None), C(GitHub Webhooks), C(Bitbucket Webhooks), C(Token), C(HMAC), C(BasicAuth)).
+  - C(auth_header) is only applicable for C(Token) and C(HMAC); defaults to C(token) if omitted.
+  - C(searchable) is always sent as C(false).
+  - C(task_params.debug_level) is always forced to C(4); C(diff) and C(dry_run) default to C(false) if provided.
 options:
   host:
     type: str
@@ -36,18 +39,16 @@ options:
         type: str
       template_id:
         type: int
-      auth_header:
-        type: str
       auth_method:
         type: str
-        choices: [token, basic, none]
+        choices: ["None", "GitHub Webhooks", "Bitbucket Webhooks", "Token", "HMAC", "BasicAuth"]
+      auth_header:
+        type: str
       auth_secret_id:
         type: int
       task_params:
         type: dict
         suboptions:
-          debug_level:
-            type: int
           diff:
             type: bool
             default: false
@@ -70,37 +71,27 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Update integration name and task params
+- name: Update integration (switch to Token auth and enable diff)
   ebdruplab.semaphoreui.project_integration_update:
     host: http://localhost
     port: 3000
     api_token: "{{ semaphore_api_token }}"
-    project_id: 1
-    integration_id: 11
+    project_id: 226
+    integration_id: 1
     integration:
-      name: "Deploy (nightly)"
+      name: "Example Integration name"
+      template_id: 1
+      auth_method: "Token"
+      auth_header: "token"   # only for Token/HMAC; defaults to "token"
+      auth_secret_id: 3
       task_params:
-        debug_level: 3
         diff: true
         dry_run: false
-
-- name: Point integration to another template and set token auth
-  ebdruplab.semaphoreui.project_integration_update:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
-    project_id: 1
-    integration_id: 11
-    integration:
-      template_id: 2
-      auth_method: token
-      auth_header: "token"
-      auth_secret_id: 3
 """
 
 RETURN = r"""
 integration:
-  description: The updated integration (server response) or the payload if HTTP 204.
+  description: Server response (or the sent payload if HTTP 204).
   type: dict
   returned: success
 status:
@@ -109,20 +100,31 @@ status:
   returned: always
 """
 
-def _normalize_task_params(module, tp):
+# UI label -> API value
+AUTH_MAP = {
+    "None": "none",
+    "GitHub Webhooks": "github_webhooks",
+    "Bitbucket Webhooks": "bitbucket_webhooks",
+    "Token": "token",
+    "HMAC": "hmac",
+    "BasicAuth": "basic",
+}
+
+def _normalize_task_params(tp):
     if not tp:
-        return {}
-    norm = {}
-    if "debug_level" in tp and tp["debug_level"] is not None:
+        return {"debug_level": 4, "diff": False, "dry_run": False}
+    return {
+        "debug_level": 4,                       # always 4
+        "diff": bool(tp.get("diff", False)),
+        "dry_run": bool(tp.get("dry_run", False)),
+    }
+
+def _opt_int(module, obj, key):
+    if key in obj and obj[key] is not None:
         try:
-            norm["debug_level"] = int(tp["debug_level"])
+            obj[key] = int(obj[key])
         except Exception:
-            module.fail_json(msg="task_params.debug_level must be an integer")
-    if "diff" in tp:
-        norm["diff"] = bool(tp.get("diff", False))
-    if "dry_run" in tp:
-        norm["dry_run"] = bool(tp.get("dry_run", False))
-    return norm
+            module.fail_json(msg=f"{key} must be an integer")
 
 def main():
     module = AnsibleModule(
@@ -137,14 +139,13 @@ def main():
                 options=dict(
                     name=dict(type="str", required=False),
                     template_id=dict(type="int", required=False),
+                    auth_method=dict(type="str", required=False, choices=list(AUTH_MAP.keys())),
                     auth_header=dict(type="str", required=False),
-                    auth_method=dict(type="str", required=False, choices=["token", "basic", "none"]),
                     auth_secret_id=dict(type="int", required=False),
                     task_params=dict(
                         type="dict",
                         required=False,
                         options=dict(
-                            debug_level=dict(type="int", required=False),
                             diff=dict(type="bool", required=False, default=False),
                             dry_run=dict(type="bool", required=False, default=False),
                         ),
@@ -167,11 +168,27 @@ def main():
 
     payload = dict(module.params["integration"] or {})
     payload["project_id"] = project_id
-    # Including id is harmless if API ignores it; omit if undesired.
     payload["id"] = integration_id
+    payload["searchable"] = False                 # always false
 
+    # Normalize ints if present
+    _opt_int(module, payload, "template_id")
+    _opt_int(module, payload, "auth_secret_id")
+
+    # Normalize auth method & header
+    if "auth_method" in payload and payload["auth_method"] is not None:
+        api_method = AUTH_MAP.get(payload["auth_method"])
+        if not api_method:
+            module.fail_json(msg="Unsupported auth_method")
+        payload["auth_method"] = api_method
+    if payload.get("auth_method") in ("token", "hmac"):
+        payload["auth_header"] = payload.get("auth_header", "token")
+    else:
+        payload.pop("auth_header", None)
+
+    # Normalize task_params if provided
     if "task_params" in payload:
-        payload["task_params"] = _normalize_task_params(module, payload.get("task_params"))
+        payload["task_params"] = _normalize_task_params(payload.get("task_params"))
 
     url = f"{host}:{port}/api/project/{project_id}/integrations/{integration_id}"
     headers = get_auth_headers(

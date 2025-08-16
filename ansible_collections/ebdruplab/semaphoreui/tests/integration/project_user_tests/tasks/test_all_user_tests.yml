@@ -1,0 +1,215 @@
+---
+- name: "Integration test: project users (create users → link/list/update/remove → cleanup)"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    semaphore_host: "http://localhost"
+    semaphore_port: 3000
+    semaphore_username: "{{ lookup('env','ebdruplab_integration_test_USER') | default('admin', true) }}"
+    semaphore_password: "{{ lookup('env','ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    project_name: "ebdruplab user-int-tests"
+
+    test_users:
+      - { name: "UT User 1", username: "ut_user1", email: "ut_user1@example.local", password: "Passw0rd!1" }
+      - { name: "UT User 2", username: "ut_user2", email: "ut_user2@example.local", password: "Passw0rd!2" }
+      - { name: "UT User 3", username: "ut_user3", email: "ut_user3@example.local", password: "Passw0rd!3" }
+      - { name: "UT User 4", username: "ut_user4", email: "ut_user4@example.local", password: "Passw0rd!4" }
+      - { name: "UT User 5", username: "ut_user5", email: "ut_user5@example.local", password: "Passw0rd!5" }
+
+    # Valid roles: Owner, Manager, Task Runner, Guest
+    role_map:
+      - { idx: 0, role: "Owner" }
+      - { idx: 1, role: "Manager" }
+      - { idx: 2, role: "Task Runner" }
+      - { idx: 3, role: "Guest" }
+      - { idx: 4, role: "Manager" }
+
+  tasks:
+    - name: Login
+      ebdruplab.semaphoreui.login:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        username: "{{ semaphore_username }}"
+        password: "{{ semaphore_password }}"
+      register: login_result
+      no_log: true
+
+    - name: Create project
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ project_name }}"
+        alert: false
+        alert_chat: ""
+        max_parallel_tasks: 0
+        demo: false
+      register: project_create
+
+    - name: DEBUG project created
+      ansible.builtin.debug:
+        msg: "Project '{{ project_create.project.name }}' id={{ project_create.project.id }}"
+
+    - name: Create test users (system)
+      ebdruplab.semaphoreui.user_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "{{ item.name }}"
+        username: "{{ item.username }}"
+        email: "{{ item.email }}"
+        password: "{{ item.password }}"
+        admin: false
+        alert: false
+        external: false
+      loop: "{{ test_users }}"
+      loop_control:
+        label: "{{ item.username }}"
+      register: users_created
+      no_log: false
+
+    # Build list of wanted usernames first
+    - name: Build wanted username list
+      ansible.builtin.set_fact:
+        wanted_usernames: "{{ test_users | map(attribute='username') | list }}"
+
+    # Fetch full system user list, then filter to wanted usernames
+    - name: List all system users
+      ebdruplab.semaphoreui.user_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: all_users
+
+    - name: Filter created users from system list
+      ansible.builtin.set_fact:
+        created_users: "{{ all_users.users | selectattr('username','in', wanted_usernames) | list }}"
+
+    - name: Build username → id map for created users
+      ansible.builtin.set_fact:
+        user_id_map: "{{ dict(created_users | map(attribute='username') | zip(created_users | map(attribute='id'))) }}"
+
+    - name: Build ordered id list (matches test_users order)
+      ansible.builtin.set_fact:
+        created_user_ids: "{{ wanted_usernames | map('extract', user_id_map) | list }}"
+        created_usernames: "{{ wanted_usernames }}"
+
+    - name: DEBUG users created (username → id)
+      ansible.builtin.debug:
+        msg: "Created users: {{ created_usernames | zip(created_user_ids) | list }}"
+
+    - name: Assert all users resolved to IDs
+      ansible.builtin.assert:
+        that:
+          - created_user_ids | length == test_users | length
+          - created_user_ids | select('defined') | list | length == test_users | length
+        fail_msg: "Not all test users resolved to IDs via user_list."
+        quiet: true
+
+    - name: Link users to project with roles
+      ebdruplab.semaphoreui.project_user_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        user:
+          user_id: "{{ created_user_ids[item.idx] }}"
+          role: "{{ item.role }}"
+      loop: "{{ role_map }}"
+      loop_control:
+        label: "user_id={{ created_user_ids[item.idx] }} role={{ item.role }}"
+      register: link_results
+
+    - name: DEBUG linked count
+      ansible.builtin.debug:
+        msg: "Linked {{ link_results.results | length }} users to project {{ project_create.project.id }}"
+
+    - name: List project users
+      ebdruplab.semaphoreui.project_user_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        sort: name
+        order: asc
+      register: proj_users_list
+
+    - name: DEBUG users in project (name, username, role)
+      ansible.builtin.debug:
+        var: proj_users_list.users
+
+    - name: Pick one non-owner to update role to Guest
+      ansible.builtin.set_fact:
+        to_update_user_id: >-
+          {{ (proj_users_list.users | selectattr('role','ne','owner') | map(attribute='id') | list | first) | default(omit) }}
+
+    - name: Update user role → Guest
+      ebdruplab.semaphoreui.project_user_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        user_id: "{{ to_update_user_id }}"
+        user:
+          role: "Guest"
+      when: to_update_user_id is defined
+
+    - name: Re-list users after update
+      ebdruplab.semaphoreui.project_user_list:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        sort: name
+        order: asc
+      register: proj_users_after_update
+
+    - name: DEBUG users after update
+      ansible.builtin.debug:
+        var: proj_users_after_update.users
+
+    - name: Remove all linked users from project
+      ebdruplab.semaphoreui.project_user_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+        user_id: "{{ item.id }}"
+      loop: "{{ proj_users_after_update.users }}"
+      loop_control:
+        label: "user_id={{ item.id }}"
+      register: unlink_results
+
+    - name: DEBUG unlink count
+      ansible.builtin.debug:
+        msg: "Unlinked {{ unlink_results.results | length }} users from project {{ project_create.project.id }}"
+
+    - name: Delete test users (system)
+      ebdruplab.semaphoreui.user_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        user_id: "{{ item }}"
+      loop: "{{ created_user_ids }}"
+      loop_control:
+        label: "user_id={{ item }}"
+      register: user_delete_results
+      no_log: true
+
+    - name: DEBUG system users deleted
+      ansible.builtin.debug:
+        msg: "Deleted system user ids: {{ created_user_ids }}"
+
+    - name: Delete project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ project_create.project.id }}"
+
+    - name: Logout
+      ebdruplab.semaphoreui.logout:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
