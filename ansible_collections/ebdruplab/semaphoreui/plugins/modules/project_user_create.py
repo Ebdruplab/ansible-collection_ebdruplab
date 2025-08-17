@@ -38,7 +38,7 @@ options:
         type: str
         required: true
         description:
-          - One of C(Owner), C(Manager), C(Task Runner), C(Guest).
+          - One of C(Owner), C(Manager), C(task_runner), C(Guest).
   session_cookie:
     type: str
     required: false
@@ -100,8 +100,8 @@ def _normalize_role(module, role):
         return "owner"
     if v == "manager":
         return "manager"
-    if v in ("task runner", "taskrunner"):
-        return "task-runner"
+    if v in ("task runner", "taskrunner","task_runner"):
+        return "task_runner"
     if v == "guest":
         return "guest"
 

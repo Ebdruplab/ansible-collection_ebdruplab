@@ -43,3 +43,8 @@
   loop_control:
     label: "{{ item.item.name | default('unknown') }}"
   when: item.template is defined
+
+- name: "Debug task (template)"
+  ansible.builtin.debug:
+    var: created_templates_by_name
+  when: project_deploy_debug

@@ -11,6 +11,7 @@ project_deploy_semaphore_password: "{{ vault_semaphore_password | default('chang
 # project_deploy_semaphore_api_token: "KEY"
 
 # Safety flags used by the role’s pre-checks
+project_deploy_debug: false
 project_deploy_sensitive_data_no_log: false
 project_deploy_force_project_creation: false
 project_deploy_force_project_update: false
@@ -25,6 +26,13 @@ project_deploy_config:
     alert_chat: ""
     max_parallel_tasks: 0
     demo: false
+  users_access:
+
+    - username: "admin"
+      role: "Owner"
+
+    - username: "ServiceDeskRunner"
+      role: task_runner
 
   # Credentials to create/ensure
   keys:

@@ -19,3 +19,8 @@
   ansible.builtin.set_fact:
     created_repos_by_name: "{{ created_repos_by_name | default({}) | combine({ item.item.name: item.repository }) }}"
   loop: "{{ created_repositories_result.results }}"
+
+- name: "Debug task (repositories)"
+  ansible.builtin.debug:
+    var: created_repos_by_name
+  when: project_deploy_debug

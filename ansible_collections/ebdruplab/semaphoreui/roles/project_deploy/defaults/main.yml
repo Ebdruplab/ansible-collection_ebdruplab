@@ -2,6 +2,9 @@
 ---
 # defaults file for ebdruplab.semaphoreui.project_deploy
 ## Safety flags used by the role’s pre-checks
+
+project_deploy_debug: false
+
 # No log sensitive data
 project_deploy_sensitive_data_no_log: true
 
@@ -26,6 +29,7 @@ project_deploy_semaphore_password: "changeme"
 ## Project and resource definitions
 project_deploy_config:
   project: []
+  users_access: []
   keys: []
   repositories: []
   views: []

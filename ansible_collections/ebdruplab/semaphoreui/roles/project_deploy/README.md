@@ -20,6 +20,7 @@ project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
 
 # Safety
+project_deploy_debug: false                       # Activate the debugs
 project_deploy_sensitive_data_no_log: true        # if sensitive data should be logged or not
 project_deploy_force_project_creation: false      # create a new project even if same name exists
 project_deploy_force_project_update:   false      # update the first matching project
@@ -29,6 +30,7 @@ project_deploy_force_project_delete_timer: 5      # seconds to pause before dele
 # Declarative config (fill these)
 project_deploy_config:
   project: []
+  users_access: []
   keys: []
   repositories: []
   views: []
@@ -67,6 +69,11 @@ project_deploy_config:
     alert_chat: ""
     max_parallel_tasks: 0
     demo: false
+
+  users_access:
+
+    - username: "Geo"
+      role: "Owner"
 
   keys:                       # map of keys
     key_handle:

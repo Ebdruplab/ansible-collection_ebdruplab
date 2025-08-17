@@ -1,0 +1,110 @@
+# Manage project users from project_deploy_config.users_access
+# - If username doesn't exist in Semaphore → print a message and skip
+# - If not linked → link with desired role
+# - If linked with different role → update role
+
+- name: "Fetch system users"
+  ebdruplab.semaphoreui.user_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+  register: _all_users
+  when: project_deploy_config.users_access is defined
+
+- name: "Map username → id"
+  ansible.builtin.set_fact:
+    _uname_to_id: "{{ dict(_all_users.users | map(attribute='username') | zip(_all_users.users | map(attribute='id'))) }}"
+    _role_display_map:
+      owner: "Owner"
+      manager: "Manager"
+      task_runner: "Task Runner"
+      guest: "Guest"
+  when: project_deploy_config.users_access is defined
+
+- name: "Fetch current project users"
+  ebdruplab.semaphoreui.project_user_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _proj_users
+  when: project_deploy_config.users_access is defined
+
+- name: "Build linked user_id → current_role_key map"
+  ansible.builtin.set_fact:
+    _uid_to_role_key: >-
+      {{
+        dict(
+          (_proj_users.users | default([]) | map(attribute='id') | list)
+          |
+          zip(
+            _proj_users.users | default([])
+            | map(attribute='role') | map('string')
+            | map('lower') | map('regex_replace','\\s+','_')
+          )
+        )
+      }}
+  when: project_deploy_config.users_access is defined
+
+- name: "Notify missing usernames (skipping create/link)"
+  ansible.builtin.debug:
+    msg: "User '{{ item.username }}' not found on server; skipping."
+  loop: "{{ project_deploy_config.users_access | default([]) }}"
+  when:
+    - project_deploy_config.users_access is defined
+    - item.username not in _uname_to_id
+
+- name: "Link users not yet in project"
+  ebdruplab.semaphoreui.project_user_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    user:
+      user_id: "{{ _uname_to_id[item.username] }}"
+      role: >-
+        {{
+          _role_display_map[
+            (item.role | string | lower | regex_replace('\\s+','_'))
+          ] | default(item.role)
+        }}
+  loop: "{{ project_deploy_config.users_access | default([]) }}"
+  loop_control:
+    label: "{{ item.username }}"
+  when:
+    - project_deploy_config.users_access is defined
+    - item.username in _uname_to_id
+    - _uname_to_id[item.username] not in _uid_to_role_key.keys() | list
+
+- name: "Update role for already-linked users (only when different)"
+  ebdruplab.semaphoreui.project_user_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    user_id: "{{ _uname_to_id[item.username] }}"
+    user:
+      role: >-
+        {{
+          _role_display_map[
+            (item.role | string | lower | regex_replace('\\s+','_'))
+          ] | default(item.role)
+        }}
+  loop: "{{ project_deploy_config.users_access | default([]) }}"
+  loop_control:
+    label: "{{ item.username }}"
+  vars:
+    _desired_key: "{{ (item.role | string | lower | regex_replace('\\s+','_')) }}"
+    _current_key: "{{ _uid_to_role_key.get(_uname_to_id[item.username]) }}"
+  when:
+    - project_deploy_config.users_access is defined
+    - item.username in _uname_to_id
+    - _uname_to_id[item.username] in _uid_to_role_key
+    - _desired_key != _current_key
+
+- name: "Debug task show project users that are allready created (users)"
+  ansible.builtin.debug:
+    var: _proj_users
+  when: project_deploy_debug

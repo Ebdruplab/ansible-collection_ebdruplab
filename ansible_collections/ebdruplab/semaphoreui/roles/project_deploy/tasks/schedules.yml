@@ -1,17 +1,4 @@
 ---
-# - name: Validate schedules
-#   ansible.builtin.assert:
-#     that:
-#       - project_deploy_config.schedules is defined
-#       - item.value.name is defined
-#       - item.value.cron_format is defined
-#       - (item.value.template_id is defined) or (item.value.template_name is defined)
-#     quiet: true
-#     fail_msg: "Each schedule needs name, cron_format, and template_id or template_name."
-#   loop: "{{ project_deploy_config.schedules | default({}) | dict2items }}"
-#   loop_control:
-#     label: "{{ item.value.name | default('unnamed-schedule') }}"
-#   when: project_deploy_config.schedules is defined
 
 - name: 'Create project schedules'
   ebdruplab.semaphoreui.project_schedule_create:
@@ -43,3 +30,8 @@
   when:
     - project_deploy_config.schedules is defined
     - created_schedules_result is defined
+
+- name: "Debug task (schedules)"
+  ansible.builtin.debug:
+    var: created_schedules_by_name
+  when: project_deploy_debug

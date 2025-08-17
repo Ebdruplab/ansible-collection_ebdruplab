@@ -26,3 +26,8 @@
   loop_control:
     label: "{{ item.environment.name | default('unknown') }}"
   when: item.environment is defined
+
+- name: "Debug task (environments)"
+  ansible.builtin.debug:
+    var: created_environments_by_name
+  when: project_deploy_debug

@@ -26,3 +26,8 @@
   ansible.builtin.set_fact:
     created_inventory_by_name: "{{ created_inventory_by_name | default({}) | combine({ item.item.name: item.inventory }) }}"
   loop: "{{ created_inventory_result.results }}"
+
+- name: "Debug task (inventories)"
+  ansible.builtin.debug:
+    var: created_inventory_by_name
+  when: project_deploy_debug

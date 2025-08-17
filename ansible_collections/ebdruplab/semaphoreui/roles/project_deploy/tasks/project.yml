@@ -33,3 +33,8 @@
     - current_project_id is not defined
     - project_exists
     - (project_deploy_force_project_update | bool)
+
+- name: "Debug task (project)"
+  ansible.builtin.debug:
+    var: created_project
+  when: project_deploy_debug

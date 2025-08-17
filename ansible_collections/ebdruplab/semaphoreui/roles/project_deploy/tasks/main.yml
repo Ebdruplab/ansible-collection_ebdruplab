@@ -22,6 +22,10 @@
       ansible.builtin.include_tasks:
         file: project.yml
 
+    - name: "Include project file"
+      ansible.builtin.include_tasks:
+        file: project_user.yml
+
     - name: "Include keys file"
       ansible.builtin.include_tasks:
         file: keys.yml

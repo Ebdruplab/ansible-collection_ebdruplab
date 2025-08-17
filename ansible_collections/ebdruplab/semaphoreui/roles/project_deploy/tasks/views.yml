@@ -19,5 +19,7 @@
     created_project_view_by_title: "{{ created_project_view_by_title | default({}) | combine({ item.item.title: item.view }) }}"
   loop: "{{ created_project_views_result.results }}"
 
-- debug:
+- name: "Debug task (view)"
+  ansible.builtin.debug:
     var: created_project_view_by_title
+  when: project_deploy_debug
