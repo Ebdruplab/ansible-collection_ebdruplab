@@ -77,7 +77,7 @@ EXAMPLES = r"""
     project_id: 1
     user_id: 2
     user:
-      role: "task-runner"
+      role: "task_runner"
 """
 
 RETURN = r"""
@@ -94,7 +94,7 @@ changed:
 def _normalize_role(module, role):
     """
     Accept UI role labels (Owner, Manager, Task Runner, Guest) in any case.
-    Normalize to API values: owner | manager | task-runner | guest.
+    Normalize to API values: owner | manager | task_runner | guest.
     Also accept "task_runner", "task runner", "taskrunner".
     """
     if not isinstance(role, str) or not role.strip():
@@ -106,7 +106,7 @@ def _normalize_role(module, role):
     if v == "manager":
         return "manager"
     if v in ("task runner", "taskrunner"):
-        return "task-runner"
+        return "task_runner"
     if v == "guest":
         return "guest"
 
