@@ -13,33 +13,51 @@ short_description: Delete an integration extracted value in a Semaphore project
 version_added: "2.0.0"
 description:
   - Removes a specific extracted value rule from an integration.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration that the extracted value belongs to.
     type: int
     required: true
   extractvalue_id:
+    description:
+      - ID of the extracted value to delete.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -66,11 +84,13 @@ EXAMPLES = r"""
 
 RETURN = r"""
 status:
-  description: HTTP status code (204 on success).
+  description:
+    - HTTP status code (C(204) on success).
   type: int
   returned: always
 changed:
-  description: Whether a change occurred.
+  description:
+    - Whether a change occurred.
   type: bool
   returned: always
 """

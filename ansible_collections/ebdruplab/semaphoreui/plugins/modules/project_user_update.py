@@ -13,42 +13,45 @@ module: project_user_update
 short_description: Update a user's role in a Semaphore project
 version_added: "2.0.0"
 description:
-  - Sets the role for an existing user linked to a project.
-  - Accepted roles (as shown in the UI): C(Owner), C(Manager), C(Task Runner), C(Guest).
-  - Input is case-insensitive; C(Task Runner) can be written as "task runner", "task_runner", or "task-runner".
+  - Sets the role for an existing user linked to a project. Role input is case-insensitive and accepts common separators.
 options:
   host:
+    description: Base URL of the Semaphore server including scheme, for example http://localhost.
     type: str
     required: true
   port:
+    description: Port where the Semaphore API is exposed, for example 3000.
     type: int
     required: true
   project_id:
+    description: ID of the project that the user is linked to.
     type: int
     required: true
   user_id:
+    description: ID of the user whose role will be updated.
     type: int
     required: true
   user:
-    description: Payload with new role.
+    description: Payload containing the new role.
     type: dict
     required: true
     suboptions:
       role:
-        description:
-          - One of C(Owner), C(Manager), C(Task Runner), C(Guest).
-          - Case-insensitive; underscores/hyphens/spaces in "Task Runner" are accepted.
+        description: Project role for the user. One of "Owner", "Manager", "Task Runner", or "Guest".
         type: str
         required: true
   session_cookie:
+    description: Session cookie for authentication. Use this or api_token.
     type: str
     required: false
     no_log: true
   api_token:
+    description: API token for authentication. Use this or session_cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:
@@ -64,7 +67,7 @@ EXAMPLES = r"""
     project_id: 1
     user_id: 2
     user:
-      role: Owner
+      role: "Owner"
 
 - name: Set user role to Task Runner (any separator/case accepted)
   ebdruplab.semaphoreui.project_user_update:
@@ -74,20 +77,25 @@ EXAMPLES = r"""
     project_id: 1
     user_id: 2
     user:
-      role: task-runner
+      role: "task-runner"
 """
 
 RETURN = r"""
 status:
-  description: HTTP status (204 on success).
+  description: HTTP status code (204 on success).
   type: int
+  returned: always
+changed:
+  description: Whether an update occurred.
+  type: bool
   returned: always
 """
 
 def _normalize_role(module, role):
     """
-    Accept UI role labels (Owner, Manager, Task Runner, Guest) in any case,
-    and normalize to API values: 'owner', 'manager', 'task-runner', 'guest'.
+    Accept UI role labels (Owner, Manager, Task Runner, Guest) in any case.
+    Normalize to API values: owner | manager | task-runner | guest.
+    Also accept "task_runner", "task runner", "taskrunner".
     """
     if not isinstance(role, str) or not role.strip():
         module.fail_json(msg="user.role must be a non-empty string.")
@@ -102,9 +110,7 @@ def _normalize_role(module, role):
     if v == "guest":
         return "guest"
 
-    module.fail_json(
-        msg="Invalid role '%s'. Allowed: Owner, Manager, Task Runner, Guest." % role
-    )
+    module.fail_json(msg="Invalid role '%s'. Allowed: Owner, Manager, Task Runner, Guest." % role)
 
 def main():
     module = AnsibleModule(

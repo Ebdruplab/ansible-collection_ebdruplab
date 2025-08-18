@@ -11,16 +11,53 @@ DOCUMENTATION = r"""
 module: project_integration_matcher_delete
 short_description: Delete a Semaphore integration matcher
 version_added: "2.0.0"
-description: Removes a matcher from a project integration.
+description:
+  - Removes a matcher from a project integration.
+
 options:
-  host:          {type: str, required: true}
-  port:          {type: int, required: true}
-  project_id:    {type: int, required: true}
-  integration_id:{type: int, required: true}
-  matcher_id:    {type: int, required: true}
-  session_cookie:{type: str, required: false, no_log: true}
-  api_token:     {type: str, required: false, no_log: true}
-  validate_certs:{type: bool, default: true}
+  host:
+    description:
+      - Base URL of the Semaphore server including scheme (e.g. C(http://localhost)).
+    type: str
+    required: true
+  port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
+    type: int
+    required: true
+  project_id:
+    description:
+      - ID of the project that owns the integration.
+    type: int
+    required: true
+  integration_id:
+    description:
+      - ID of the integration the matcher belongs to.
+    type: int
+    required: true
+  matcher_id:
+    description:
+      - ID of the matcher to delete.
+    type: int
+    required: true
+  session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
+    type: str
+    required: false
+    no_log: true
+  api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
+    type: str
+    required: false
+    no_log: true
+  validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
+    type: bool
+    default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -38,11 +75,13 @@ EXAMPLES = r"""
 
 RETURN = r"""
 status:
-  description: HTTP status (204 on success).
+  description:
+    - HTTP status code (204 on success).
   type: int
   returned: always
 changed:
-  description: Whether the matcher was removed.
+  description:
+    - Whether the matcher was removed.
   type: bool
   returned: always
 """

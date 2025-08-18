@@ -13,31 +13,47 @@ module: project_integration_extraction_get
 short_description: List extracted value rules for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Retrieves all extracted value rules linked to a given integration in a Semaphore project.
+  - Retrieve all extracted value rules linked to an integration inside a Semaphore project.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration whose extracted values should be listed.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -64,11 +80,13 @@ EXAMPLES = r"""
 
 RETURN = r"""
 extractions:
-  description: List of extraction rules.
+  description:
+    - List of extracted value rules returned by the API.
   type: list
   returned: success
 status:
-  description: HTTP status code (200 on success).
+  description:
+    - HTTP status code from the API (expected C(200) on success).
   type: int
   returned: always
 """

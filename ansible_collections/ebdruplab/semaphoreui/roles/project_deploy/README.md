@@ -159,7 +159,12 @@ project_deploy_semaphore_port: 3000
 project_deploy_semaphore_username: "admin"
 project_deploy_semaphore_password: "changeme"
 
-project_deploy_force_project_delete: false
+# Safety flags used by the role’s pre-checks
+project_deploy_debug: false
+project_deploy_sensitive_data_no_log: false
+project_deploy_force_project_creation: false
+project_deploy_force_project_update: false
+project_deploy_force_project_delete: true
 project_deploy_force_project_delete_timer: 2
 
 project_deploy_config:
@@ -170,20 +175,25 @@ project_deploy_config:
     max_parallel_tasks: 0
     demo: false
 
+  users_access:
+
+    - username: "ServiceDeskRunner"
+      role: task_runner
+
   keys:
     project_ssh:
       name: "Ebdruplab example ssh key"
       type: ssh
       ssh:
         login: "ansibleuser"
-        passphrase: "vault:ssh_passphrase"
-        private_key: "vault:ssh_private_key"
+        passphrase: "{{ vaulted_private_key_passphrase_ansibleuser }}"
+        private_key: "{{ vaulted_private_key_ansibleuser }}"
     git_user:
       name: "Ebdruplab Example User"
       type: login_password
       login_password:
         login: "Fake Git User"
-        password: "vault:git_password"
+        password: "{{ vaulted_password_fake_git_user }}"
 
   repositories:
     - name: "Repositorie Ebdruplab Demo"
@@ -214,10 +224,10 @@ project_deploy_config:
         foo: "bar"
       secrets:
         - name: "DB_PASSWORD"
-          secret: "vault:db_password"
+          secret: "{{ vaulted_db_password }}"
           type: env
         - name: "api_token"
-          secret: "vault:api_token"
+          secret: "{{ vaulted_api_token }}"
           type: json
 
   templates:
@@ -245,6 +255,8 @@ project_deploy_config:
 * **Names → IDs**: The role resolves `*_name` references to IDs and stores maps like `created_repos_by_name`, `created_inventory_by_name`, `created_environments_by_name`, `created_project_view_by_title`, etc., for later steps.
 * **Template arguments**: Provide `arguments`/`vaults` as YAML lists or dicts — the role serializes them to JSON strings the API expects.
 * **Secrets in environments**: Use `type: env` (environment vars) or `type: json` (extra vars). Aliases `extra_variables`/`extra_vars` are accepted.
+* **Vault**: `ansible-vault create vars/vaulted.yml`; put only secrets (keys, passwords, tokens); load with `vars_files: [vars/project.yml, vars/vaulted.yml]`; reference with `{{ vaulted_* }}` within the sensitive variables; run with `--ask-vault-pass`.
+* **Example**: For examples you may see within the `tests/` dir for the `project_deploy` role.
 
 ## License
 

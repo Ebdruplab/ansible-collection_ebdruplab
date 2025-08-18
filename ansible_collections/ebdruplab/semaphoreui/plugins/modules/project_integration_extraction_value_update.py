@@ -14,49 +14,81 @@ short_description: Update an extracted value for a Semaphore integration
 version_added: "2.0.0"
 description:
   - Updates a specific extracted value rule on a project integration in Semaphore.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server, including scheme (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed.
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration that contains the extracted value rule.
     type: int
     required: true
   extractvalue_id:
+    description:
+      - ID of the extracted value to update.
     type: int
     required: true
   value:
+    description:
+      - Fields to update on the extracted value. Provide one or more.
     type: dict
     required: true
     suboptions:
       name:
+        description:
+          - Human-readable name for the extracted value rule.
         type: str
       value_source:
+        description:
+          - Location of the value to extract (for example C(body), C(headers), or C(query)).
         type: str
       body_data_type:
+        description:
+          - Data type when reading from the request body (for example C(json) or C(text)).
         type: str
       key:
+        description:
+          - Path or key selector used to find the value (e.g. C(payload.user.id)).
         type: str
       variable:
+        description:
+          - Variable name to store the extracted value as (e.g. C(USER_ID)).
         type: str
       variable_type:
+        description:
+          - Target bucket for the variable (for example C(environment) or C(json)).
         type: str
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -81,11 +113,13 @@ EXAMPLES = r"""
 
 RETURN = r"""
 extracted_value:
-  description: The server response (if any), or the payload when status is 204.
+  description:
+    - Server response (if any) or the update payload when the API returns C(204 No Content).
   type: dict
   returned: success
 status:
-  description: HTTP status code (expected 204).
+  description:
+    - HTTP status code (C(204) expected on success).
   type: int
   returned: always
 """

@@ -14,56 +14,94 @@ short_description: Update a Semaphore project integration
 version_added: "2.0.0"
 description:
   - Updates an existing integration under a Semaphore project.
-  - Auth methods match the UI: C(None), C(GitHub Webhooks), C(Bitbucket Webhooks), C(Token), C(HMAC), C(BasicAuth)).
-  - C(auth_header) is only applicable for C(Token) and C(HMAC); defaults to C(token) if omitted.
+  - Auth methods match the UI labels.
+  - C(auth_header) is only valid for C(Token) and C(HMAC); defaults to C(token) when those methods are used.
   - C(searchable) is always sent as C(false).
-  - C(task_params.debug_level) is always forced to C(4); C(diff) and C(dry_run) default to C(false) if provided.
+  - C(task_params.debug_level) is always forced to C(4); only C(diff) and C(dry_run) are user-settable (default C(false)).
 options:
   host:
+    description:
+      - Base URL of the Semaphore server including scheme, e.g. C(http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed, e.g. C(3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration to update.
     type: int
     required: true
   integration:
+    description:
+      - Fields to update on the integration.
     type: dict
     required: true
     suboptions:
       name:
+        description:
+          - New human-readable name for the integration.
         type: str
       template_id:
+        description:
+          - ID of the template to run when this integration triggers.
         type: int
       auth_method:
+        description:
+          - Authentication method (must match UI label exactly).
         type: str
-        choices: ["None", "GitHub Webhooks", "Bitbucket Webhooks", "Token", "HMAC", "BasicAuth"]
+        choices:
+          - "None"
+          - "GitHub Webhooks"
+          - "Bitbucket Webhooks"
+          - "Token"
+          - "HMAC"
+          - "BasicAuth"
       auth_header:
+        description:
+          - HTTP header that carries the auth secret. Only for C(Token) and C(HMAC). Defaults to C(token) if omitted.
         type: str
       auth_secret_id:
+        description:
+          - ID of the secret used by the selected auth method.
         type: int
       task_params:
+        description:
+          - Task behavior flags. C(debug_level) is forced to C(4).
         type: dict
         suboptions:
           diff:
+            description:
+              - Show diffs in task output.
             type: bool
             default: false
           dry_run:
+            description:
+              - Run in check mode (no changes).
             type: bool
             default: false
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:
@@ -91,14 +129,17 @@ EXAMPLES = r"""
 
 RETURN = r"""
 integration:
-  description: Server response (or the sent payload if HTTP 204).
+  description:
+    - Server response (if any). When the API returns 204, this contains the payload sent.
   type: dict
   returned: success
 status:
-  description: HTTP status code.
+  description:
+    - HTTP status code (204 or 200 on success).
   type: int
   returned: always
 """
+
 
 # UI label -> API value
 AUTH_MAP = {

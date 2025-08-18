@@ -11,35 +11,44 @@ DOCUMENTATION = r"""
 module: project_integration_extraction_delete
 short_description: Delete an extracted value from a Semaphore integration
 version_added: "2.0.0"
-description:
-  - Removes a specific extracted value rule from a project integration.
+description: Delete a specific extracted value rule from a project integration.
+
 options:
   host:
+    description: Base URL of the Semaphore server (e.g. http://localhost).
     type: str
     required: true
   port:
+    description: Port where the Semaphore API is exposed (e.g. 3000).
     type: int
     required: true
   project_id:
+    description: ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description: ID of the integration that holds the extracted value rule.
     type: int
     required: true
   extractvalue_id:
+    description: ID of the extracted value rule to delete.
     type: int
     required: true
   session_cookie:
+    description: Session cookie for authentication. Use this or api_token.
     type: str
     required: false
     no_log: true
   api_token:
+    description: Bearer API token for authentication. Use this or session_cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -66,11 +75,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 status:
-  description: HTTP status code (204 on success).
+  description: HTTP status code from the API (204 on success).
   type: int
   returned: always
 changed:
-  description: Whether a deletion occurred.
+  description: Whether a deletion occurred (false if the rule was not found).
   type: bool
   returned: always
 """

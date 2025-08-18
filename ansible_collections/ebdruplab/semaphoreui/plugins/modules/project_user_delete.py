@@ -12,29 +12,36 @@ module: project_user_delete
 short_description: Remove a user from a Semaphore project
 version_added: "2.0.0"
 description:
-  - Unlinks (removes) a user from a specific Semaphore project.
+  - Unlinks (removes) an existing user from a specific Semaphore project.
 options:
   host:
+    description: Base URL of the Semaphore server including scheme, for example C(http://localhost).
     type: str
     required: true
   port:
+    description: Port where the Semaphore API is exposed, for example C(3000).
     type: int
     required: true
   project_id:
+    description: ID of the project to remove the user from.
     type: int
     required: true
   user_id:
+    description: ID of the user to unlink from the project.
     type: int
     required: true
   session_cookie:
+    description: Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description: API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:
@@ -42,11 +49,19 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Remove user from project
+- name: Remove user from project (session)
   ebdruplab.semaphoreui.project_user_delete:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 1
+    user_id: 2
+
+- name: Remove user from project (token)
+  ebdruplab.semaphoreui.project_user_delete:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
     project_id: 1
     user_id: 2
 """
@@ -56,7 +71,12 @@ status:
   description: HTTP status code (204 on success).
   type: int
   returned: always
+changed:
+  description: Whether a removal occurred.
+  type: bool
+  returned: always
 """
+
 
 def main():
     module = AnsibleModule(

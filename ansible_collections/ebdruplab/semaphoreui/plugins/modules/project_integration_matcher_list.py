@@ -6,38 +6,53 @@
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
 import json
-
 DOCUMENTATION = r"""
 ---
 module: project_integration_matcher_list
 short_description: List matchers for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Retrieves all matchers for an integration in a Semaphore project.
+  - Retrieves all matcher rules linked to a given integration in a Semaphore project.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server including scheme, for example C(http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed, for example C(3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration whose matchers should be listed.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -47,25 +62,29 @@ EXAMPLES = r"""
   ebdruplab.semaphoreui.project_integration_matcher_list:
     host: http://localhost
     port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
+    api_token: "{{ semaphore_api_token }}"
     project_id: 1
     integration_id: 11
   register: matcher_list
 
-- debug:
-    var: matcher_list.matchers
+- name: Show matcher count
+  ansible.builtin.debug:
+    msg: "Found {{ matcher_list.matchers | length }} matcher(s)."
 """
 
 RETURN = r"""
 matchers:
-  description: List of integration matchers.
+  description:
+    - List of matcher objects returned by the API.
   type: list
   returned: success
 status:
-  description: HTTP status code.
+  description:
+    - HTTP status code (200 on success).
   type: int
   returned: always
 """
+
 
 def main():
     module = AnsibleModule(

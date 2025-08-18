@@ -7,46 +7,52 @@ from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_post, get_auth_headers
 import json
 
+
 DOCUMENTATION = r"""
 ---
 module: project_integration_extraction_create
-short_description: Create an extracted value rule for a Semaphore integration
+short_description: Add an extracted value to a Semaphore integration
 version_added: "2.0.0"
-description:
-  - Adds an "extracted value" to a project integration, e.g. read a key from the HTTP response body and store it in environment or extra vars.
+description: Create an extracted value rule for a project integration that pulls data from the request and stores it as an environment/json/header variable.
+
 options:
   host:
+    description: Base URL of the Semaphore server (e.g. http://localhost).
     type: str
     required: true
   port:
+    description: Port where the Semaphore API is exposed (e.g. 3000).
     type: int
     required: true
   project_id:
+    description: ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description: ID of the integration to which the extracted value will be added.
     type: int
     required: true
-  extraction:
+
+  value:
+    description: Extracted value rule to create.
     type: dict
     required: true
     suboptions:
       name:
-        description: Human-friendly name for this extraction rule.
+        description: Display name of the extracted value rule.
         type: str
         required: true
       value_source:
-        description: Where to read the value from.
+        description: Source in the incoming request to read from.
         type: str
-        choices: [body, header, query, path]
-        default: body
+        required: true
+        choices: [body, headers, query]
       body_data_type:
-        description: Payload type when value_source=body.
+        description: How to interpret the body when value_source is body.
         type: str
-        choices: [json, text]
-        default: json
+        choices: [json, form, text]
       key:
-        description: Key/selector (e.g. JSON pointer/path, header/query name).
+        description: Key or path used to locate the value in the source.
         type: str
         required: true
       variable:
@@ -54,62 +60,54 @@ options:
         type: str
         required: true
       variable_type:
-        description: Destination bucket. Use C(environment) for env vars or C(json) for extra vars. Aliases: C(env)->environment, C(var/json/extra_vars/extra_variables)->json.
+        description: Destination bucket for the variable.
         type: str
         required: true
+        choices: [environment, json, header]
+
   session_cookie:
+    description: Session cookie for authentication. Use this or api_token.
     type: str
     required: false
     no_log: true
   api_token:
+    description: Bearer API token for authentication. Use this or session_cookie.
     type: str
     required: false
     no_log: true
   validate_certs:
+    description: Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
 
 EXAMPLES = r"""
-- name: Extract token from JSON body into env var
+- name: Create extracted value (body → environment var)
   ebdruplab.semaphoreui.project_integration_extraction_create:
     host: http://localhost
     port: 3000
     api_token: "{{ semaphore_api_token }}"
     project_id: 1
     integration_id: 11
-    extraction:
-      name: "Access token"
-      value_source: body
-      body_data_type: json
-      key: "access.token"
-      variable: "ACCESS_TOKEN"
-      variable_type: environment
-
-- name: Extract run_id header into extra vars
-  ebdruplab.semaphoreui.project_integration_extraction_create:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
-    project_id: 1
-    integration_id: 11
-    extraction:
-      name: "Run ID"
-      value_source: header
-      key: "x-run-id"
-      variable: "run_id"
-      variable_type: json
+    value:
+      name: "grab message"
+      value_source: "body"
+      body_data_type: "json"
+      key: "message"
+      variable: "MSG"
+      variable_type: "environment"
 """
 
 RETURN = r"""
-extraction:
-  description: Created extraction object.
+value:
+  description: The created extracted value object returned by the API.
   type: dict
   returned: success
 status:
-  description: HTTP status (201 on success).
+  description: HTTP status code from the API response.
   type: int
   returned: always
 """

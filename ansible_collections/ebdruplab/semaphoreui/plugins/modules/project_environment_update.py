@@ -13,67 +13,109 @@ module: project_environment_update
 short_description: Update an existing environment in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Updates an environment in a Semaphore project.
-  - Plain vars live in C(env) (environment vars) and C(json) (extra vars).
-  - C(extra_variables) is an alias for C(json) (provide one or the other).
-  - Secrets target C(env) or C(var). Aliases C(json), C(extra_vars), C(extra_variables) map to C(var).
-  - Secrets are always sent with C(operation=create).
+  - "Updates an environment in a Semaphore project."
+  - "Plain variables live in C(env) (environment vars) and C(json) (extra vars)."
+  - "C(extra_variables) is an alias for C(json); provide one or the other."
+  - "Secrets target C(env) or C(var). Aliases C(json), C(extra_vars), C(extra_variables) map to C(var)."
+  - "Secrets are always sent with C(operation=create)."
 options:
-  host: {type: str, required: true}
-  port: {type: int, required: true}
-  project_id: {type: int, required: true}
-  environment_id: {type: int, required: true}
+  host:
+    description:
+      - "Base URL (scheme + host) of the Semaphore server, e.g. C(http://localhost)."
+    type: str
+    required: true
+  port:
+    description:
+      - "Port where the Semaphore API is exposed, e.g. C(3000)."
+    type: int
+    required: true
+  project_id:
+    description:
+      - "Project ID."
+    type: int
+    required: true
+  environment_id:
+    description:
+      - "Environment ID to update."
+    type: int
+    required: true
   environment:
+    description:
+      - "Fields to update for the environment."
     type: dict
     required: true
     suboptions:
-      name: {type: str}
-      password: {type: str}
-      env: {type: raw}
-      json: {type: raw}
-      extra_variables: {type: raw}
+      name:
+        description:
+          - "New environment name."
+        type: str
+      password:
+        description:
+          - "Optional password (vault password)."
+        type: str
+      env:
+        description:
+          - "Environment variables. Accepts a dict or a valid JSON string."
+        type: raw
+      json:
+        description:
+          - "Extra variables. Accepts a dict or a valid JSON string."
+        type: raw
+      extra_variables:
+        description:
+          - "Alias of C(json). Provide either C(json) or C(extra_variables), not both."
+        type: raw
       secrets:
+        description:
+          - "List of secret items to create (always sent with C(operation=create))."
+          - "Each secret targets either C(env) or C(var). Aliases C(json), C(extra_vars), and C(extra_variables) map to C(var)."
         type: list
         elements: dict
         suboptions:
-          id: {type: int}
-          name: {type: str, required: true}
-          secret: {type: str, required: true, no_log: true}
-          type:
+          id:
+            description:
+              - "Optional secret item ID."
+            type: int
+          name:
+            description:
+              - "Secret key name."
             type: str
             required: true
-            choices: [env, var, json, extra_vars, extra_variables]
-  session_cookie: {type: str, no_log: true}
-  api_token: {type: str, no_log: true}
-  validate_certs: {type: bool, default: true}
-author: ["Kristian Ebdrup (@kris9854)"]
-"""
-
-EXAMPLES = r"""
-- name: Update env (rename, change vars, add secret to extra vars)
-  ebdruplab.semaphoreui.project_environment_update:
-    host: http://localhost
-    port: 3000
-    api_token: "{{ semaphore_api_token }}"
-    project_id: 1
-    environment_id: 2
-    environment:
-      name: "Updated Env"
-      env: { APP_MODE: "updated" }
-      extra_variables: { retries: 5 }
-      secrets:
-        - name: "API_TOKEN"
-          secret: "{{ vault_api_token }}"
-          type: extra_variables   # alias -> sent as 'var'
-"""
-
-RETURN = r"""
-environment:
-  description: Updated environment object, or the payload if the server returns 204.
-  type: dict
-status:
-  description: HTTP status code.
-  type: int
+          secret:
+            description:
+              - "Secret value."
+            type: str
+            required: true
+          type:
+            description:
+              - "Target bucket for the secret."
+            type: str
+            required: true
+            choices:
+              - env
+              - var
+              - json
+              - extra_vars
+              - extra_variables
+  session_cookie:
+    description:
+      - "Session cookie for authentication. Use this or C(api_token)."
+    type: str
+    required: false
+    no_log: true
+  api_token:
+    description:
+      - "API token for authentication. Use this or C(session_cookie)."
+    type: str
+    required: false
+    no_log: true
+  validate_certs:
+    description:
+      - "Whether to validate TLS certificates when using HTTPS."
+    type: bool
+    default: true
+author:
+  - "Kristian Ebdrup (@kris9854)"
 """
 
 def _ensure_json_string(module, data, field):

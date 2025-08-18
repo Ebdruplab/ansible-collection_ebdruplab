@@ -13,56 +13,92 @@ module: project_integration_create
 short_description: Create a Semaphore project integration
 version_added: "2.0.0"
 description:
-  - Creates an integration under a Semaphore project that triggers a template.
-  - Auth methods match the UI: C(None), C(GitHub Webhooks), C(Bitbucket Webhooks), C(Token), C(HMAC), C(BasicAuth).
-  - C(auth_header) applies only to C(Token) and C(HMAC); defaults to C(token) if omitted.
-  - C(searchable) is always sent as C(false).
-  - C(task_params.debug_level) is always C(4); C(diff) and C(dry_run) default to C(false).
+  - "Creates an integration under a Semaphore project that triggers a template."
+  - "Auth methods match the UI: C(None), C(GitHub Webhooks), C(Bitbucket Webhooks), C(Token), C(HMAC), C(BasicAuth)."
+  - "C(auth_header) applies only to C(Token) and C(HMAC); defaults to C(token) if omitted."
+  - "C(searchable) is always sent as C(false)."
+  - "C(task_params.debug_level) is always C(4); only C(diff) and C(dry_run) are user-settable (default C(false))."
 options:
   host:
+    description:
+      - "Base URL (scheme + host) of the Semaphore server, e.g. C(http://localhost)."
     type: str
     required: true
   port:
+    description:
+      - "Port where the Semaphore API is exposed, e.g. C(3000)."
     type: int
     required: true
   project_id:
+    description:
+      - "ID of the project that will own the integration."
     type: int
     required: true
   integration:
+    description:
+      - "Integration definition to create."
     type: dict
     required: true
     suboptions:
       name:
+        description:
+          - "Human-readable name for the integration."
         type: str
         required: true
       template_id:
+        description:
+          - "ID of the template to trigger when the integration matches."
         type: int
         required: true
       auth_method:
+        description:
+          - "Authentication method to use. Must match UI values."
         type: str
-        choices: ["None", "GitHub Webhooks", "Bitbucket Webhooks", "Token", "HMAC", "BasicAuth"]
+        choices:
+          - "None"
+          - "GitHub Webhooks"
+          - "Bitbucket Webhooks"
+          - "Token"
+          - "HMAC"
+          - "BasicAuth"
       auth_header:
+        description:
+          - "HTTP header that carries the auth secret. Only used for C(Token) and C(HMAC). Defaults to C(token) if omitted."
         type: str
       auth_secret_id:
+        description:
+          - "ID of the secret used by the selected auth method."
         type: int
       task_params:
+        description:
+          - "Task flags. C(debug_level) is forced to C(4) by this module."
         type: dict
         suboptions:
           diff:
+            description:
+              - "Show diffs in task output."
             type: bool
             default: false
           dry_run:
+            description:
+              - "Run in check mode (no changes)."
             type: bool
             default: false
   session_cookie:
+    description:
+      - "Session cookie for authentication. Use this or C(api_token)."
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - "API token for authentication. Use this or C(session_cookie)."
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - "Whether to validate TLS certificates when using HTTPS."
     type: bool
     default: true
 author:
@@ -80,7 +116,7 @@ EXAMPLES = r"""
       name: "Example Integration name"
       template_id: 1
       auth_method: "HMAC"
-      auth_header: "token"          # only used for Token/HMAC; defaults to "token" if omitted
+      auth_header: "token"          # only for Token/HMAC; defaults to "token" if omitted
       auth_secret_id: 3
       task_params:
         diff: false
@@ -89,9 +125,11 @@ EXAMPLES = r"""
 
 RETURN = r"""
 integration:
+  description: "Created integration object returned by the API."
   type: dict
   returned: success
 status:
+  description: "HTTP status code (201 or 200 on success)."
   type: int
   returned: always
 """

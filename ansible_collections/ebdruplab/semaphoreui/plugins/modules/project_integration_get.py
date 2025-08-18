@@ -10,17 +10,50 @@ import json
 DOCUMENTATION = r"""
 ---
 module: project_integration_get
-short_description: Get a single Semaphore project integration
+short_description: Get a Semaphore project integration
 version_added: "2.0.0"
-description: Returns one integration by ID for a given project.
+description:
+  - Returns a single integration by ID for a given project.
+
 options:
-  host:           {type: str, required: true}
-  port:           {type: int, required: true}
-  project_id:     {type: int, required: true}
-  integration_id: {type: int, required: true}
-  session_cookie: {type: str, required: false, no_log: true}
-  api_token:      {type: str, required: false, no_log: true}
-  validate_certs: {type: bool, default: true}
+  host:
+    description:
+      - Base URL of the Semaphore server including scheme (e.g. C(http://localhost)).
+    type: str
+    required: true
+  port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
+    type: int
+    required: true
+  project_id:
+    description:
+      - ID of the project that owns the integration.
+    type: int
+    required: true
+  integration_id:
+    description:
+      - ID of the integration to retrieve.
+    type: int
+    required: true
+  session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
+    type: str
+    required: false
+    no_log: true
+  api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
+    type: str
+    required: false
+    no_log: true
+  validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
+    type: bool
+    default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -38,11 +71,13 @@ EXAMPLES = r"""
 
 RETURN = r"""
 integration:
-  description: Integration object.
+  description:
+    - The integration object returned by the API.
   type: dict
   returned: success
 status:
-  description: HTTP status code (200 on success).
+  description:
+    - HTTP status code (C(200) on success).
   type: int
   returned: always
 """

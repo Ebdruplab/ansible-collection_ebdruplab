@@ -15,89 +15,82 @@ version_added: "2.0.0"
 description:
   - Adds a matcher rule to an existing integration under a Semaphore project.
   - A matcher inspects an incoming request or payload and determines whether to trigger the linked template.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server including scheme (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project the integration belongs to.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration to attach the matcher to.
     type: int
     required: true
   matcher:
-    description: Matcher definition to create.
+    description:
+      - Matcher definition to create.
     type: dict
     required: true
     suboptions:
       name:
-        description: Human-friendly matcher name.
+        description:
+          - Human-friendly matcher name.
         type: str
         required: true
       match_type:
-        description: Where to match (e.g. C(body), C(headers), C(query)). API commonly uses C(body).
+        description:
+          - Location to match such as C(body), C(headers), or C(query).
         type: str
         required: true
       method:
-        description: Match method (e.g. C(equals), C(contains), C(regex)).
+        description:
+          - Match method such as C(equals), C(contains), or C(regex)).
         type: str
         required: true
       body_data_type:
-        description: Data type for body matching (e.g. C(json), C(text)). Only used when C(match_type=body).
+        description:
+          - Data type for body matching, e.g. C(json) or C(text).
+          - Only relevant when C(match_type=body).
         type: str
       key:
-        description: Key/path to inspect (e.g. JSON pointer or header/query key).
+        description:
+          - Key or path to inspect (e.g. JSON path, header key, or query key).
         type: str
       value:
-        description: Value to compare against.
+        description:
+          - Value to compare against.
         type: str
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
-"""
-
-EXAMPLES = r"""
-- name: Create integration matcher (body JSON equals)
-  ebdruplab.semaphoreui.project_integration_matcher_create:
-    host: http://localhost
-    port: 3000
-    api_token: "{{ semaphore_api_token }}"
-    project_id: 1
-    integration_id: 11
-    matcher:
-      name: "deploy-event"
-      match_type: "body"
-      method: "equals"
-      body_data_type: "json"
-      key: "event"
-      value: "deploy"
-"""
-
-RETURN = r"""
-matcher:
-  description: Created matcher object from the API.
-  type: dict
-  returned: success
-status:
-  description: HTTP status code (200/201 on success).
-  type: int
-  returned: always
-changed:
-  type: bool
-  returned: always
 """
 
 def main():

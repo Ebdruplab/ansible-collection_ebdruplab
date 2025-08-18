@@ -12,28 +12,83 @@ DOCUMENTATION = r"""
 module: project_integration_matcher_update
 short_description: Update a Semaphore integration matcher
 version_added: "2.0.0"
-description: Update an existing matcher on a project integration.
+description:
+  - Updates an existing matcher on a project integration.
+
 options:
-  host:            {type: str, required: true}
-  port:            {type: int, required: true}
-  project_id:      {type: int, required: true}
-  integration_id:  {type: int, required: true}
-  matcher_id:      {type: int, required: true}
+  host:
+    description:
+      - Base URL of the Semaphore server including scheme, for example C(http://localhost).
+    type: str
+    required: true
+  port:
+    description:
+      - Port where the Semaphore API is exposed, for example C(3000).
+    type: int
+    required: true
+  project_id:
+    description:
+      - ID of the project that owns the integration.
+    type: int
+    required: true
+  integration_id:
+    description:
+      - ID of the integration that owns the matcher.
+    type: int
+    required: true
+  matcher_id:
+    description:
+      - ID of the matcher to update.
+    type: int
+    required: true
   matcher:
     description:
-      - Fields to update. Some Semaphore installs require full object plus ids.
+      - Fields to update. Some Semaphore versions may require the full object.
     type: dict
     required: true
     suboptions:
-      name:           {type: str}
-      match_type:     {type: str}
-      method:         {type: str}
-      body_data_type: {type: str}
-      key:            {type: str}
-      value:          {type: str}
-  session_cookie:   {type: str, required: false, no_log: true}
-  api_token:        {type: str, required: false, no_log: true}
-  validate_certs:   {type: bool, default: true}
+      name:
+        description:
+          - New human-readable name for the matcher.
+        type: str
+      match_type:
+        description:
+          - Where to match, for example C(body), C(headers), or C(query).
+        type: str
+      method:
+        description:
+          - Match method, for example C(equals), C(contains), or C(regex).
+        type: str
+      body_data_type:
+        description:
+          - Body data type when C(match_type=body), for example C(json) or C(text).
+        type: str
+      key:
+        description:
+          - Key/path to inspect (JSON path/pointer, header name, or query key).
+        type: str
+      value:
+        description:
+          - Value to compare against.
+        type: str
+  session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
+    type: str
+    required: false
+    no_log: true
+  api_token:
+    description:
+      - Bearer token for authentication. Use this or C(session_cookie).
+    type: str
+    required: false
+    no_log: true
+  validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
+    type: bool
+    default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -54,16 +109,27 @@ EXAMPLES = r"""
       body_data_type: "json"
       key: "action"
       value: "deploy"
+  register: matcher_update_result
 """
 
 RETURN = r"""
 matcher:
-  description: Server response (if any) or the payload when HTTP 204.
+  description:
+    - Server response (if any) or the request payload when the API returns C(204 No Content).
   type: dict
+  returned: success
 status:
-  description: HTTP status (204 expected).
+  description:
+    - HTTP status code. C(204) is expected on success.
   type: int
+  returned: always
+changed:
+  description:
+    - Whether the matcher was updated.
+  type: bool
+  returned: always
 """
+
 
 def main():
     module = AnsibleModule(

@@ -14,40 +14,54 @@ short_description: Link a user to a Semaphore project with a role
 version_added: "2.0.0"
 description:
   - Adds an existing user to a project with a specific role.
-  - Accepted roles (as in the UI): C(Owner), C(Manager), C(Task Runner), C(Guest).
-  - Input is case-insensitive; C(Task Runner) may be written as "task runner", "task_runner", or "task-runner".
+  - Accepted roles match the UI labels (Owner, Manager, Task Runner, Guest).
 options:
   host:
+    description:
+      - Base URL of the Semaphore server including scheme, e.g. C(http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed, e.g. C(3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project to link the user to.
     type: int
     required: true
   user:
-    description: User and role to add to the project.
+    description:
+      - User and role to add to the project.
     type: dict
     required: true
     suboptions:
       user_id:
+        description:
+          - ID of the existing user to link.
         type: int
         required: true
       role:
+        description:
+          - Project role label. Allowed values are C(Owner), C(Manager), C(Task Runner), C(Guest).
         type: str
         required: true
-        description:
-          - One of C(Owner), C(Manager), C(task_runner), C(Guest).
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:
@@ -63,9 +77,9 @@ EXAMPLES = r"""
     project_id: 1
     user:
       user_id: 42
-      role: Owner
+      role: "Owner"
 
-- name: Add user as Task Runner (flexible separators/case)
+- name: Add user as Task Runner
   ebdruplab.semaphoreui.project_user_create:
     host: http://localhost
     port: 3000
@@ -73,34 +87,36 @@ EXAMPLES = r"""
     project_id: 1
     user:
       user_id: 99
-      role: task_runner
+      role: "Task Runner"
 """
 
 RETURN = r"""
 status:
-  description: HTTP status (204 on success).
+  description:
+    - HTTP status code (204 on success).
   type: int
   returned: always
 user:
-  description: Echo of the assignment (returned when server sends no body).
+  description:
+    - Echo of the assignment when the server returns no content.
   type: dict
-  returned: when status is 204
+  returned: success
 """
 
 def _normalize_role(module, role):
     """
-    Normalize UI roles to API values: owner | manager | task-runner | guest.
+    Normalize UI roles to API values: owner | manager | task_runner | guest.
     Accepts case-insensitive and -, _, or space for 'Task Runner'.
     """
     if not isinstance(role, str) or not role.strip():
         module.fail_json(msg="user.role must be a non-empty string.")
 
-    v = role.strip().lower().replace("_", " ").replace("-", " ")
+    v = role.strip().lower().replace("-", " ").replace("_", " ")
     if v == "owner":
         return "owner"
     if v == "manager":
         return "manager"
-    if v in ("task runner", "taskrunner","task_runner"):
+    if v in ("task runner", "taskrunner"):
         return "task_runner"
     if v == "guest":
         return "guest"

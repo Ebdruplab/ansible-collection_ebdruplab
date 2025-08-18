@@ -14,84 +14,91 @@ short_description: Create an extracted value for a Semaphore integration
 version_added: "2.0.0"
 description:
   - Adds an extracted value rule to a specific integration in a Semaphore project.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration to attach the extracted value to.
     type: int
     required: true
   value:
+    description:
+      - Definition of the extracted value to create.
     type: dict
     required: true
     suboptions:
       id:
+        description:
+          - Optional client-supplied ID; usually omitted.
         type: int
       name:
+        description:
+          - Human-readable name of the extraction rule.
         type: str
         required: true
       value_source:
+        description:
+          - Where to read the value from in the incoming request.
         type: str
+        choices: [body, headers, query]
         default: body
       body_data_type:
+        description:
+          - Data type of the request body when C(value_source=body).
         type: str
+        choices: [json, text]
         default: json
       key:
+        description:
+          - Key or path to extract (e.g. C(payload.user.id), header/query key).
         type: str
         required: true
       variable:
+        description:
+          - Variable name to store the extracted value under.
         type: str
         required: true
       variable_type:
+        description:
+          - Target variable bucket.
         type: str
+        choices: [environment, extra]
         default: environment
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
-"""
-
-EXAMPLES = r"""
-- name: Create extracted value for an integration
-  ebdruplab.semaphoreui.project_integration_extraction_value_create:
-    host: http://localhost
-    port: 3000
-    api_token: "{{ semaphore_api_token }}"
-    project_id: 1
-    integration_id: 11
-    value:
-      name: "extract this value"
-      value_source: "body"
-      body_data_type: "json"
-      key: "payload.user.id"
-      variable: "USER_ID"
-      variable_type: "environment"
-"""
-
-RETURN = r"""
-extracted_value:
-  description: Created extracted value object.
-  type: dict
-  returned: success
-status:
-  description: HTTP status code.
-  type: int
-  returned: always
 """
 
 def main():

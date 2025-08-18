@@ -16,26 +16,40 @@ description:
   - Removes an integration from a Semaphore project.
 options:
   host:
+    description:
+      - Base URL (scheme + host) of the Semaphore server, for example C(http://localhost).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed, for example C(3000).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration to delete.
     type: int
     required: true
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Whether to validate TLS certificates when using HTTPS.
     type: bool
     default: true
 author:

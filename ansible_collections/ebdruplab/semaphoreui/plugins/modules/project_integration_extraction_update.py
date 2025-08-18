@@ -6,60 +6,92 @@
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
-
 DOCUMENTATION = r"""
 ---
 module: project_integration_extraction_update
 short_description: Update an extracted value rule on a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Updates a specific extracted value definition (name, value source, data type, key, variable, variable type)
-    for a given integration in a Semaphore project.
+  - Update one or more fields of an existing Integration Extracted Value
+    attached to a Semaphore project integration.
+
 options:
   host:
+    description:
+      - Base URL of the Semaphore server (e.g. C(http://localhost)).
     type: str
     required: true
   port:
+    description:
+      - Port where the Semaphore API is exposed (e.g. C(3000)).
     type: int
     required: true
   project_id:
+    description:
+      - ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
+    description:
+      - ID of the integration that the extracted value belongs to.
     type: int
     required: true
   extractvalue_id:
+    description:
+      - ID of the extracted value to update.
     type: int
     required: true
   extraction:
     description:
-      - Fields to update for the extract value. Provide one or more.
+      - Fields to update. Provide at least one.
     type: dict
     required: true
     suboptions:
       name:
+        description:
+          - Human-readable name of the extracted value rule.
         type: str
       value_source:
+        description:
+          - Where to read the value from in the incoming request.
         type: str
+        choices: [body, headers, query]
       body_data_type:
+        description:
+          - Data type of the request body when C(value_source=body).
         type: str
+        choices: [json, text]
       key:
+        description:
+          - Key or path to extract (e.g. C(result.id) for JSON body, or a header/query key).
         type: str
       variable:
+        description:
+          - Variable name to store the extracted value under.
         type: str
       variable_type:
+        description:
+          - Target variable bucket.
         type: str
+        choices: [environment, extra]
   session_cookie:
+    description:
+      - Session cookie for authentication. Use this or C(api_token).
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - Bearer API token for authentication. Use this or C(session_cookie).
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - Validate TLS certificates when using HTTPS.
     type: bool
     default: true
+
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
@@ -80,14 +112,18 @@ EXAMPLES = r"""
 
 RETURN = r"""
 status:
-  description: HTTP status code (204 on success).
+  description:
+    - HTTP status code (C(204) on success, some servers may return C(200) with body).
   type: int
   returned: always
 extraction:
-  description: The payload sent (useful when the API returns 204 No Content).
+  description:
+    - The updated object if returned by the API, otherwise the sent payload.
   type: dict
   returned: success
 changed:
+  description:
+    - Whether an update was performed.
   type: bool
   returned: always
 """

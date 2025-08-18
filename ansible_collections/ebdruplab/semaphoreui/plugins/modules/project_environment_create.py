@@ -13,95 +13,105 @@ module: project_environment_create
 short_description: Create a Semaphore environment
 version_added: "1.0.0"
 description:
-  - Creates an environment inside a Semaphore project.
-  - Supports plain vars in two buckets: environment vars (C(env)) and extra vars (C(json)).
-  - C(extra_variables) is an alias for C(json) (provide one or the other).
-  - Secret items target a bucket via C(type): C(env) or C(var) (aliases C(json), C(extra_vars), C(extra_variables)).
-  - Secret operation is always C(create).
+  - "Creates an environment inside a Semaphore project."
+  - "Supports two buckets for plain variables: environment variables (C(env)) and extra variables (C(json))."
+  - "C(extra_variables) is an alias for C(json) (provide one or the other)."
+  - "Secrets target a bucket using C(type). Use C(env) for environment variables or C(var) for extra variables (aliases: C(json), C(extra_vars), C(extra_variables))."
+  - "Secret operation is always C(create)."
 options:
   host:
+    description:
+      - "Base URL (scheme + host) of the Semaphore server, e.g. C(http://localhost)."
     type: str
     required: true
   port:
+    description:
+      - "Port where the Semaphore API is exposed, e.g. C(3000)."
     type: int
     required: true
   project_id:
+    description:
+      - "ID of the project where the environment will be created."
     type: int
     required: true
   environment:
+    description:
+      - "Environment definition to create."
     type: dict
     required: true
     suboptions:
       name:
+        description:
+          - "Human-readable name of the environment."
         type: str
         required: true
       password:
+        description:
+          - "Optional password (vault password). Marked C(no_log) in the module args."
         type: str
       env:
+        description:
+          - "Environment variables. Accepts a dict or a valid JSON string."
         type: raw
       json:
+        description:
+          - "Extra variables. Accepts a dict or a valid JSON string."
         type: raw
       extra_variables:
+        description:
+          - "Alias of C(json). Provide either C(json) or C(extra_variables), not both."
         type: raw
       secrets:
+        description:
+          - "List of secret items to create. Each secret targets either the environment bucket (C(env)) or the extra vars bucket (C(var)/aliases)."
         type: list
         elements: dict
         suboptions:
           id:
+            description:
+              - "Optional ID for the secret item. If omitted, a default is used."
             type: int
           name:
+            description:
+              - "Secret key name as it will appear in the chosen bucket."
             type: str
             required: true
           secret:
+            description:
+              - "Secret value. Marked C(no_log) in the module args."
             type: str
             required: true
-            no_log: true
           type:
+            description:
+              - "Target bucket for the secret."
+              - "Use C(env) for environment variables or C(var) for extra variables. Aliases C(json), C(extra_vars), and C(extra_variables) also map to C(var)."
             type: str
             required: true
-            choices: [env, var, json, extra_vars, extra_variables]
+            choices:
+              - env
+              - var
+              - json
+              - extra_vars
+              - extra_variables
   session_cookie:
+    description:
+      - "Session cookie for authentication. Use this or C(api_token)."
     type: str
     required: false
     no_log: true
   api_token:
+    description:
+      - "API token for authentication. Use this or C(session_cookie)."
     type: str
     required: false
     no_log: true
   validate_certs:
+    description:
+      - "Whether to validate TLS certificates when using HTTPS."
     type: bool
     default: true
 author:
   - "Kristian Ebdrup (@kris9854)"
-"""
-
-EXAMPLES = r"""
-- name: Create environment (env + json, plus secrets)
-  ebdruplab.semaphoreui.project_environment_create:
-    host: http://localhost
-    port: 3000
-    api_token: "{{ semaphore_api_token }}"
-    project_id: 1
-    environment:
-      name: "Prod Env"
-      env: { APP_MODE: "prod" }
-      json: { retries: 5 }
-      secrets:
-        - name: "DB_PASSWORD"
-          secret: "{{ vault_db_password }}"
-          type: env
-        - name: "api_token"
-          secret: "{{ vault_api_token }}"
-          type: json   # alias -> sent as 'var'
-"""
-
-RETURN = r"""
-environment:
-  type: dict
-  returned: success
-status:
-  type: int
-  returned: always
 """
 
 def _ensure_json_string(module, data, field):

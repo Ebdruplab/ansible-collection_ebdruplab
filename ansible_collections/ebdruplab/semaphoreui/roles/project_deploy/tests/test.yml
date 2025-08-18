@@ -4,5 +4,33 @@
   hosts: localhost
   vars_files:
     - "vars/example_vars.yml"
+  pre_tasks:
+    - name: Login
+      ebdruplab.semaphoreui.login:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        username: "{{ project_deploy_semaphore_username }}"
+        password: "{{ project_deploy_semaphore_password }}"
+      register: login_result
+
+    - name: "Proeced with project deployment and creation of ressources"
+      block:
+        - name: Create a new user
+          ebdruplab.semaphoreui.user_create:
+            host: http://localhost
+            port: 3000
+            session_cookie: "{{ login_result.session_cookie }}"
+            name: "Service Desk"
+            username: "ServiceDeskRunner"
+            email: "sd@example.com"
+            password: "thisshouldbevaulted"
+            admin: true
+            alert: true
+      always:
+        - name: Logout
+          ebdruplab.semaphoreui.logout:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
   roles:
     - ebdruplab.semaphoreui.project_deploy
