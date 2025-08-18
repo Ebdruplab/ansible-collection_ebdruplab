@@ -1,0 +1,137 @@
+#SPDX-License-Identifier: MIT-0
+---
+# example vars
+
+# Connection and authentication variables
+project_deploy_semaphore_host: "http://localhost"
+project_deploy_semaphore_port: 3000
+project_deploy_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
+project_deploy_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
+# If your role supports it, you can use an API token instead of username/password:
+# project_deploy_semaphore_api_token: "KEY"
+
+# Safety flags used by the role’s pre-checks
+project_deploy_debug: false
+project_deploy_sensitive_data_no_log: false
+project_deploy_force_project_creation: false
+project_deploy_force_project_update: false
+project_deploy_force_project_delete: true
+project_deploy_force_project_delete_timer: 2
+
+# Project and resource definitions
+project_deploy_config:
+  project:
+    name: "Ebdruplab Example Project"
+    alert: false
+    alert_chat: ""
+    max_parallel_tasks: 0
+    demo: false
+  users_access:
+
+    - username: "admin"
+      role: "Owner"
+
+    - username: "ServiceDeskRunner"
+      role: task_runner
+
+  # Credentials to create/ensure
+  keys:
+    project_ssh_key_ebdlab:
+      name: "Ebdruplab example ssh key"
+      type: ssh
+      ssh:
+        login: "ansibleuser"
+        passphrase: "INSERT_VALUT_ENCRYPTED_SECRET"
+        private_key: "ssh-rsa vaultencryptedsecretkey"   # example only; use Vault/multiline key
+    project_login_user_ebdlab:
+      name: "Ebdruplab Example User"
+      type: login_password
+      login_password:
+        login: "Ebdruplab Fake Git User"
+        password: "vaultencryptedsecretpassword"
+
+  # Repositories to add; this one uses the login/password credential above
+  repositories:
+    - name: "Repositorie Ebdruplab Demo"
+      git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"
+      git_branch: "main"
+      key_name: "Ebdruplab Example User"   # matches the login_password key's name
+
+  # Optional board views
+  views:
+    pos_0:
+      title: "Examples"
+      position: 0
+    pos_1:
+      title: "ExamplePos_1"
+      position: 1
+
+  # Inventories (ensure an SSH credential is associated)
+  inventories:
+    inventory_one:
+      name: "A Yaml Inventory"
+      type: "static-yaml"
+      ssh_key_name: "Ebdruplab example ssh key"   # role should resolve name -> id (or use ssh_key_id)
+      inventory: |
+        all:
+          hosts:
+            localhost:
+              ansible_connection: local
+
+    inventory_two:
+      name: "A Local Ini Inventory"
+      type: "static"
+      ssh_key_name: "Ebdruplab example ssh key"
+      inventory: "localhost ansible_connection=local"
+
+    inventory_three:
+      name: "A repository Inventory"
+      type: "file"
+      repository_name: "Repositorie Ebdruplab Demo"
+      inventory_file: "inventories/example/example.ini"
+      ssh_key_name: "Ebdruplab example ssh key"
+      become_key_name: "Ebdruplab example ssh key"
+
+  # Environments
+  environments:
+    environment_1:
+      name: "Test Environment"
+      password: "mysecret"
+
+      # Environment variables (non-secret)
+      env:
+        KEY: "value"
+
+      # Extra variables (non-secret) — you can also use `extra_variables:` if you prefer
+      json:
+        foo: "bar"
+
+      # Secrets (always created; no 'operation' needed)
+      secrets:
+        - name: "DB_PASSWORD"
+          secret: "{{ vault_db_password | default('changeme', true) }}"
+          type: env
+        - name: "api_token"
+          secret: "{{ vault_api_token | default('token', true) }}"
+          type: json
+
+  # Templates (jobs)
+  templates:
+    an_example:
+      name: "Run Example Playbook"
+      inventory_name: "A repository Inventory"
+      repository_name: "Repositorie Ebdruplab Demo"
+      environment_name: "Test Environment"
+      type: "job"
+      playbook: "playbooks/pb-semaphore-example.yml"
+      arguments: ""
+      description: "Runs the example Ansible playbook"
+      view_title: ExamplePos_1
+
+  # schedules
+  schedules:
+    nightly_example:
+      name: "Nightly – Run Example Playbook"
+      cron_format: "0 3 * * *"
+      template_name: "Run Example Playbook"
+      active: false

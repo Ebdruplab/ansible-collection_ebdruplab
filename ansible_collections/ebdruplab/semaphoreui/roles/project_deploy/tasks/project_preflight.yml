@@ -1,0 +1,97 @@
+---
+
+- name: "Check if project already exists"
+  ebdruplab.semaphoreui.project_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+  register: existing_projects
+
+- name: "Build list of existing projects with the same name"
+  ansible.builtin.set_fact:
+    matching_projects: >-
+      {{ (existing_projects.projects | default([]))
+         | selectattr('name', 'equalto', project_deploy_config.project.name)
+         | list }}
+
+- name: "Flag if a project with that name exists"
+  ansible.builtin.set_fact:
+    project_exists: "{{ (matching_projects | length) > 0 }}"
+
+- name: "Fail if project already exists and no override flags are set"
+  ansible.builtin.fail:
+    msg: "A project with the name '{{ project_deploy_config.project.name }}' already exists!"
+  when:
+    - project_exists
+    - not (
+        (project_deploy_force_project_creation | bool)
+        or (project_deploy_force_project_update | bool)
+        or (project_deploy_force_project_delete | bool)
+      )
+
+- name: "Already exists — will create a new one with same name"
+  ansible.builtin.debug:
+    msg: "A project named '{{ project_deploy_config.project.name }}' already exists; you chose to create a new one."
+  when:
+    - project_exists
+    - (project_deploy_force_project_creation | bool)
+
+- name: "Already exists — will update the existing project"
+  ansible.builtin.debug:
+    msg: "A project named '{{ project_deploy_config.project.name }}' already exists; you chose to update it."
+  when:
+    - project_exists
+    - (project_deploy_force_project_update | bool)
+
+- name: "WARN: Will DELETE existing project(s) before re-creating"
+  ansible.builtin.debug:
+    msg: |
+      WARNING: project_deploy_force_project_delete is TRUE.
+      Will delete {{ matching_projects | length }} project(s) named "{{ project_deploy_config.project.name }}"
+      with IDs: {{ matching_projects | map(attribute='id') | list | join(', ') }}
+      in {{ project_deploy_force_project_delete_timer | default(5) | int }} seconds...
+  when:
+    - project_exists
+    - (project_deploy_force_project_delete | bool)
+
+- name: "Pause before deletion"
+  ansible.builtin.pause:
+    seconds: "{{ project_deploy_force_project_delete_timer | default(5) | int }}"
+  when:
+    - project_exists
+    - (project_deploy_force_project_delete | bool)
+
+- name: "Delete existing project(s) with the same name"
+  ebdruplab.semaphoreui.project_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ item.id }}"
+  loop: "{{ matching_projects }}"
+  loop_control:
+    label: "{{ item.name }} (id={{ item.id }})"
+  when:
+    - project_exists
+    - (project_deploy_force_project_delete| bool)
+
+- name: "Refresh project list (post-deletion)"
+  ebdruplab.semaphoreui.project_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+  register: existing_projects_refreshed
+  when:
+    - (project_deploy_force_project_delete | bool)
+
+- name: "Recompute matching_projects and project_exists (post-deletion)"
+  ansible.builtin.set_fact:
+    matching_projects: >-
+      {{ (existing_projects_refreshed.projects | default([]))
+         | selectattr('name', 'equalto', project_deploy_config.project.name)
+         | list }}
+    project_exists: "{{ (matching_projects | length) > 0 }}"
+  when:
+    - (project_deploy_force_project_delete | bool)

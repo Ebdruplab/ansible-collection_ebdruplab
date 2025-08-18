@@ -1,0 +1,33 @@
+---
+
+- name: "Create inventories"
+  ebdruplab.semaphoreui.project_inventory_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    inventory:
+      name: "{{ item.name }}"
+      type: "{{ item.type }}"
+      repository_id: "{{ created_repos_by_name[item.repository_name].id
+                   if item.repository_name is defined
+                   else omit }}"
+      inventory_file: "{{ item.inventory_file if item.inventory_file is defined | default(omit) }}"
+      inventory: "{{ item.inventory | default(omit) }}"
+      ssh_key_id: "{{ created_keys_by_name[item.ssh_key_name].id }}"
+      become_key_id: "{{ created_keys_by_name[item.become_key_name].id
+                   if item.become_key_name is defined
+                   else omit }}"
+  loop: "{{ project_deploy_config['inventories'].values() }}"
+  register: created_inventory_result
+
+- name: "Set created inventories fact"
+  ansible.builtin.set_fact:
+    created_inventory_by_name: "{{ created_inventory_by_name | default({}) | combine({ item.item.name: item.inventory }) }}"
+  loop: "{{ created_inventory_result.results }}"
+
+- name: "Debug task (inventories)"
+  ansible.builtin.debug:
+    var: created_inventory_by_name
+  when: project_deploy_debug

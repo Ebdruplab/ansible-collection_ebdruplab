@@ -11,6 +11,9 @@
     test_inventory_name: "Local Static Inventory"
     inventory_data: |
       localhost ansible_connection=local
+    key1_name: "Test_login"
+    key1_password: "changeme"
+    key1_login: "root"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -32,6 +35,19 @@
         demo: false
       register: create_result
 
+    - name: 'Create first key'
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "{{ key1_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key1_login }}"
+          password: "{{ key1_password }}"
+      register: created_key1
+
     - name: Create inventory
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
@@ -42,6 +58,8 @@
           name: "{{ test_inventory_name }}"
           type: "static"
           inventory: "{{ inventory_data }}"
+          ssh_key_id: "{{ created_key1.key.id }}"
+          become_key_id: "{{ created_key1.key.id }}"
       register: created_inventory
 
     - name: Show created inventory
@@ -56,13 +74,21 @@
         project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
 
+    - name: 'Delete first key'
+      ebdruplab.semaphoreui.project_key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        key_id: "{{ created_key1.key.id }}"
+
     - name: 'Delete project'
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ create_result.project.id }}"
- 
+
     - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"

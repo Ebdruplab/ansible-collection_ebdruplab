@@ -13,104 +13,168 @@ module: project_environment_update
 short_description: Update an existing environment in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Updates the specified environment for a project in Semaphore.
+  - "Updates an environment in a Semaphore project."
+  - "Plain variables live in C(env) (environment vars) and C(json) (extra vars)."
+  - "C(extra_variables) is an alias for C(json); provide one or the other."
+  - "Secrets target C(env) or C(var). Aliases C(json), C(extra_vars), C(extra_variables) map to C(var)."
+  - "Secrets are always sent with C(operation=create)."
 options:
   host:
     description:
-      - Hostname or IP of the Semaphore server (including http or https).
-    required: true
+      - "Base URL (scheme + host) of the Semaphore server, e.g. C(http://localhost)."
     type: str
+    required: true
   port:
     description:
-      - Port where the Semaphore API is running.
-    required: true
+      - "Port where the Semaphore API is exposed, e.g. C(3000)."
     type: int
+    required: true
   project_id:
     description:
-      - ID of the Semaphore project.
-    required: true
+      - "Project ID."
     type: int
+    required: true
   environment_id:
     description:
-      - ID of the environment to update.
-    required: true
+      - "Environment ID to update."
     type: int
+    required: true
   environment:
     description:
-      - Dictionary describing the environment to update.
-    required: true
+      - "Fields to update for the environment."
     type: dict
+    required: true
+    suboptions:
+      name:
+        description:
+          - "New environment name."
+        type: str
+      password:
+        description:
+          - "Optional password (vault password)."
+        type: str
+      env:
+        description:
+          - "Environment variables. Accepts a dict or a valid JSON string."
+        type: raw
+      json:
+        description:
+          - "Extra variables. Accepts a dict or a valid JSON string."
+        type: raw
+      extra_variables:
+        description:
+          - "Alias of C(json). Provide either C(json) or C(extra_variables), not both."
+        type: raw
+      secrets:
+        description:
+          - "List of secret items to create (always sent with C(operation=create))."
+          - "Each secret targets either C(env) or C(var). Aliases C(json), C(extra_vars), and C(extra_variables) map to C(var)."
+        type: list
+        elements: dict
+        suboptions:
+          id:
+            description:
+              - "Optional secret item ID."
+            type: int
+          name:
+            description:
+              - "Secret key name."
+            type: str
+            required: true
+          secret:
+            description:
+              - "Secret value."
+            type: str
+            required: true
+          type:
+            description:
+              - "Target bucket for the secret."
+            type: str
+            required: true
+            choices:
+              - env
+              - var
+              - json
+              - extra_vars
+              - extra_variables
   session_cookie:
     description:
-      - Session authentication cookie.
-    required: false
+      - "Session cookie for authentication. Use this or C(api_token)."
     type: str
+    required: false
     no_log: true
   api_token:
     description:
-      - Bearer token for authentication.
-    required: false
+      - "API token for authentication. Use this or C(session_cookie)."
     type: str
+    required: false
     no_log: true
   validate_certs:
     description:
-      - Whether to validate TLS certificates.
-    required: false
+      - "Whether to validate TLS certificates when using HTTPS."
     type: bool
     default: true
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
 
-EXAMPLES = r"""
-- name: Update an environment
-  ebdruplab.semaphoreui.project_environment_update:
-    host: http://localhost
-    port: 3000
-    session_cookie: "{{ login_result.session_cookie }}"
-    project_id: 1
-    environment_id: 2
-    environment:
-      name: "Updated Env"
-      password: "updatedpass"
-      env:
-        KEY: "updated"
-      json:
-        key: "updated"
-      secrets: []
-"""
-
-RETURN = r"""
-environment:
-  description: The updated environment object (if returned by the server).
-  type: dict
-  returned: success
-status:
-  description: HTTP response status code.
-  type: int
-  returned: always
-"""
-
-def serialize_json_field(field_value, field_name, module):
-    """
-    Ensures the field is a valid JSON string.
-    Accepts dict or JSON string. Fails if input is invalid.
-    """
-    if isinstance(field_value, dict):
-        return json.dumps(field_value)
-    elif isinstance(field_value, str):
+def _ensure_json_string(module, data, field):
+    """If dict -> JSON string; if str -> must be valid JSON."""
+    if field not in data or data[field] is None:
+        return
+    val = data[field]
+    if isinstance(val, dict):
         try:
-            json.loads(field_value)
-            return field_value
-        except json.JSONDecodeError:
-            if "=" in field_value:
-                key, value = field_value.split("=", 1)
-                return json.dumps({key.strip(): value.strip()})
-            else:
-                module.fail_json(msg=f"Invalid JSON string in field '{field_name}': {field_value}")
+            data[field] = json.dumps(val)
+        except Exception as e:
+            module.fail_json(msg=f"Failed to serialize '{field}' to JSON: {e}")
+    elif isinstance(val, str):
+        try:
+            json.loads(val)
+        except Exception as e:
+            module.fail_json(msg=f"Field '{field}' must be valid JSON or dict: {e}")
     else:
-        module.fail_json(msg=f"Unsupported type for field '{field_name}': {type(field_value)}")
+        module.fail_json(msg=f"Field '{field}' must be dict or JSON string.")
 
+def _normalize_secret_type(stype):
+    """Map aliases to API-accepted types: env | var."""
+    return {
+        "env": "env",
+        "var": "var",
+        "json": "var",
+        "extra_vars": "var",
+        "extra_variables": "var",
+    }.get(stype)
+
+def _normalize_secrets(module, secrets):
+    if secrets is None:
+        return None
+    if not isinstance(secrets, list):
+        module.fail_json(msg="Field 'secrets' must be a list.")
+    out = []
+    for i, s in enumerate(secrets):
+        if not isinstance(s, dict):
+            module.fail_json(msg=f"Secret at index {i} must be a dict.")
+        name = s.get("name")
+        stype = _normalize_secret_type(s.get("type"))
+        sval = s.get("secret")
+        if not name:
+            module.fail_json(msg=f"Secret at index {i} missing 'name'.")
+        if stype not in ("env", "var"):
+            module.fail_json(msg=f"Secret '{name}' invalid type; use env/var (aliases json/extra_vars/extra_variables map to var).")
+        if sval in (None, ""):
+            module.fail_json(msg=f"Secret '{name}' missing 'secret' value.")
+        entry = {
+            "name": name,
+            "secret": sval,
+            "type": stype,
+            "operation": "create",
+        }
+        # Only send id if explicitly > 0
+        if isinstance(s.get("id"), int) and s["id"] > 0:
+            entry["id"] = s["id"]
+        out.append(entry)
+    return out
 
 def main():
     module = AnsibleModule(
@@ -119,12 +183,31 @@ def main():
             port=dict(type='int', required=True),
             project_id=dict(type='int', required=True),
             environment_id=dict(type='int', required=True),
-            environment=dict(type='dict', required=True),
+            environment=dict(
+                type='dict',
+                required=True,
+                options=dict(
+                    name=dict(type='str', required=False),
+                    password=dict(type='str', required=False, no_log=True),
+                    env=dict(type='raw', required=False),
+                    json=dict(type='raw', required=False),
+                    extra_variables=dict(type='raw', required=False),
+                    secrets=dict(
+                        type='list', required=False, elements='dict',
+                        options=dict(
+                            id=dict(type='int', required=False),
+                            name=dict(type='str', required=True),
+                            secret=dict(type='str', required=True, no_log=True),
+                            type=dict(type='str', required=True, choices=['env','var','json','extra_vars','extra_variables']),
+                        )
+                    ),
+                ),
+            ),
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
-        required_one_of=[["session_cookie", "api_token"]],
+        required_one_of=[['session_cookie', 'api_token']],
         supports_check_mode=False
     )
 
@@ -132,26 +215,44 @@ def main():
     port = module.params["port"]
     project_id = module.params["project_id"]
     environment_id = module.params["environment_id"]
-    environment = module.params["environment"]
+    env_update = dict(module.params["environment"] or {})
     validate_certs = module.params["validate_certs"]
 
-    environment["project_id"] = project_id
-    environment["id"] = environment_id
+    env_update["project_id"] = project_id
+    env_update["id"] = environment_id
 
-    for field in ["env", "json"]:
-        if field in environment:
-            environment[field] = serialize_json_field(environment[field], field, module)
+    # extra_variables -> json (mutually exclusive)
+    has_json = env_update.get("json") is not None
+    has_extra = env_update.get("extra_variables") is not None
+    if has_json and has_extra:
+        module.fail_json(msg="Provide either 'json' or 'extra_variables', not both.")
+    if has_extra and not has_json:
+        env_update["json"] = env_update.pop("extra_variables")
+
+    _ensure_json_string(module, env_update, "env")
+    _ensure_json_string(module, env_update, "json")
+
+    if "secrets" in env_update:
+        env_update["secrets"] = _normalize_secrets(module, env_update.get("secrets"))
+
+    # Ensure buckets exist if secrets target them
+    if env_update.get("secrets"):
+        targets = {s["type"] for s in env_update["secrets"]}
+        if "env" in targets and "env" not in env_update:
+            env_update["env"] = "{}"
+        if "var" in targets and "json" not in env_update:
+            env_update["json"] = "{}"
 
     url = f"{host}:{port}/api/project/{project_id}/environment/{environment_id}"
-
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
-        api_token=module.params.get("api_token")
+        api_token=module.params.get("api_token"),
     )
     headers["Content-Type"] = "application/json"
+    headers.setdefault("Accept", "application/json")
 
     try:
-        body = json.dumps(environment).encode("utf-8")
+        body = json.dumps(env_update).encode("utf-8")
         response_body, status, _ = semaphore_put(
             url,
             body=body,
@@ -159,17 +260,23 @@ def main():
             validate_certs=validate_certs
         )
 
-        if status not in (200, 204):
-            error = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
+        if status == 204:
+            module.exit_json(changed=True, environment=env_update, status=status)
+
+        if status != 200:
+            error = response_body.decode() if isinstance(response_body, (bytes, bytearray)) else str(response_body)
             module.fail_json(msg=f"PUT failed with status {status}: {error}", status=status)
 
-        updated_env = json.loads(response_body) if response_body else {}
+        text = response_body.decode() if isinstance(response_body, (bytes, bytearray)) else response_body
+        try:
+            updated_env = json.loads(text) if isinstance(text, str) else text
+        except Exception:
+            updated_env = {"raw": text}
+
         module.exit_json(changed=True, environment=updated_env, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
-
 if __name__ == "__main__":
     main()
-

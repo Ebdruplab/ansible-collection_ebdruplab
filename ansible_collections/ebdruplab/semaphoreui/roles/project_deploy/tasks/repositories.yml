@@ -1,0 +1,26 @@
+---
+
+- name: "Create project repositories"
+  ebdruplab.semaphoreui.project_repository_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    repository:
+      name: "{{ item.name }}"
+      git_url: "{{ item.git_url }}"
+      git_branch: "{{ item.git_branch }}"
+      ssh_key_id: "{{ created_keys_by_name[item.key_name].id }}"
+  loop: "{{ project_deploy_config.repositories }}"
+  register: created_repositories_result
+
+- name: "Set created repositories fact"
+  ansible.builtin.set_fact:
+    created_repos_by_name: "{{ created_repos_by_name | default({}) | combine({ item.item.name: item.repository }) }}"
+  loop: "{{ created_repositories_result.results }}"
+
+- name: "Debug task (repositories)"
+  ansible.builtin.debug:
+    var: created_repos_by_name
+  when: project_deploy_debug

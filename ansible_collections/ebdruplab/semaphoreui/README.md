@@ -12,7 +12,7 @@ This Ansible collection provides modules for automating the management of [Semap
 - CRUD operations for **inventories**, **repositories**, and **SSH/API keys**
 - Manage **tasks** (start, cancel, retrieve logs/output)
 - Create and control **environments** and **template variables**
-- Support for **user** and **token** management
+- Support for **user**, **project user** and **token** management
 - Role and view administration
 - Seamless integration with Semaphore’s REST API (v2+)
 
@@ -40,6 +40,7 @@ This Ansible collection provides modules for automating the management of [Semap
 | **Environment** | `project_environment_create`, `project_environment_update`, `project_environment_get`, `project_environment_list`, `project_environment_delete` |
 | **Template Variables** | `project_template_variable_create`, `project_template_variable_update`, `project_template_variable_get`, `project_template_variable_list`, `project_template_variable_delete` |
 | **User Management** | `user_create`, `user_delete`, `user_get`, `user_list`, `user_update`, `user_password_update` |
+| **Project User Management** | `porject_user_create`, `porject_user_delete`, `porject_user_update`, `porject_user_list` |
 | **Tokens** | `user_token_create`, `user_token_delete`, `user_token_get` |
 | **Views & Roles** | `project_view_create`, `project_view_get`, `project_view_list`, `project_view_delete`, `project_role` |
 | **WebSocket Status** | `websocket_status` |

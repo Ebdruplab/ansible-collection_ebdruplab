@@ -1,0 +1,61 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for ebdruplab.semaphoreui.project_deploy
+
+- name: "Include assert tasks"
+  ansible.builtin.include_tasks:
+    file: assert.yml
+
+- name: "Include Login to Semaphoreui"
+  ansible.builtin.include_tasks:
+    file: login.yml
+  when: project_deploy_semaphore_api_token is not defined
+
+- name: "Include project_preflight tasks"
+  ansible.builtin.include_tasks:
+    file: project_preflight.yml
+
+- name: "Proeced with project deployment and creation of ressources"
+  block:
+
+    - name: "Include project file"
+      ansible.builtin.include_tasks:
+        file: project.yml
+
+    - name: "Include project file"
+      ansible.builtin.include_tasks:
+        file: project_user.yml
+
+    - name: "Include keys file"
+      ansible.builtin.include_tasks:
+        file: keys.yml
+
+    - name: "Include repositories file"
+      ansible.builtin.include_tasks:
+        file: repositories.yml
+
+    - name: "Include views file"
+      ansible.builtin.include_tasks:
+        file: views.yml
+
+    - name: "Include inventories file"
+      ansible.builtin.include_tasks:
+        file: inventories.yml
+
+    - name: "Include environments file"
+      ansible.builtin.include_tasks:
+        file: environments.yml
+
+    - name: "Include templates file"
+      ansible.builtin.include_tasks:
+        file: templates.yml
+
+    - name: "Include schedules file"
+      ansible.builtin.include_tasks:
+        file: schedules.yml
+  always:
+
+    - name: "Include Logout to Semaphoreui"
+      ansible.builtin.include_tasks:
+        file: logout.yml
+      when: project_deploy_semaphore_api_token is not defined

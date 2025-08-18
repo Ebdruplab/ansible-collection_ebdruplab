@@ -1,6 +1,7 @@
 - name: "Integration test for new semaphoreui modules with project setup"
   hosts: localhost
-  gather_facts: true
+  gather_facts: false
+
   vars:
     semaphore_host: "http://localhost"
     semaphore_port: 3000
@@ -15,8 +16,9 @@
     repo_branch: "main"
     inventory_name: "Inventory from Git file"
     inventory_file_path: "inventories/example/example.ini"
+
   tasks:
-    - name: "Log in to Semaphore"
+    - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -24,7 +26,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: "Create a test project"
+    - name: Create a test project
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -36,7 +38,7 @@
         demo: false
       register: create_project
 
-    - name: "Create a test login_password key"
+    - name: Create a test login_password key
       ebdruplab.semaphoreui.project_key_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -49,7 +51,7 @@
           password: "{{ key_password }}"
       register: key_create
 
-    - name: "Retrieve the created key"
+    - name: Retrieve the created key
       ebdruplab.semaphoreui.project_key_get:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -58,7 +60,7 @@
         key_id: "{{ key_create.key.id }}"
       register: key_get
 
-    - name: "Create a test repository"
+    - name: Create a test repository
       ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -71,7 +73,7 @@
           ssh_key_id: "{{ key_create.key.id }}"
       register: repo_create
 
-    - name: "Create a test inventory from repo file"
+    - name: Create a test inventory from repo file
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -82,9 +84,10 @@
           type: "file"
           repository_id: "{{ repo_create.repository.id }}"
           inventory_file: "{{ inventory_file_path }}"
+          ssh_key_id: "{{ key_create.key.id }}"
       register: inv_create
 
-    - name: "Retrieve the created inventory"
+    - name: Retrieve the created inventory
       ebdruplab.semaphoreui.project_inventory_get:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -93,7 +96,7 @@
         inventory_id: "{{ inv_create.inventory.id }}"
       register: inv_get
 
-    - name: "Retrieve the created repository"
+    - name: Retrieve the created repository
       ebdruplab.semaphoreui.project_repository_get:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -102,7 +105,7 @@
         repository_id: "{{ repo_create.repository.id }}"
       register: repo_get
 
-    - name: "Create template to attach survey variable"
+    - name: Create template to attach survey variable
       ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -115,16 +118,18 @@
           inventory_id: "{{ inv_create.inventory.id }}"
           repository_id: "{{ repo_create.repository.id }}"
           environment_id: 1
+          type: "job"
+          description: "Template for tests"
           allow_override_args_in_task: false
           prompt_limit: true
           vaults:
             - type: "password"
               id: "{{ key_create.key.id }}"
+          arguments: "[]"
       register: tpl_create
 
-    - name: "Log out of Semaphore"
+    - name: Log out of Semaphore
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-

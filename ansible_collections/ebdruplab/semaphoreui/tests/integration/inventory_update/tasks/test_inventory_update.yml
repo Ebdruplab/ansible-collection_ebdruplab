@@ -7,15 +7,19 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: 'edb_test_project_inventory004'
+    project_name: "edb_test_project_inventory004"
     original_inventory_name: "Inventory Before Update"
     updated_inventory_name: "Inventory After Update"
     original_inventory_data: |
       localhost ansible_connection=local
     updated_inventory_data: |
       127.0.0.1 ansible_connection=local ansible_user=root
+    key_name: "Test_login"
+    key_password: "changeme"
+    key_login: "admin"
+
   tasks:
-    - name: Log in to Semaphore
+    - name: Log in
       ebdruplab.semaphoreui.login:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -23,7 +27,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: 'Create project'
+    - name: Create project
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -35,7 +39,20 @@
         demo: false
       register: create_result
 
-    - name: Create an inventory
+    - name: Create key
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "{{ key_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key_login }}"
+          password: "{{ key_password }}"
+      register: created_key
+
+    - name: Create inventory (static)
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -45,9 +62,14 @@
           name: "{{ original_inventory_name }}"
           type: "static"
           inventory: "{{ original_inventory_data }}"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_inventory
 
-    - name: Update the inventory
+    - name: Show created inventory
+      debug:
+        var: created_inventory.inventory
+
+    - name: Update inventory (name, data, keep same key; set become_key_id too)
       ebdruplab.semaphoreui.project_inventory_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -58,13 +80,24 @@
           name: "{{ updated_inventory_name }}"
           type: "static"
           inventory: "{{ updated_inventory_data }}"
+          ssh_key_id: "{{ created_key.key.id }}"
+          become_key_id: "{{ created_key.key.id }}"
       register: updated_inventory
 
-    - name: Show updated inventory (if returned)
-      ansible.builtin.debug:
-        var: updated_inventory.inventory
+    - name: Get updated inventory
+      ebdruplab.semaphoreui.project_inventory_get:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+      register: inv_get
 
-    - name: Delete updated inventory
+    - name: Show updated inventory (server view)
+      debug:
+        var: inv_get.inventory
+
+    - name: Delete inventory
       ebdruplab.semaphoreui.project_inventory_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -72,7 +105,15 @@
         project_id: "{{ create_result.project.id }}"
         inventory_id: "{{ created_inventory.inventory.id }}"
 
-    - name: 'Delete project'
+    - name: Delete key
+      ebdruplab.semaphoreui.project_key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        key_id: "{{ created_key.key.id }}"
+
+    - name: Delete project
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"

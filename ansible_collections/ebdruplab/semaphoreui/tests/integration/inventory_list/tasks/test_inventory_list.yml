@@ -7,11 +7,15 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
-    project_name: 'edb_test_project_inventory003'
+    project_name: "edb_test_project_inventory003"
     test_inventory_name_1: "Integration Inventory 1"
     test_inventory_name_2: "Integration Inventory 2"
     inventory_data: |
       localhost ansible_connection=local
+    key_name: "Inv_Test_Login"
+    key_login: "admin"
+    key_password: "changeme"
+
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -21,7 +25,7 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: 'Create project'
+    - name: Create project
       ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -33,7 +37,20 @@
         demo: false
       register: create_result
 
-    - name: Create first inventory
+    - name: Create login_password key (required by inventory)
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        name: "{{ key_name }}"
+        type: login_password
+        login_password:
+          login: "{{ key_login }}"
+          password: "{{ key_password }}"
+      register: created_key
+
+    - name: Create first inventory (static)
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -43,9 +60,10 @@
           name: "{{ test_inventory_name_1 }}"
           type: "static"
           inventory: "{{ inventory_data }}"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_inventory_1
 
-    - name: Create second inventory
+    - name: Create second inventory (static)
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -55,6 +73,7 @@
           name: "{{ test_inventory_name_2 }}"
           type: "static"
           inventory: "{{ inventory_data }}"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_inventory_2
 
     - name: List all inventories
@@ -82,7 +101,15 @@
       loop_control:
         label: "Inventory ID {{ item }}"
 
-    - name: 'Delete project'
+    - name: Delete key
+      ebdruplab.semaphoreui.project_key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_result.project.id }}"
+        key_id: "{{ created_key.key.id }}"
+
+    - name: Delete project
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
