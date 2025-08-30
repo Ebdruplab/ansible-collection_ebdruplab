@@ -14,193 +14,160 @@ short_description: Create a Semaphore template (job, deploy, or build) with surv
 version_added: "1.0.0"
 description:
   - Creates a new template in a Semaphore project.
-  - Supports surveys (string, integer, secret, enum), vault attachments, and task parameter overrides.
-  - For job templates (i.e. when C(type) is omitted, C(None), C(""), or C("job")), Semaphore does not accept C(task_params).
-    This module will automatically drop C(task_params) for job templates to avoid API 400 errors.
+  - Supports surveys (string, int, secret, enum), vault attachments, and task parameter overrides.
+  - Sends C(allow_parallel_tasks) as provided.
+  - Drops update-only fields like C(id) and UI-only counters like C(tasks) on create.
+  - IMPORTANT: For job templates (C(type="") or C("job")), the create API rejects C(task_params) and C(survey_vars).
+    They are accepted/returned on update, but must be omitted on create to avoid API 400 errors.
+  - Normalizes integers, arguments JSON, list-style tags, and prunes false-y prompt flags.
 options:
   host:
-    description:
-      - Full host address of the Semaphore server (including scheme).
+    description: Full host address of the Semaphore server (including scheme).
     type: str
     required: true
   port:
-    description:
-      - Port of the Semaphore server (e.g. 3000).
+    description: Port of the Semaphore server (e.g. 3000).
     type: int
     required: true
   project_id:
-    description:
-      - ID of the project where the template will be created.
+    description: ID of the project where the template will be created.
     type: int
     required: true
   template:
-    description:
-      - Template definition dictionary.
+    description: Template definition dictionary.
     type: dict
     required: true
     suboptions:
       name:
-        description: Template name.
         type: str
         required: true
+        description: Template name.
       app:
-        description: Application type. Defaults to C(ansible) if omitted.
         type: str
         required: false
+        description: Application type. Defaults to C(ansible) if omitted.
       playbook:
-        description: Playbook path in the repo.
         type: str
         required: true
+        description: Playbook path in the repo.
       repository_id:
+        type: int
+        required: true
         description: Repository ID.
-        type: int
-        required: true
       inventory_id:
-        description: Inventory ID.
         type: int
         required: true
+        description: Inventory ID.
       environment_id:
-        description: Environment ID.
         type: int
       view_id:
-        description: Board view ID.
         type: int
+      build_template_id:
+        type: int
+        description: Only relevant for builds; omitted for other types on create.
       type:
-        description:
-          - Template type. Use C(job), C(deploy), C(build), or omit/empty for "None".
         type: str
         choices: [job, deploy, build, ""]
+        description: Template type. Omit/empty for job (API represents job as an empty string).
       description:
-        description: Human description.
         type: str
       git_branch:
-        description: Git branch override.
         type: str
       arguments:
-        description:
-          - JSON string for arguments as stored by Semaphore UI.
-          - If a list or dict is provided, it will be JSON-encoded.
-          - If omitted/empty, defaults to C("[]").
         type: raw
+        description:
+          - JSON string as stored by Semaphore UI.
+          - Lists/dicts encoded to JSON; scalars wrapped into a single-element JSON list.
+          - Defaults to "[]".
       allow_override_args_in_task:
         type: bool
       allow_override_branch_in_task:
         type: bool
       allow_parallel_tasks:
         type: bool
+        description: Allow running tasks in parallel for this template.
       suppress_success_alerts:
         type: bool
+      autorun:
+        type: bool
+        description: Auto-run created tasks.
       limit:
         type: str
       tags:
-        description: Template tags string (not to be confused with task_params.tags).
-        type: str
+        type: raw
+        description: Template tags (list joined with newlines).
       skip_tags:
-        type: str
+        type: raw
+        description: Template skip-tags (list joined with newlines).
       vault_password:
         type: str
       start_version:
         type: str
-      prompt_inventory:
-        type: bool
-      prompt_limit:
-        type: bool
-      prompt_tags:
-        type: bool
-      prompt_skip_tags:
-        type: bool
-      prompt_vault_password:
-        type: bool
-      prompt_arguments:
-        type: bool
-      prompt_branch:
-        type: bool
-      prompt_environment:
-        type: bool
-      survey_vars:
-        description:
-          - List of survey variable definitions.
-        type: list
-        elements: dict
-        suboptions:
-          name:
-            type: str
-            required: true
-          title:
-            type: str
-            required: true
-          type:
-            description: Survey type.
-            type: str
-            choices: [string, int, secret, enum]
-            required: true
-          description:
-            type: str
-          required:
-            type: bool
-            default: false
-          default_value:
-            type: raw
-          values:
-            description:
-              - For C(enum) only, list of name/value objects.
-            type: list
-            elements: dict
-            suboptions:
-              name:
-                type: str
-                required: true
-              value:
-                type: raw
-                required: true
+        description: Required by API when C(type=build). Omitted for other types on create.
+      prompt_inventory: {type: bool}
+      prompt_limit: {type: bool}
+      prompt_tags: {type: bool}
+      prompt_skip_tags: {type: bool}
+      prompt_vault_password: {type: bool}
+      prompt_arguments: {type: bool}
+      prompt_branch: {type: bool}
+      prompt_environment: {type: bool}
       task_params:
-        description:
-          - Task parameter overrides. Ignored for job templates (Semaphore API limitation).
         type: dict
+        description: Task parameter overrides. NOTE: dropped on create when C(type="")/job.
         suboptions:
-          allow_debug:
-            type: bool
-          allow_override_inventory:
-            type: bool
-          allow_override_limit:
-            type: bool
-          allow_override_tags:
-            type: bool
-          allow_override_skip_tags:
-            type: bool
+          allow_debug: {type: bool}
+          allow_override_inventory: {type: bool}
+          allow_override_limit: {type: bool}
+          allow_override_tags: {type: bool}
+          allow_override_skip_tags: {type: bool}
           tags:
             type: list
             elements: str
-      vaults:
-        description:
-          - List of vault attachments for the template.
-          - Provide IDs via C(vault_key_id). Entries without a valid C(vault_key_id) are dropped.
+      survey_vars:
         type: list
         elements: dict
+        description: Survey variable definitions. NOTE: dropped on create when C(type="")/job.
+        suboptions:
+          name: {type: str, required: true}
+          title: {type: str, required: true}
+          type:
+            type: str
+            choices: [string, int, secret, enum]
+            required: true
+          description: {type: str}
+          required: {type: bool, default: false}
+          default_value: {type: raw}
+          values:
+            type: list
+            elements: dict
+            description: Only for C(enum); list of name/value pairs.
+            suboptions:
+              name: {type: str, required: true}
+              value: {type: raw, required: true}
+      vaults:
+        type: list
+        elements: dict
+        description:
+          - Vault attachments for the template (provide C(vault_key_id)).
+          - Entries without a valid C(vault_key_id) are dropped.
         suboptions:
           type:
             type: str
             choices: [password, key, script]
             required: true
-          vault_key_id:
-            description: ID of the vault key to attach.
-            type: int
-          name:
-            type: str
-          script:
-            type: raw
+          vault_key_id: {type: int}
+          name: {type: str}
+          script: {type: raw}
   session_cookie:
-    description: Session cookie for authentication.
     type: str
     required: false
     no_log: true
   api_token:
-    description: API token for authentication.
     type: str
     required: false
     no_log: true
   validate_certs:
-    description: Whether to validate TLS certificates.
     type: bool
     default: true
 author:
@@ -208,7 +175,7 @@ author:
 '''
 
 EXAMPLES = r'''
-- name: Create template with surveys and task params
+- name: Create template with surveys and task params (deploy/build)
   ebdruplab.semaphoreui.project_template_create:
     host: http://localhost
     port: 3000
@@ -222,44 +189,48 @@ EXAMPLES = r'''
       inventory_id: 121
       environment_id: 93
       view_id: 82
-      type: "job"
+      type: "deploy"
       description: "A sample deployment"
-      arguments: []     # will be encoded to "[]"
+      arguments: []
       allow_override_args_in_task: true
       allow_override_branch_in_task: true
       allow_parallel_tasks: true
+      suppress_success_alerts: true
       task_params:
         allow_debug: true
         allow_override_inventory: true
         allow_override_limit: true
         allow_override_skip_tags: true
         allow_override_tags: true
-        tags: ["blue", "db"]
       survey_vars:
         - name: "release_version"
           title: "Release version"
           type: "string"
-          description: "Version to deploy"
           required: true
           default_value: "1.0.0"
-        - name: "batch_size"
-          title: "Batch size"
-          type: "integer"
-          default_value: 5
-        - name: "api_key"
-          title: "API key"
-          type: "secret"
-          required: true
-        - name: "env"
-          title: "Environment"
-          type: "enum"
-          required: true
-          values:
-            - { name: "staging", value: "stg" }
-            - { name: "production", value: "prod" }
       vaults:
         - type: password
           vault_key_id: 251
+
+- name: Create a job template (task_params/surveys auto-dropped)
+  ebdruplab.semaphoreui.project_template_create:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
+    project_id: 51
+    template:
+      name: "Ebdruplab Example Playbook"
+      app: "ansible"
+      playbook: "playbooks/pb-semaphore-example.yml"
+      repository_id: 49
+      inventory_id: 142
+      view_id: 92
+      type: ""
+      arguments: "[]"
+      allow_override_args_in_task: true
+      allow_override_branch_in_task: true
+      allow_parallel_tasks: false
+      suppress_success_alerts: true
 '''
 
 RETURN = r'''
@@ -273,7 +244,6 @@ status:
   returned: always
 '''
 
-
 TYPE_NORMALIZE = {
     None: "",
     "": "",
@@ -284,9 +254,8 @@ TYPE_NORMALIZE = {
     "build": "build",
 }
 
-# NOTE: API examples show "int" (not "integer").
 SURVEY_TYPES = {"string", "int", "secret", "enum"}
-VAULT_TYPES = {"password", "key", "script"}  # added "key" to match documented choices
+VAULT_TYPES = {"password", "key", "script"}
 
 PROMPT_KEYS = [
     "prompt_inventory",
@@ -299,12 +268,24 @@ PROMPT_KEYS = [
     "prompt_environment",
 ]
 
+# Only allow fields that the create API actually accepts.
+ALLOWED_CREATE_FIELDS = {
+    # identity/required
+    "project_id", "name", "app", "playbook", "repository_id", "inventory_id",
+    # common optional
+    "environment_id", "view_id", "build_template_id", "type", "description", "git_branch",
+    "arguments", "limit", "tags", "skip_tags", "vault_password", "start_version",
+    # booleans
+    "allow_override_args_in_task", "allow_override_branch_in_task",
+    "allow_parallel_tasks", "suppress_success_alerts", "autorun",
+    # prompts
+    "prompt_inventory", "prompt_limit", "prompt_tags", "prompt_skip_tags",
+    "prompt_vault_password", "prompt_arguments", "prompt_branch", "prompt_environment",
+    # complex
+    "task_params", "survey_vars", "vaults",
+}
 
 def _json_stringify_arguments(value):
-    """
-    Normalize 'arguments' to the JSON string format the Semaphore UI stores.
-    Defaults to "[]" when not provided.
-    """
     if value is None:
         return "[]"
     if isinstance(value, str):
@@ -315,13 +296,10 @@ def _json_stringify_arguments(value):
             json.loads(s)
             return s
         except Exception:
-            # Treat scalar string as a single argument
             return json.dumps([value])
     if isinstance(value, (list, dict)):
         return json.dumps(value)
-    # Any other scalar: wrap as single arg
     return json.dumps([str(value)])
-
 
 def _normalize_task_params(tp):
     tp = dict(tp or {})
@@ -340,7 +318,6 @@ def _normalize_task_params(tp):
         out["tags"] = [str(t) for t in tags]
     return out
 
-
 def _validate_and_normalize_surveys(svars, module):
     if not svars:
         return []
@@ -348,19 +325,15 @@ def _validate_and_normalize_surveys(svars, module):
     for idx, sv in enumerate(svars, 1):
         if not isinstance(sv, dict):
             module.fail_json(msg=f"survey_vars[{idx}] must be a dict")
-
         name = sv.get("name")
         title = sv.get("title")
         stype = sv.get("type")
-
         if not name or not title or not stype:
             module.fail_json(msg=f"survey_vars[{idx}] requires 'name', 'title', and 'type'")
 
-        # Normalize survey type: accept "integer"/"number" but send "int" to the API
         stype_l = str(stype).lower()
         if stype_l in ("integer", "number"):
             stype_l = "int"
-
         if stype_l not in SURVEY_TYPES:
             module.fail_json(msg=f"survey_vars[{idx}].type must be one of {sorted(SURVEY_TYPES)}")
 
@@ -375,14 +348,12 @@ def _validate_and_normalize_surveys(svars, module):
                 except Exception:
                     module.fail_json(msg=f"survey_vars[{idx}].default_value must be integer-compatible")
             values = None
-
         elif stype_l in ("string", "secret"):
             if default_value is not None and not isinstance(default_value, (str, int, float)):
                 module.fail_json(msg=f"survey_vars[{idx}].default_value must be scalar")
             if isinstance(default_value, (int, float)):
                 default_value = str(default_value)
             values = None
-
         else:  # enum
             values = sv.get("values", [])
             if not isinstance(values, list) or len(values) == 0:
@@ -406,9 +377,7 @@ def _validate_and_normalize_surveys(svars, module):
         if values is not None:
             out_item["values"] = values
         out.append(out_item)
-
     return out
-
 
 def _validate_and_normalize_vaults(vaults, module):
     if not vaults:
@@ -417,24 +386,18 @@ def _validate_and_normalize_vaults(vaults, module):
     for idx, v in enumerate(vaults, 1):
         if not isinstance(v, dict):
             module.fail_json(msg=f"vaults[{idx}] must be a dict")
-
         vtype = v.get("type")
         if vtype not in VAULT_TYPES:
             module.fail_json(msg=f"vaults[{idx}].type must be one of {sorted(VAULT_TYPES)}")
-
         vkid = v.get("vault_key_id")
         if vkid is None or str(vkid).strip() == "":
-            # API wants a valid ID; skip incomplete entries
+            # API wants a valid ID for new attachments; skip incomplete entries
             continue
         try:
             vkid = int(vkid)
         except Exception:
             module.fail_json(msg=f"vaults[{idx}].vault_key_id must be an integer")
-
-        item = {
-            "type": vtype,
-            "vault_key_id": vkid,
-        }
+        item = {"type": vtype, "vault_key_id": vkid}
         if "name" in v and v["name"] is not None:
             item["name"] = str(v["name"])
         if "script" in v:
@@ -442,12 +405,13 @@ def _validate_and_normalize_vaults(vaults, module):
         out.append(item)
     return out
 
-
 def _drop_falsey_prompts(d):
     for k in PROMPT_KEYS:
         if not d.get(k):
             d.pop(k, None)
 
+def _prune_to_allowlist(d, allowed):
+    return {k: v for k, v in d.items() if k in allowed}
 
 def main():
     module = AnsibleModule(
@@ -493,7 +457,7 @@ def main():
             except (ValueError, TypeError):
                 module.fail_json(msg=f"{opt_int} must be an integer if provided.")
 
-    # Type normalization
+    # Normalize type
     raw_type = tpl.get('type', '')
     norm_type = TYPE_NORMALIZE.get(
         raw_type if raw_type in ("", "job", "deploy", "build", None) else str(raw_type).lower(),
@@ -503,16 +467,14 @@ def main():
         module.fail_json(msg="template.type must be one of '', job, deploy, build (or omit/None).")
     tpl['type'] = norm_type  # "" for job
 
-    # Arguments normalization
+    # Normalize arguments
     tpl['arguments'] = _json_stringify_arguments(tpl.get('arguments'))
 
-    # Normalize substructures
+    # task_params / surveys / vaults (keep normalized; may be dropped later for job)
     if 'task_params' in tpl:
         tpl['task_params'] = _normalize_task_params(tpl.get('task_params'))
-
     if 'survey_vars' in tpl:
         tpl['survey_vars'] = _validate_and_normalize_surveys(tpl.get('survey_vars'), module)
-
     if 'vaults' in tpl:
         norm_vaults = _validate_and_normalize_vaults(tpl.get('vaults'), module)
         if norm_vaults:
@@ -539,7 +501,7 @@ def main():
         if bkey in tpl and tpl[bkey] is not None:
             tpl[bkey] = bool(tpl[bkey])
 
-    # Drop false-y prompt_* flags (Semaphore often omits false prompt keys)
+    # Drop false-y prompt_* flags
     _drop_falsey_prompts(tpl)
 
     # Convert list tags to newline-delimited strings
@@ -548,11 +510,23 @@ def main():
     if isinstance(tpl.get('skip_tags'), list):
         tpl['skip_tags'] = "\n".join([str(x) for x in tpl['skip_tags']])
 
-    # IMPORTANT: task_params are not accepted for job templates
-    if tpl.get('type', '') == "":
+    # --- CRITICAL: remove update/UI-only fields on create ---
+    tpl.pop('id', None)      # present in some UI dumps; create must not send it
+    tpl.pop('tasks', None)   # UI may show 0; create must not send it
 
-      tpl.pop('task_params', None)
-      tpl.pop('survey_vars', None)  # job templates also reject surveys (avoids API 400)
+    # --- TYPE-SPECIFIC SANITY ---
+    if tpl['type'] != 'build':
+        # Only builds should send these
+        tpl.pop('start_version', None)
+        tpl.pop('build_template_id', None)
+
+    # Job create quirk: drop task_params & survey_vars
+    if tpl['type'] == "":
+        tpl.pop('task_params', None)
+        tpl.pop('survey_vars', None)
+
+    # Keep only keys the create API understands
+    tpl = _prune_to_allowlist(tpl, ALLOWED_CREATE_FIELDS)
 
     headers = get_auth_headers(
         session_cookie=p.get("session_cookie"),
@@ -589,7 +563,6 @@ def main():
         module.exit_json(changed=True, template=created, status=status)
 
     except Exception as e:
-        # Surface useful debugging context even when module_utils raises for 4xx
         module.fail_json(msg=str(e), debug={"url": url, "payload": tpl})
 
 if __name__ == '__main__':
