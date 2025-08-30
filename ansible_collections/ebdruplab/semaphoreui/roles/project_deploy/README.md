@@ -1,13 +1,18 @@
 # Ansible Role — `ebdruplab.semaphoreui.project_deploy`
 
-Deploy a complete Semaphore project from one declarative variable tree. The role logs in (or uses an API token), validates your config, optionally deletes an existing project, then creates/links **keys, repositories, views, inventories, environments,** and **templates** — idempotently.
+Deploy a complete Semaphore project from one declarative variable tree. The role logs in (or uses an API token), validates your config, optionally deletes an existing project, then creates/links **keys, repositories, views, inventories, environments, templates, schedules,** and **integrations** — idempotently.
 
+You can see a working example under the repository’s **`tests/`** directory.
 
+---
 
 ## Requirements
-- Ansible 2.10+
-- Collection: `ebdruplab.semaphoreui` (this role lives inside it)
-- A reachable Semaphore instance
+
+* Ansible 2.10+
+* Collection: `ebdruplab.semaphoreui` (this role lives inside it)
+* A reachable Semaphore instance
+
+---
 
 ## Defaults (quick view)
 
@@ -20,46 +25,63 @@ project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
 
 # Safety
-project_deploy_debug: false                       # Activate the debugs
-project_deploy_sensitive_data_no_log: true        # if sensitive data should be logged or not
-project_deploy_force_project_creation: false      # create a new project even if same name exists
-project_deploy_force_project_update:   false      # update the first matching project
-project_deploy_force_project_delete:   false      # delete all matching projects, then create
-project_deploy_force_project_delete_timer: 5      # seconds to pause before delete
+project_deploy_debug: false                       # Extra debug logs
+project_deploy_sensitive_data_no_log: true        # Hide sensitive values in task logs
+project_deploy_force_project_creation: false      # Always create a new project (even if same name exists)
+project_deploy_force_project_update:   false      # Reuse first matching project and sync resources
+project_deploy_force_project_delete:   false      # Delete matching project(s) before creating fresh
+project_deploy_force_project_delete_timer: 5      # Seconds to pause before delete
 
-# Declarative config (fill these)
+# Pruning (delete items not present in your YAML)
+project_deploy_variable_delete: false
+
+# Declarative config (preferred shapes shown below)
 project_deploy_config:
-  project: []
-  users_access: []
-  keys: []
-  repositories: []
-  views: []
-  inventories: []
-  environments: []
-  templates: []
-````
+  project: {}
+  users_access: []          # list
+  keys: {}                  # map (handle -> key spec)
+  repositories: []          # list
+  views: {}                 # map (handle -> {title, position})
+  inventories: {}           # map
+  environments: {}          # map
+  templates: {}             # map
+  schedules: {}             # map
+  integrations: {}          # map
+```
+
+> If you previously used empty lists (`[]`) for maps, switch to `{}` to match the role’s expectations (most task files iterate with `dict2items`).
+
+---
 
 ## What the role does
 
 1. **Auth** via API token *or* username/password.
+
 2. **Preflight** validation of your `project_deploy_config`.
-3. **Existing projects**:  
-  
-   * If none: create a new one.  
-   * If some:  
-  
-     * `project_deploy_force_project_delete: true` → warn + pause → delete → create fresh.  
-     * `project_deploy_force_project_creation: true` → create **another** project with same name.  
-     * `project_deploy_force_project_update: true` → reuse the first match and update resources.  
-     * Otherwise → fail safely.  
-4. **Create/link resources** in a sensible order:  
-  
-   * keys → repositories → views → inventories → environments → templates  
-5. **Expose lookups** like `created_*_by_name` so later steps can reference IDs by name.  
+
+3. **Existing projects**
+
+   * None → **create** a new one
+   * Found → behavior depends on flags
+
+     * `project_deploy_force_project_delete: true` → pause → **delete** → **create fresh**
+     * `project_deploy_force_project_creation: true` → **create another** project with same name
+     * `project_deploy_force_project_update: true` → **reuse** first match and **sync** resources
+     * Otherwise → **fail safely**
+
+4. **Create/link resources in order**
+   keys → repositories → views → inventories → environments → templates → schedules → integrations
+
+5. **Expose lookups** so later steps can resolve IDs by name/title:
+   `created_keys_by_name`, `created_repos_by_name`, `created_project_view_by_title`, `created_inventory_by_name`, `created_environments_by_name`, `created_templates_by_name`, `created_schedules_by_name`, `created_integrations_by_name`.
+
+6. **Pruning** (when `project_deploy_variable_delete: true`)
+
+   * Removes **schedules**, **integrations**, **templates** (and other supported resources) that exist in Semaphore but are **not** present in your YAML.
+
+---
 
 ## Variable schema (overview)
-
-> Shapes shown are the recommended ones this role expects.
 
 ```yaml
 project_deploy_config:
@@ -70,76 +92,119 @@ project_deploy_config:
     max_parallel_tasks: 0
     demo: false
 
-  users_access:
+  users_access:                      # list (users must already exist in Semaphore)
+    - username: "admin"
+      role: "Owner"                  # Owner | Manager | Task Runner | Guest (case/space-insensitive)
 
-    - username: "Geo"
-      role: "Owner"
-
-  keys:                       # map of keys
+  keys:                              # map
     key_handle:
       name: "Human Name"
       type: ssh | login_password
       ssh:
-        login: "user"
-        passphrase: "vault:..."
-        private_key: "vault:..."         # multiline OK
+        login: "ansibleuser"
+        passphrase: "{{ vault_passphrase }}"
+        private_key: "{{ vault_private_key_multiline }}"
       login_password:
         login: "Git User"
-        password: "vault:..."
+        password: "{{ vault_git_password }}"
 
-  repositories:               # list
+  repositories:                      # list
     - name: "Repo Name"
-      git_url: "https://..."
+      git_url: "https://github.com/org/repo.git"
       git_branch: "main"
-      key_name: "Human Name of a key"    # or key_id
+      key_name: "Human Name of a key"      # or ssh_key_id
 
-  views:                      # map
+  views:                             # map
     my_view:
       title: "Board Column"
       position: 0
 
-  inventories:                # map
+  inventories:                       # map
     inv1:
       name: "Static YAML"
       type: static-yaml | static | file
-      inventory: |            # for static/static-yaml
-        ...
+      inventory: |                   # for static/static-yaml
+        all:
+          hosts:
+            localhost:
+              ansible_connection: local
       repository_name: "Repo Name"   # for type=file (or repository_id)
       inventory_file: "path/in/repo.ini"
-      ssh_key_name: "SSH key name"    # required
-      become_key_name: "Sudo key"     # optional
+      ssh_key_name: "SSH key name"   # required
+      become_key_name: "SSH key name (become)"   # optional
 
-  environments:               # map
+  environments:                      # map
     env1:
       name: "Env Name"
-      password: "vault:..."           # optional
-      env: { KEY: "value" }           # environment vars
-      json: { foo: "bar" }            # extra vars (alias: extra_variables)
-      secrets:                         # always create
+      password: "{{ vault_env_password | default('', true) }}"
+      env: { KEY: "value" }          # environment variables (non-secret)
+      json: { foo: "bar" }           # extra variables (non-secret) – alias: extra_variables
+      secrets:                       # always created/ensured
         - name: "DB_PASSWORD"
-          secret: "vault:..."
-          type: env                    # or json / extra_variables
+          secret: "{{ vault_db_password }}"
+          type: env                  # env | json
 
-  templates:                  # map
+  templates:                         # map
     job1:
       name: "Run Example"
+      app: "ansible"                 # default if omitted
       type: "job"
-      repository_name: "Repo Name"
-      inventory_name: "Inventory Name"
-      environment_name: "Env Name"
-      view_title: "Board Column"
+      repository_name: "Repo Name"   # or repository_id
+      inventory_name: "Inventory Name" # or inventory_id
+      environment_name: "Env Name"   # or environment_id (optional)
+      view_title: "Board Column"     # or view_id (optional)
       playbook: "playbooks/site.yml"
       description: "Runs site"
-      arguments: []                   # list (role converts to JSON string)
-      vaults: []                      # optional
+      arguments: []                  # list/dict OK; role serializes to JSON string
+      vaults: []                     # optional list of {id, type}
+      tags:                          # the API expects newline-separated string; give list and role joins with '\n'
+        - web
+        - prod
 
-  schedules:
+  schedules:                         # map
     nightly_example:
       name: "Nightly – Run Example"
       cron_format: "0 3 * * *"
-      template_name: "Run Example"
-      active: false # true | false
+      template_name: "Run Example"   # or template_id
+      active: false
+      arguments: []                  # optional (role serializes when needed)
+
+  integrations:                      # map
+    webhook_hmac:
+      name: "Deploy via HMAC"
+      template_name: "Run Example"   # or template_id
+      auth_method: "HMAC"            # None | GitHub Webhooks | Bitbucket Webhooks | Token | HMAC | BasicAuth
+      auth_header: "token"           # only for Token/HMAC; defaults to "token"
+      auth_secret_name: "hmac-secret"  # or auth_secret_id
+      task_params:
+        diff: false
+        dry_run: false
 ```
+
+### Notes on fields and conversions
+
+* **Templates**
+
+  * The `project_template_create` module requires: `name`, `app`, `playbook`, `inventory_id`, `repository_id`. The role resolves `*_name` → IDs for you when possible.
+  * `arguments`: Provide a string **or** list/dict. Lists/dicts are serialized to a JSON string (e.g., `[]`).
+  * `tags`: Provide a **list** in YAML; the role will join it with `'\n'` to match the API’s newline-separated string.
+  * When **updating** templates, the role only sends supported fields (does **not** include `template.id` or `template.project_id` in the payload).
+
+* **Schedules**
+
+  * `template_id` is required by the API. The role will resolve `template_name` → `template_id` using existing/created templates.
+
+* **Integrations**
+
+  * `auth_method` uses UI-friendly values; the module converts to API codes.
+  * `auth_header` only applies to **Token**/**HMAC** and defaults to `"token"` when omitted.
+  * `task_params.debug_level` is pinned to `4` by the module; you can set only `diff` and `dry_run`.
+
+* **Pruning**
+
+  * When `project_deploy_variable_delete: true`, the role removes existing **schedules**, **integrations**, and **templates** not present in `project_deploy_config`.
+
+---
 
 ## Example play
 
@@ -151,7 +216,7 @@ project_deploy_config:
     - role: ebdruplab.semaphoreui.project_deploy
 ```
 
-**`vars/project.yml` (minimal but complete):**
+### `vars/project.yml` (minimal but complete)
 
 ```yaml
 project_deploy_semaphore_host: "http://localhost"
@@ -159,13 +224,10 @@ project_deploy_semaphore_port: 3000
 project_deploy_semaphore_username: "admin"
 project_deploy_semaphore_password: "changeme"
 
-# Safety flags used by the role’s pre-checks
 project_deploy_debug: false
 project_deploy_sensitive_data_no_log: false
-project_deploy_force_project_creation: false
-project_deploy_force_project_update: false
-project_deploy_force_project_delete: true
-project_deploy_force_project_delete_timer: 2
+project_deploy_force_project_update: true
+project_deploy_variable_delete: true
 
 project_deploy_config:
   project:
@@ -176,7 +238,6 @@ project_deploy_config:
     demo: false
 
   users_access:
-
     - username: "ServiceDeskRunner"
       role: task_runner
 
@@ -186,14 +247,14 @@ project_deploy_config:
       type: ssh
       ssh:
         login: "ansibleuser"
-        passphrase: "{{ vaulted_private_key_passphrase_ansibleuser }}"
-        private_key: "{{ vaulted_private_key_ansibleuser }}"
+        passphrase: "{{ vaulted_pk_passphrase }}"
+        private_key: "{{ vaulted_pk_private_key }}"
     git_user:
       name: "Ebdruplab Example User"
       type: login_password
       login_password:
         login: "Fake Git User"
-        password: "{{ vaulted_password_fake_git_user }}"
+        password: "{{ vaulted_git_password }}"
 
   repositories:
     - name: "Repositorie Ebdruplab Demo"
@@ -202,7 +263,7 @@ project_deploy_config:
       key_name: "Ebdruplab Example User"
 
   views:
-    main:
+    examples:
       title: "Examples"
       position: 0
 
@@ -233,14 +294,18 @@ project_deploy_config:
   templates:
     run_example:
       name: "Run Example Playbook"
+      app: "ansible"
       type: "job"
       repository_name: "Repositorie Ebdruplab Demo"
       inventory_name: "A repository Inventory"
       environment_name: "Test Environment"
       view_title: "Examples"
       playbook: "playbooks/pb-semaphore-example.yml"
-      arguments: []    # will be serialized to "[]"
       description: "Runs the example Ansible playbook"
+      arguments: []
+      tags:
+        - demo
+        - example
 
   schedules:
     nightly_example:
@@ -248,15 +313,29 @@ project_deploy_config:
       cron_format: "0 3 * * *"
       template_name: "Run Example Playbook"
       active: false
+
+  integrations:
+    webhook_hmac:
+      name: "Deploy via HMAC"
+      template_name: "Run Example Playbook"
+      auth_method: "HMAC"
+      auth_header: "token"
+      auth_secret_name: "hmac-secret"
+      task_params:
+        diff: false
+        dry_run: false
 ```
+
+---
 
 ## Tips
 
-* **Names → IDs**: The role resolves `*_name` references to IDs and stores maps like `created_repos_by_name`, `created_inventory_by_name`, `created_environments_by_name`, `created_project_view_by_title`, etc., for later steps.
-* **Template arguments**: Provide `arguments`/`vaults` as YAML lists or dicts — the role serializes them to JSON strings the API expects.
-* **Secrets in environments**: Use `type: env` (environment vars) or `type: json` (extra vars). Aliases `extra_variables`/`extra_vars` are accepted.
-* **Vault**: `ansible-vault create vars/vaulted.yml`; put only secrets (keys, passwords, tokens); load with `vars_files: [vars/project.yml, vars/vaulted.yml]`; reference with `{{ vaulted_* }}` within the sensitive variables; run with `--ask-vault-pass`.
-* **Example**: For examples you may see within the `tests/` dir for the `project_deploy` role.
+* **Names → IDs** are resolved automatically where possible. If you specify both, IDs win.
+* **Arguments/Vaults** can be given as strings or list/dict; lists/dicts are serialized to API-friendly strings.
+* **Template tags** should be authored as a **YAML list**; the role converts to a newline-separated string that the API expects.
+* **Debugging**: set `project_deploy_debug: true` to see helpful interim maps (e.g., desired vs. existing resources).
+
+---
 
 ## License
 
@@ -264,6 +343,7 @@ MIT
 
 ## Author
 
-Kristian Ebdrup <kristian@ebdruplab.dk>
-Github: https://github.com/kris9854
+Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
+GitHub: [https://github.com/kris9854](https://github.com/kris9854)
 
+> Want to see this role in action? Check the **`tests/`** folder for a runnable example.

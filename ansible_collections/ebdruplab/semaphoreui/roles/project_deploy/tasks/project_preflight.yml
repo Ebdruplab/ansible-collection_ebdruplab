@@ -7,6 +7,10 @@
     api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie | default(omit) }}"
   register: existing_projects
+  tags:
+    - project_deploy
+    - project
+    - list
 
 - name: "Build list of existing projects with the same name"
   ansible.builtin.set_fact:
@@ -14,10 +18,18 @@
       {{ (existing_projects.projects | default([]))
          | selectattr('name', 'equalto', project_deploy_config.project.name)
          | list }}
+  tags:
+    - project_deploy
+    - project
+    - facts
 
 - name: "Flag if a project with that name exists"
   ansible.builtin.set_fact:
     project_exists: "{{ (matching_projects | length) > 0 }}"
+  tags:
+    - project_deploy
+    - project
+    - facts
 
 - name: "Fail if project already exists and no override flags are set"
   ansible.builtin.fail:
@@ -29,6 +41,10 @@
         or (project_deploy_force_project_update | bool)
         or (project_deploy_force_project_delete | bool)
       )
+  tags:
+    - project_deploy
+    - project
+    - fail
 
 - name: "Already exists — will create a new one with same name"
   ansible.builtin.debug:
@@ -36,6 +52,10 @@
   when:
     - project_exists
     - (project_deploy_force_project_creation | bool)
+  tags:
+    - project_deploy
+    - project
+    - debug
 
 - name: "Already exists — will update the existing project"
   ansible.builtin.debug:
@@ -43,6 +63,10 @@
   when:
     - project_exists
     - (project_deploy_force_project_update | bool)
+  tags:
+    - project_deploy
+    - project
+    - debug
 
 - name: "WARN: Will DELETE existing project(s) before re-creating"
   ansible.builtin.debug:
@@ -54,6 +78,10 @@
   when:
     - project_exists
     - (project_deploy_force_project_delete | bool)
+  tags:
+    - project_deploy
+    - project
+    - debug
 
 - name: "Pause before deletion"
   ansible.builtin.pause:
@@ -61,6 +89,10 @@
   when:
     - project_exists
     - (project_deploy_force_project_delete | bool)
+  tags:
+    - project_deploy
+    - project
+    - pause
 
 - name: "Delete existing project(s) with the same name"
   ebdruplab.semaphoreui.project_delete:
@@ -75,6 +107,10 @@
   when:
     - project_exists
     - (project_deploy_force_project_delete| bool)
+  tags:
+    - project_deploy
+    - project
+    - delete
 
 - name: "Refresh project list (post-deletion)"
   ebdruplab.semaphoreui.project_list:
@@ -85,6 +121,10 @@
   register: existing_projects_refreshed
   when:
     - (project_deploy_force_project_delete | bool)
+  tags:
+    - project_deploy
+    - project
+    - list
 
 - name: "Recompute matching_projects and project_exists (post-deletion)"
   ansible.builtin.set_fact:
@@ -95,3 +135,7 @@
     project_exists: "{{ (matching_projects | length) > 0 }}"
   when:
     - (project_deploy_force_project_delete | bool)
+  tags:
+    - project_deploy
+    - project
+    - facts

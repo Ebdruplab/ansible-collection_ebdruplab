@@ -1,6 +1,121 @@
 ---
+- name: "List Project Repositories"
+  ebdruplab.semaphoreui.project_repository_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _repo_list
+  tags:
+    - project_deploy
+    - repositories
+    - list
 
-- name: "Create project repositories"
+- name: "Build Maps: repos_by_name and repos_by_name_full"
+  ansible.builtin.set_fact:
+    repos_by_name: >-
+      {{
+        dict(
+          (_repo_list['repositories'] | default([])) | map(attribute='name') | list
+          | zip((_repo_list['repositories'] | default([])) | map(attribute='id') | list)
+        )
+      }}
+    repos_by_name_full: >-
+      {{
+        dict(
+          (_repo_list['repositories'] | default([])) | map(attribute='name') | list
+          | zip((_repo_list['repositories'] | default([])) | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - repositories
+    - facts
+
+- name: "Compute Desired Repositories List"
+  ansible.builtin.set_fact:
+    _desired_repositories: "{{ project_deploy_config['repositories'] | default([]) }}"
+  tags:
+    - project_deploy
+    - repositories
+    - facts
+
+- name: "Assert SSH Key Id Is Resolved For Update"
+  ansible.builtin.assert:
+    that:
+      - _ssh_key_id_resolved | string | length > 0
+    fail_msg: >-
+      Could not resolve ssh_key_id for repository "{{ item.name }}".
+      Provide either "key_name" that exists in created_keys_by_name, or an explicit ssh_key_id,
+      or ensure the repository already has ssh_key_id set in Semaphore.
+    success_msg: "Resolved ssh_key_id={{ _ssh_key_id_resolved }} for {{ item.name }}"
+  vars:
+    _ssh_key_id_resolved: >-
+      {{
+        (
+          created_keys_by_name[item.key_name].id | int
+          if (item.key_name is defined and created_keys_by_name is defined and item.key_name in created_keys_by_name)
+          else (
+            item.ssh_key_id | int
+            if (item.ssh_key_id is defined)
+            else (
+              repos_by_name_full[item.name].ssh_key_id | int
+              if (repos_by_name_full is defined
+                  and item.name in repos_by_name_full
+                  and (repos_by_name_full[item.name].ssh_key_id is defined))
+              else ''
+            )
+          )
+        )
+      }}
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (repos_by_name | default({}))
+  loop: "{{ _desired_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - repositories
+    - validate
+
+- name: "Update Project Repository By Name"
+  ebdruplab.semaphoreui.project_repository_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    repository_id: "{{ repos_by_name[item.name] | int }}"
+    repository:
+      name: "{{ item.name }}"
+      git_url: "{{ item.git_url }}"
+      git_branch: "{{ item.git_branch }}"
+      ssh_key_id: >-
+        {{
+          (
+            created_keys_by_name[item.key_name].id | int
+            if (item.key_name is defined and created_keys_by_name is defined and item.key_name in created_keys_by_name)
+            else (
+              item.ssh_key_id | int
+              if (item.ssh_key_id is defined)
+              else (repos_by_name_full[item.name].ssh_key_id | int)
+            )
+          )
+        }}
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (repos_by_name | default({}))
+  loop: "{{ _desired_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - repositories
+    - update
+
+- name: "Create Project Repository When Missing"
   ebdruplab.semaphoreui.project_repository_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -11,16 +126,75 @@
       name: "{{ item.name }}"
       git_url: "{{ item.git_url }}"
       git_branch: "{{ item.git_branch }}"
-      ssh_key_id: "{{ created_keys_by_name[item.key_name].id }}"
-  loop: "{{ project_deploy_config.repositories }}"
-  register: created_repositories_result
+      ssh_key_id: >-
+        {{
+          (
+            created_keys_by_name[item.key_name].id | int
+            if (item.key_name is defined and created_keys_by_name is defined and item.key_name in created_keys_by_name)
+            else (item.ssh_key_id | int)
+          )
+        }}
+  when:
+    - item.name not in (repos_by_name | default({}))
+  loop: "{{ _desired_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - repositories
+    - create
 
-- name: "Set created repositories fact"
+- name: "Refresh Project Repositories List"
+  ebdruplab.semaphoreui.project_repository_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _repo_list_after
+  tags:
+    - project_deploy
+    - repositories
+    - list
+
+- name: "Set Created Repositories Fact"
   ansible.builtin.set_fact:
-    created_repos_by_name: "{{ created_repos_by_name | default({}) | combine({ item.item.name: item.repository }) }}"
-  loop: "{{ created_repositories_result.results }}"
+    created_repos_by_name: >-
+      {{
+        dict(
+          (_repo_list_after['repositories'] | default([])) | map(attribute='name') | list
+          | zip((_repo_list_after['repositories'] | default([])))
+        )
+      }}
+  tags:
+    - project_deploy
+    - repositories
+    - facts
 
-- name: "Debug task (repositories)"
+- name: "Debug Repository Payload (When Updating)"
   ansible.builtin.debug:
-    var: created_repos_by_name
-  when: project_deploy_debug
+    msg:
+      repository_id: "{{ repos_by_name[item.name] | int }}"
+      ssh_key_id_resolved: >-
+        {{
+          (
+            created_keys_by_name[item.key_name].id | int
+            if (item.key_name is defined and created_keys_by_name is defined and item.key_name in created_keys_by_name)
+            else (
+              item.ssh_key_id | int
+              if (item.ssh_key_id is defined)
+              else (repos_by_name_full[item.name].ssh_key_id | int)
+            )
+          )
+        }}
+  when:
+    - project_deploy_debug | bool
+    - project_deploy_force_project_update | bool
+    - item.name in (repos_by_name | default({}))
+  loop: "{{ _desired_repositories }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - repositories
+    - debug

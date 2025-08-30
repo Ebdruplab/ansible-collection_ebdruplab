@@ -5,6 +5,7 @@
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_get, get_auth_headers
+import json
 
 DOCUMENTATION = r"""
 ---
@@ -45,7 +46,6 @@ options:
     description:
       - Whether to validate SSL certificates.
     type: bool
-    required: false
     default: true
   sort:
     description:
@@ -79,62 +79,77 @@ templates:
   type: list
   elements: dict
   returned: success
+status:
+  description: HTTP status code from the Semaphore API
+  type: int
+  returned: always
 """
 
 def main():
     module = AnsibleModule(
         argument_spec=dict(
-            host=dict(type='str', required=True),
-            port=dict(type='int', required=True),
-            project_id=dict(type='int', required=True),
-            session_cookie=dict(type='str', required=False, no_log=True),
-            api_token=dict(type='str', required=False, no_log=True),
-            validate_certs=dict(type='bool', default=True),
-            sort=dict(type='str', required=False),
-            order=dict(type='str', required=False, choices=['asc', 'desc']),
+            host=dict(type="str", required=True),
+            port=dict(type="int", required=True),
+            project_id=dict(type="int", required=True),
+            session_cookie=dict(type="str", required=False, no_log=True),
+            api_token=dict(type="str", required=False, no_log=True),
+            validate_certs=dict(type="bool", default=True),
+            sort=dict(type="str", required=False),
+            order=dict(type="str", required=False, choices=["asc", "desc"]),
         ),
-        required_one_of=[['session_cookie', 'api_token']],
-        supports_check_mode=True
+        required_one_of=[["session_cookie", "api_token"]],
+        supports_check_mode=True,
     )
 
-    host = module.params['host'].rstrip('/')
-    port = module.params['port']
-    project_id = module.params['project_id']
-    sort = module.params.get('sort')
-    order = module.params.get('order')
-    validate_certs = module.params['validate_certs']
-    session_cookie = module.params.get('session_cookie')
-    api_token = module.params.get('api_token')
+    host = module.params["host"].rstrip("/")
+    port = module.params["port"]
+    project_id = module.params["project_id"]
+    validate_certs = module.params["validate_certs"]
 
     url = f"{host}:{port}/api/project/{project_id}/templates"
-    query_params = []
-    if sort:
-        query_params.append(f"sort={sort}")
-    if order:
-        query_params.append(f"order={order}")
-    if query_params:
-        url += '?' + '&'.join(query_params)
+    q = []
+    if module.params.get("sort"):
+        q.append(f"sort={module.params['sort']}")
+    if module.params.get("order"):
+        q.append(f"order={module.params['order']}")
+    if q:
+        url += "?" + "&".join(q)
+
+    headers = get_auth_headers(
+        session_cookie=module.params.get("session_cookie"),
+        api_token=module.params.get("api_token"),
+    )
+    headers.setdefault("Accept", "application/json")
 
     try:
-        headers = get_auth_headers(session_cookie=session_cookie, api_token=api_token)
-        headers['Content-Type'] = 'application/json'
-
-        response_body, status, _ = semaphore_get(
-            url,
-            validate_certs=validate_certs,
-            headers=headers
+        resp_body, status, _ = semaphore_get(
+            url, headers=headers, validate_certs=validate_certs
         )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to list templates: HTTP {status}", status=status)
+            text = resp_body.decode() if isinstance(resp_body, (bytes, bytearray)) else str(resp_body)
+            module.fail_json(msg=f"GET failed with status {status}: {text}", status=status)
 
-        templates = response_body if isinstance(response_body, list) else []
-        module.exit_json(changed=False, templates=templates)
+        # Robust JSON normalization
+        if isinstance(resp_body, (bytes, bytearray)):
+            text = resp_body.decode()
+            try:
+                templates = json.loads(text)
+            except Exception:
+                templates = []
+        elif isinstance(resp_body, str):
+            try:
+                templates = json.loads(resp_body)
+            except Exception:
+                templates = []
+        else:
+            templates = resp_body if isinstance(resp_body, list) else []
+
+        module.exit_json(changed=False, templates=templates, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-

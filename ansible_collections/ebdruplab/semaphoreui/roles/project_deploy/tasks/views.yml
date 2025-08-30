@@ -1,6 +1,69 @@
 ---
+- name: "List Project Views"
+  ebdruplab.semaphoreui.project_view_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _view_list
+  tags: [project_deploy, views, list]
 
-- name: "Create project views"
+- name: "Build Maps: views_by_title and views_by_title_full"
+  ansible.builtin.set_fact:
+    views_by_title: >-
+      {{
+        dict(
+          (_view_list.views | default([])) | map(attribute='title') | list
+          | zip((_view_list.views | default([])) | map(attribute='id') | list)
+        )
+      }}
+    views_by_title_full: >-
+      {{
+        dict(
+          (_view_list.views | default([])) | map(attribute='title') | list
+          | zip((_view_list.views | default([])) | list)
+        )
+      }}
+  tags: [project_deploy, views, facts]
+
+- name: "Compute Desired Views Dict"
+  ansible.builtin.set_fact:
+    _desired_views: "{{ (project_deploy_config.views if (project_deploy_config is defined and project_deploy_config is mapping and 'views' in project_deploy_config) else {}) }}"
+  tags: [project_deploy, views, facts]
+
+- name: "Debug views maps"
+  when: project_deploy_debug | bool
+  ansible.builtin.debug:
+    msg:
+      desired_views: "{{ _desired_views }}"
+      views_by_title: "{{ views_by_title }}"
+      views_by_title_full: "{{ views_by_title_full }}"
+  tags:
+    - project_deploy
+    - views
+    - debug
+
+
+
+- name: "Update Project View By Title"
+  ebdruplab.semaphoreui.project_view_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    view_id: "{{ views_by_title[item.title] }}"
+    title: "{{ item.title }}"
+    position: "{{ item.position | default(omit) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.title in (views_by_title | default({}))
+  loop: "{{ _desired_views | dict2items | map(attribute='value') | list }}"
+  loop_control: { label: "{{ item.title }}" }
+  tags: [project_deploy, views, update]
+
+- name: "Create Project View When Missing"
   ebdruplab.semaphoreui.project_view_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -9,17 +72,43 @@
     project_id: "{{ current_project_id }}"
     title: "{{ item.title }}"
     position: "{{ item.position | default(omit) }}"
-  loop: "{{ project_deploy_config['views'].values() }}"
-  loop_control:
-    label: "{{ item.title }}"
-  register: created_project_views_result
+  when: item.title not in (views_by_title | default({}))
+  loop: "{{ _desired_views | dict2items | map(attribute='value') | list }}"
+  loop_control: { label: "{{ item.title }}" }
+  tags: [project_deploy, views, create]
 
-- name: "Set created project views fact"
+- name: "Prune Project Views not in YAML"
+  ebdruplab.semaphoreui.project_view_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    view_id: "{{ item.id }}"
+  when:
+    - project_deploy_variable_delete | bool
+    - item.title not in (_desired_views | dict2items | map(attribute='value') | map(attribute='title') | list)
+  loop: "{{ _view_list.views | default([]) }}"
+  loop_control: { label: "{{ item.title }}" }
+  tags: [project_deploy, views, prune]
+
+- name: "Refresh Project Views List"
+  ebdruplab.semaphoreui.project_view_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _view_list_after
+  tags: [project_deploy, views, list]
+
+- name: "Set Created Project Views Fact"
   ansible.builtin.set_fact:
-    created_project_view_by_title: "{{ created_project_view_by_title | default({}) | combine({ item.item.title: item.view }) }}"
-  loop: "{{ created_project_views_result.results }}"
-
-- name: "Debug task (view)"
-  ansible.builtin.debug:
-    var: created_project_view_by_title
-  when: project_deploy_debug
+    created_project_view_by_title: >-
+      {{
+        dict(
+          (_view_list_after.views | default([])) | map(attribute='title') | list
+          | zip((_view_list_after.views | default([])))
+        )
+      }}
+  tags: [project_deploy, views, facts]

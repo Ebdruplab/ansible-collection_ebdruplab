@@ -85,7 +85,7 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Create extracted value (body → environment var)
+- name: Create extracted value (body -> environment var)
   ebdruplab.semaphoreui.project_integration_extraction_create:
     host: http://localhost
     port: 3000

@@ -1,5 +1,5 @@
 ---
-- name: "Integration test: project users (create → link/list/update/remove → cleanup)"
+- name: "Integration test: project users (create -> link/list/update/remove -> cleanup)"
   hosts: localhost
   gather_facts: false
 
@@ -62,7 +62,7 @@
       register: all_projects
       tags: ["resolve", "delete"]
 
-    - name: "Map project name → id (last match)"
+    - name: "Map project name -> id (last match)"
       ansible.builtin.set_fact:
         project_id_by_name: >-
           {{
@@ -168,7 +168,7 @@
           }}
       tags: ["list", "create", "delete"]
 
-    - name: "Build username → id map"
+    - name: "Build username -> id map"
       ansible.builtin.set_fact:
         user_id_map: "{{ dict(created_users_merged | map(attribute='username') | zip(created_users_merged | map(attribute='id'))) }}"
       tags: ["list", "delete"]
@@ -179,7 +179,7 @@
         created_usernames: "{{ wanted_usernames }}"
       tags: ["list", "delete"]
 
-    - name: "DEBUG users created (username → id)"
+    - name: "DEBUG users created (username -> id)"
       ansible.builtin.debug:
         msg: "Created users: {{ created_usernames | zip(created_user_ids) | list }}"
       tags: ["debug", "list"]
@@ -244,7 +244,7 @@
           }}
       tags: ["update"]
 
-    - name: "Update user role → Guest"
+    - name: "Update user role -> Guest"
       ebdruplab.semaphoreui.project_user_update:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
@@ -300,7 +300,7 @@
       register: all_users_for_delete
       tags: ["delete"]
 
-    - name: "Build username → id map for delete"
+    - name: "Build username -> id map for delete"
       ansible.builtin.set_fact:
         delete_user_id_map: "{{ dict((all_users_for_delete.users | default([])) | map(attribute='username') | zip((all_users_for_delete.users | default([])) | map(attribute='id'))) }}"
         delete_ids: "{{ (test_users | map(attribute='username') | list) | map('extract', delete_user_id_map) | select('defined') | list }}"

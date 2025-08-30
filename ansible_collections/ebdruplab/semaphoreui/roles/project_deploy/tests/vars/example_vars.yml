@@ -11,10 +11,14 @@ project_deploy_semaphore_password: "{{ vault_semaphore_password | default('chang
 # project_deploy_semaphore_api_token: "KEY"
 
 # Safety flags used by the role’s pre-checks
-project_deploy_debug: false
+project_deploy_debug: true
 project_deploy_sensitive_data_no_log: false
+# Forces a new project with the same name to be created
 project_deploy_force_project_creation: false
-project_deploy_force_project_update: false
+project_deploy_force_project_update: true
+# Delete variables not present in our YAML (env.extra_variables/env/env.json)
+project_deploy_variable_delete: true
+
 project_deploy_force_project_delete: true
 project_deploy_force_project_delete_timer: 2
 
@@ -32,7 +36,7 @@ project_deploy_config:
       role: "Owner"
 
     - username: "ServiceDeskRunner"
-      role: task_runner
+      role: "Owner"
 
   # Credentials to create/ensure
   keys:
@@ -43,12 +47,21 @@ project_deploy_config:
         login: "ansibleuser"
         passphrase: "INSERT_VALUT_ENCRYPTED_SECRET"
         private_key: "ssh-rsa vaultencryptedsecretkey"   # example only; use Vault/multiline key
+
     project_login_user_ebdlab:
       name: "Ebdruplab Example User"
       type: login_password
       login_password:
         login: "Ebdruplab Fake Git User"
         password: "vaultencryptedsecretpassword"
+
+    # NEW: Vault password key (required by templates' vaults[type=password])
+    project_vault_pass_key:
+      name: "Project Vault Password"     # must match templates' vault_key_name exactly (case-sensitive)
+      type: login_password               # key type handled by the role’s key task
+      login_password:
+        login: "ansible-ebdruplab vault"
+        password: "{{ vault_project_vault_password | default('TopSecret900', true) }}"
 
   # Repositories to add; this one uses the login/password credential above
   repositories:
@@ -118,20 +131,162 @@ project_deploy_config:
   # Templates (jobs)
   templates:
     an_example:
-      name: "Run Example Playbook"
+      name: "Ebdruplab Example Playbook"
       inventory_name: "A repository Inventory"
       repository_name: "Repositorie Ebdruplab Demo"
       environment_name: "Test Environment"
       type: "job"
       playbook: "playbooks/pb-semaphore-example.yml"
-      arguments: ""
+      arguments: []
       description: "Runs the example Ansible playbook"
       view_title: ExamplePos_1
+      git_branch: "main"
+      limit: "localhost"
+      tags:
+        - setup
+        - init
+      skip_tags:
+        - db
+      allow_override_args_in_task: true
+      allow_override_branch_in_task: true
+      allow_parallel_tasks: true
+      suppress_success_alerts: false
+      prompt_inventory: false
+      prompt_limit: false
+      prompt_tags: false
+      prompt_skip_tags: false
+      prompt_vault_password: false
+      prompt_arguments: false
+      prompt_branch: false
+      prompt_environment: false
+      task_params:
+        allow_debug: true
+        allow_override_inventory: true
+        allow_override_limit: true
+        allow_override_tags: true
+        allow_override_skip_tags: true
+      survey_vars:
+        - name: "targets"
+          title: "What is our target?"
+          type: "string"
+          required: true
+          default_value: "localhost"
 
-  # schedules
-  schedules:
-    nightly_example:
-      name: "Nightly – Run Example Playbook"
-      cron_format: "0 3 * * *"
-      template_name: "Run Example Playbook"
-      active: false
+    job_example:
+      name: "Run Example Playbook"
+      type: "job"
+      playbook: "playbooks/pb-semaphore-example.yml"
+      inventory_name: "A repository Inventory"
+      repository_name: "Repositorie Ebdruplab Demo"
+      environment_name: "Test Environment"
+      view_title: ExamplePos_1
+      description: "Runs the example Ansible playbook"
+      arguments: []
+      git_branch: "main"
+      limit: "localhost"
+      tags:
+        - setup
+        - init
+      skip_tags:
+        - db
+      allow_override_args_in_task: true
+      allow_override_branch_in_task: true
+      allow_parallel_tasks: true
+      suppress_success_alerts: false
+      prompt_inventory: false
+      prompt_limit: false
+      prompt_tags: false
+      prompt_skip_tags: false
+      prompt_vault_password: false
+      prompt_arguments: false
+      prompt_branch: false
+      prompt_environment: false
+      task_params:
+        allow_debug: true
+        allow_override_inventory: true
+        allow_override_limit: true
+        allow_override_tags: true
+        allow_override_skip_tags: true
+      survey_vars:
+        - name: "release_version"
+          title: "Release version"
+          type: "string"
+          required: true
+          default_value: "1.0.0"
+        - name: "batch_size"
+          title: "Batch size"
+          type: "int"
+          default_value: 5
+        - name: "api_key"
+          title: "API key"
+          type: "secret"
+          required: true
+        - name: "env"
+          title: "Environment"
+          type: "enum"
+          required: true
+          values:
+            - name: "staging"
+              value: "stg"
+            - name: "production"
+              value: "prod"
+      vaults:
+        - type: password
+          vault_key_name: "Project Vault Password"
+          # name: "Default"   # optional vault-id label; server defaults to "Default" if omitted
+        - type: script
+          name: "exist"              # optional vault-id label
+          script: "extension-client" # client script identifier/path
+
+    deploy_example:
+      name: "Deploy Service"
+      type: "deploy"
+      playbook: "playbooks/deploy.yml"
+      repository_name: "Repositorie Ebdruplab Demo"
+      inventory_name: "A repository Inventory"
+      environment_name: "Test Environment"
+      view_title: "ExamplePos_1"
+      description: "Deploys the service"
+      arguments: []
+      git_branch: "release"
+      tags:
+        - deploy
+        - web
+      task_params:
+        allow_debug: true
+      survey_vars:
+        - name: "target_env"
+          title: "Target environment"
+          type: "enum"
+          required: true
+          values:
+            - name: "dev"
+              value: "dev"
+            - name: "prod"
+              value: "prod"
+      vaults:
+        - type: password
+          vault_key_name: "Project Vault Password"
+
+    build_example:
+      name: "Build Artifact"
+      type: "build"
+      start_version: "1.0.0.0"         # REQUIRED for type=build
+      playbook: "playbooks/build.yml"
+      repository_name: "Repositorie Ebdruplab Demo"
+      inventory_name: "A repository Inventory"
+      environment_name: "Test Environment"
+      view_title: "ExamplePos_1"
+      description: "Builds the application artifact"
+      arguments: []
+      tags:
+        - ci
+        - build
+      task_params:
+        allow_debug: false
+      vaults:
+        - type: password
+          vault_key_name: "Project Vault Password"
+        - type: script
+          name: "exist"
+          script: "extension-client"

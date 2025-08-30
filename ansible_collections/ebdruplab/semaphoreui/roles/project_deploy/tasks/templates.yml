@@ -1,5 +1,214 @@
 ---
-- name: "Create project template {{ item.name }}"
+# tasks/templates.yml
+# Manage Semaphore project templates in a style mirroring the schedules flow.
+# Uses fully-qualified collection names throughout.
+# NOTE:
+# - 'tags' and 'skip_tags' are *Ansible runtime* tags (not CLI args) and belong at the top level of the template payload.
+#   Do NOT put them inside 'arguments'. The collection module will normalize list -> newline-separated string for the API.
+# - 'task_params.tags' are *UI labels* for tasks in Semaphore, different from Ansible runtime tags above.
+# - Some template flags are only valid for certain template types. In particular, 'allow_parallel_tasks'
+#   is not accepted for 'job' templates by some Semaphore API versions. We therefore only send it when type != 'job'.
+# - Vault entries (template.vaults) accept types 'password' or 'script' (client script). Each entry may include:
+#     - type: "password" | "script"
+#     - vault_key_id: <int> (optional; if omitted, defaults to the "Default" vault)
+#     - name: <string> (optional alias)
+#     - script: <string> (only for type 'script'; e.g., 'extension-client')
+#   The modules will pass these through to the Semaphore API.
+
+- name: "List Project Templates"
+  ebdruplab.semaphoreui.project_template_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _tpl_list
+  tags:
+    - project_deploy
+    - templates
+    - list
+
+- name: "Build Maps: templates_by_name and templates_by_name_full"
+  ansible.builtin.set_fact:
+    templates_by_name: >-
+      {{
+        dict(
+          (_tpl_list.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list.templates | default([])) | map(attribute='id') | list)
+        )
+      }}
+    templates_by_name_full: >-
+      {{
+        dict(
+          (_tpl_list.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list.templates | default([])) | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - templates
+    - facts
+
+- name: "Compute Desired Templates List"
+  ansible.builtin.set_fact:
+    _desired_templates: "{{ project_deploy_config.templates | default({}) | dict2items | map(attribute='value') | list }}"
+  tags:
+    - project_deploy
+    - templates
+    - facts
+
+- name: "Debug template maps"
+  when: project_deploy_debug | bool
+  ansible.builtin.debug:
+    msg:
+      desired_templates: "{{ _desired_templates }}"
+      existing_templates_by_name: "{{ templates_by_name }}"
+  tags:
+    - project_deploy
+    - templates
+    - debug
+
+# -------------------------------------------------------------------
+# VALIDATE constraints that the API enforces
+# -------------------------------------------------------------------
+- name: "Validate: build templates must define start_version"
+  ansible.builtin.assert:
+    that:
+      - (item.start_version is defined)
+        or (
+             item.name in (templates_by_name_full | default({}))
+             and ((templates_by_name_full[item.name].start_version | default('')) | length > 0)
+           )
+    fail_msg: "Template '{{ item.name }}' is type 'build' and must set 'start_version'."
+  loop: "{{ _desired_templates | selectattr('type','defined') | selectattr('type','equalto','build') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - templates
+    - validate
+
+# -------------------------------------------------------------------
+# UPDATE existing templates (by name)
+# Note: module requires name/app/playbook on update.
+# -------------------------------------------------------------------
+- name: "Update Project Template By Name"
+  ebdruplab.semaphoreui.project_template_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    template_id: "{{ templates_by_name[item.name] | int }}"
+    template:
+      # Required
+      name: "{{ item.name }}"
+      app: "{{ item.app | default('ansible') }}"
+      playbook: >-
+        {{
+          item.playbook
+          | default(templates_by_name_full[item.name].playbook | default(omit))
+        }}
+
+      # IMPORTANT: For some Semaphore versions, 'job' is internally represented as empty string.
+      # We **keep** whatever type the existing template currently has to avoid mismatches,
+      # falling back to 'job' when neither side specifies it.
+      type: >-
+        {{
+          (item.type | default(templates_by_name_full[item.name].type | default('job')))
+        }}
+      description: "{{ item.description | default(omit) }}"
+      git_branch: "{{ item.git_branch | default(omit) }}"
+      start_version: "{{ item.start_version | default(templates_by_name_full[item.name].start_version | default(omit)) }}"
+
+      # ID resolution (prefer explicit id, else by name maps created earlier)
+      repository_id: >-
+        {{
+          (item.repository_id | int)
+          if (item.repository_id is defined)
+          else (templates_by_name_full[item.name].repository_id | default(omit))
+        }}
+      inventory_id: >-
+        {{
+          (item.inventory_id | int)
+          if (item.inventory_id is defined)
+          else (templates_by_name_full[item.name].inventory_id | default(omit))
+        }}
+      environment_id: >-
+        {{
+          (item.environment_id | int)
+          if (item.environment_id is defined)
+          else (created_environments_by_name[item.environment_name].id | int)
+              if (item.environment_name is defined and (item.environment_name in (created_environments_by_name | default({}))))
+              else (templates_by_name_full[item.name].environment_id | default(omit))
+        }}
+      view_id: >-
+        {{
+          (item.view_id | int)
+          if (item.view_id is defined)
+          else (created_project_view_by_title[item.view_title].id | int)
+              if (item.view_title is defined and (item.view_title in (created_project_view_by_title | default({}))))
+              else (templates_by_name_full[item.name].view_id | default(omit))
+        }}
+      build_template_id: "{{ item.build_template_id | default(omit) }}"
+
+      # Play execution bits (runtime Ansible options)
+      limit: "{{ item.limit | default(omit) }}"
+      tags: "{{ item.tags | default(omit) }}"           # do NOT put '--tags' into 'arguments'
+      skip_tags: "{{ item.skip_tags | default(omit) }}" # do NOT put '--skip-tags' into 'arguments'
+      vault_password: "{{ item.vault_password | default(omit) }}"
+      arguments: "{{ item.arguments | default(omit) }}"
+
+      # Template-level flags
+      allow_override_args_in_task: "{{ item.allow_override_args_in_task | default(omit) }}"
+      allow_override_branch_in_task: "{{ item.allow_override_branch_in_task | default(omit) }}"
+      # Only send 'allow_parallel_tasks' when it's set AND template type is not 'job'
+      allow_parallel_tasks: >-
+        {{
+          (item.allow_parallel_tasks)
+          if (item.allow_parallel_tasks is defined
+              and ( (item.type | default('job')) != 'job' ))
+          else omit
+        }}
+      suppress_success_alerts: "{{ item.suppress_success_alerts | default(omit) }}"
+      autorun: "{{ item.autorun | default(omit) }}"
+
+      # Prompt flags
+      prompt_inventory: "{{ item.prompt_inventory | default(omit) }}"
+      prompt_limit: "{{ item.prompt_limit | default(omit) }}"
+      prompt_tags: "{{ item.prompt_tags | default(omit) }}"
+      prompt_skip_tags: "{{ item.prompt_skip_tags | default(omit) }}"
+      prompt_vault_password: "{{ item.prompt_vault_password | default(omit) }}"
+      prompt_arguments: "{{ item.prompt_arguments | default(omit) }}"
+      prompt_branch: "{{ item.prompt_branch | default(omit) }}"
+      prompt_environment: "{{ item.prompt_environment | default(omit) }}"
+
+      # Advanced
+      task_params: "{{ item.task_params | default(omit) }}"
+      survey_vars: "{{ item.survey_vars | default(omit) }}"
+      # Vault entries are passed through; supported types: 'password' | 'script'
+      vaults: "{{ item.vaults | default(omit) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (templates_by_name | default({}))
+    - (item.playbook is defined)
+      or (item.name in (templates_by_name_full | default({}))
+          and (templates_by_name_full[item.name].playbook | default('')) != '')
+  loop: "{{ _desired_templates }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - templates
+    - update
+
+# -------------------------------------------------------------------
+# CREATE missing templates
+# Uses created_repos_by_name and created_inventory_by_name (correct var names).
+# -------------------------------------------------------------------
+- name: "Create Project Template When Missing"
   ebdruplab.semaphoreui.project_template_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -10,41 +219,155 @@
       name: "{{ item.name }}"
       app: "{{ item.app | default('ansible') }}"
       playbook: "{{ item.playbook }}"
-      inventory_id: >-
-        {{ (created_inventory_by_name[item.inventory_name].id | int)
-           if (item.inventory_name is defined and item.inventory_name in created_inventory_by_name)
-           else omit }}
+
+      # For CREATE: omit 'type' when 'job' to avoid older API issues that may reject '' for job.
+      # Always send for non-job types.
+      type: >-
+        {{
+          (item.type)
+          if (item.type is defined and item.type != 'job')
+          else omit
+        }}
+      description: "{{ item.description | default(omit) }}"
+      git_branch: "{{ item.git_branch | default(omit) }}"
+      start_version: "{{ item.start_version | default(omit) }}"  # REQUIRED by API when type == 'build' (validated above)
+
       repository_id: >-
-        {{ created_repos_by_name[item.repository_name].id | int }}
+        {{
+          (item.repository_id | int)
+          if (item.repository_id is defined)
+          else (created_repos_by_name[item.repository_name].id | int)
+        }}
+      inventory_id: >-
+        {{
+          (item.inventory_id | int)
+          if (item.inventory_id is defined)
+          else (created_inventory_by_name[item.inventory_name].id | int)
+        }}
       environment_id: >-
-        {{ (created_environments_by_name[item.environment_name].id | int)
-           if (item.environment_name is defined
-               and item.environment_name|length > 0
-               and item.environment_name in created_environments_by_name)
-           else omit }}
+        {{
+          (item.environment_id | int)
+          if (item.environment_id is defined)
+          else (created_environments_by_name[item.environment_name].id | int)
+              if (item.environment_name is defined and (item.environment_name in (created_environments_by_name | default({}))))
+              else omit
+        }}
       view_id: >-
-        {{ (created_project_view_by_title[item.view_title].id | int)
-           if (item.view_title is defined
-               and item.view_title in created_project_view_by_title)
-           else omit }}
-      type: "{{ item.type }}"
-      description: "{{ item.description | default('') }}"
-      vaults: "{{ item.vaults | default(omit, true) }}"
-      arguments: "{{ item.arguments | default(omit, true) }}"
-  loop: "{{ project_deploy_config.templates.values() }}"
+        {{
+          (item.view_id | int)
+          if (item.view_id is defined)
+          else (created_project_view_by_title[item.view_title].id | int)
+              if (item.view_title is defined and (item.view_title in (created_project_view_by_title | default({}))))
+              else omit
+        }}
+
+      build_template_id: "{{ item.build_template_id | default(omit) }}"
+
+      # Runtime Ansible options
+      limit: "{{ item.limit | default(omit) }}"
+      tags: "{{ item.tags | default(omit) }}"           # stays top-level
+      skip_tags: "{{ item.skip_tags | default(omit) }}" # stays top-level
+      vault_password: "{{ item.vault_password | default(omit) }}"
+      arguments: "{{ item.arguments | default(omit) }}"
+
+      # Template-level flags
+      allow_override_args_in_task: "{{ item.allow_override_args_in_task | default(omit) }}"
+      allow_override_branch_in_task: "{{ item.allow_override_branch_in_task | default(omit) }}"
+      allow_parallel_tasks: >-
+        {{
+          (item.allow_parallel_tasks)
+          if (item.allow_parallel_tasks is defined
+              and ( (item.type | default('job')) != 'job' ))
+          else omit
+        }}
+      suppress_success_alerts: "{{ item.suppress_success_alerts | default(omit) }}"
+
+      # Prompt flags
+      prompt_inventory: "{{ item.prompt_inventory | default(omit) }}"
+      prompt_limit: "{{ item.prompt_limit | default(omit) }}"
+      prompt_tags: "{{ item.prompt_tags | default(omit) }}"
+      prompt_skip_tags: "{{ item.prompt_skip_tags | default(omit) }}"
+      prompt_vault_password: "{{ item.prompt_vault_password | default(omit) }}"
+      prompt_arguments: "{{ item.prompt_arguments | default(omit) }}"
+      prompt_branch: "{{ item.prompt_branch | default(omit) }}"
+      prompt_environment: "{{ item.prompt_environment | default(omit) }}"
+
+      # Advanced
+      task_params: "{{ item.task_params | default(omit) }}"
+      survey_vars: "{{ item.survey_vars | default(omit) }}"
+      # Vault entries are passed through; supported types: 'password' | 'script'
+      vaults: "{{ item.vaults | default(omit) }}"
+  when:
+    - item.name not in (templates_by_name | default({}))
+    - (item.repository_id is defined)
+      or (item.repository_name in (created_repos_by_name | default({})))
+    - (item.inventory_id is defined)
+      or (item.inventory_name in (created_inventory_by_name | default({})))
+  loop: "{{ _desired_templates }}"
   loop_control:
     label: "{{ item.name }}"
-  register: created_templates_result
+  tags:
+    - project_deploy
+    - templates
+    - create
 
-- name: "Set created templates fact"
-  ansible.builtin.set_fact:
-    created_templates_by_name: "{{ created_templates_by_name | default({}) | combine({ item.item.name: item.template }) }}"
-  loop: "{{ created_templates_result.results | default([]) }}"
+# -------------------------------------------------------------------
+# PRUNE templates not present in YAML (optional)
+# -------------------------------------------------------------------
+- name: "Prune Project Templates not in YAML"
+  ebdruplab.semaphoreui.project_template_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    template_id: "{{ item.id }}"
+  when:
+    - project_deploy_variable_delete | bool
+    - item.name not in (_desired_templates | map(attribute='name') | list)
+  loop: "{{ _tpl_list.templates | default([]) }}"
   loop_control:
-    label: "{{ item.item.name | default('unknown') }}"
-  when: item.template is defined
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - templates
+    - prune
 
-- name: "Debug task (template)"
-  ansible.builtin.debug:
-    var: created_templates_by_name
-  when: project_deploy_debug
+# -------------------------------------------------------------------
+# Refresh & expose facts
+# -------------------------------------------------------------------
+- name: "Refresh Project Templates List"
+  ebdruplab.semaphoreui.project_template_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _tpl_list_after
+  tags:
+    - project_deploy
+    - templates
+    - list
+
+- name: "Set Created Templates Facts"
+  ansible.builtin.set_fact:
+    created_templates_by_name: >-
+      {{
+        dict(
+          (_tpl_list_after.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list_after.templates | default([])))
+        )
+      }}
+    templates_by_name: >-
+      {{
+        dict(
+          (_tpl_list_after.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list_after.templates | default([])) | map(attribute='id') | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - templates
+    - facts

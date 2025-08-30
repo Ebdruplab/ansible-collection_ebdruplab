@@ -1,8 +1,4 @@
-# Manage project users from project_deploy_config.users_access
-# - If username doesn't exist in Semaphore → print a message and skip
-# - If not linked → link with desired role
-# - If linked with different role → update role
-
+---
 - name: "Fetch system users"
   ebdruplab.semaphoreui.user_list:
     host: "{{ project_deploy_semaphore_host }}"
@@ -10,8 +6,12 @@
     session_cookie: "{{ login_result.session_cookie }}"
   register: _all_users
   when: project_deploy_config.users_access is defined
+  tags:
+    - project_deploy
+    - users
+    - list
 
-- name: "Map username → id"
+- name: "Map username -> id"
   ansible.builtin.set_fact:
     _uname_to_id: "{{ dict(_all_users.users | map(attribute='username') | zip(_all_users.users | map(attribute='id'))) }}"
     _role_display_map:
@@ -20,6 +20,10 @@
       task_runner: "Task Runner"
       guest: "Guest"
   when: project_deploy_config.users_access is defined
+  tags:
+    - project_deploy
+    - users
+    - facts
 
 - name: "Fetch current project users"
   ebdruplab.semaphoreui.project_user_list:
@@ -31,8 +35,12 @@
     order: asc
   register: _proj_users
   when: project_deploy_config.users_access is defined
+  tags:
+    - project_deploy
+    - users
+    - list
 
-- name: "Build linked user_id → current_role_key map"
+- name: "Build linked user_id -> current_role_key map"
   ansible.builtin.set_fact:
     _uid_to_role_key: >-
       {{
@@ -47,6 +55,10 @@
         )
       }}
   when: project_deploy_config.users_access is defined
+  tags:
+    - project_deploy
+    - users
+    - facts
 
 - name: "Notify missing usernames (skipping create/link)"
   ansible.builtin.debug:
@@ -55,6 +67,10 @@
   when:
     - project_deploy_config.users_access is defined
     - item.username not in _uname_to_id
+  tags:
+    - project_deploy
+    - users
+    - debug
 
 - name: "Link users not yet in project"
   ebdruplab.semaphoreui.project_user_create:
@@ -76,7 +92,11 @@
   when:
     - project_deploy_config.users_access is defined
     - item.username in _uname_to_id
-    - _uname_to_id[item.username] not in _uid_to_role_key.keys() | list
+    - _uname_to_id[item.username] not in (_uid_to_role_key.keys() | list)
+  tags:
+    - project_deploy
+    - users
+    - create
 
 - name: "Update role for already-linked users (only when different)"
   ebdruplab.semaphoreui.project_user_update:
@@ -103,8 +123,57 @@
     - item.username in _uname_to_id
     - _uname_to_id[item.username] in _uid_to_role_key
     - _desired_key != _current_key
+  tags:
+    - project_deploy
+    - users
+    - update
 
-- name: "Debug task show project users that are allready created (users)"
+- name: "Compute desired user_id set for pruning"
+  ansible.builtin.set_fact:
+    _desired_user_ids: >-
+      {{
+        project_deploy_config.users_access | default([])
+        | map(attribute='username')
+        | select('in', (_uname_to_id.keys() | list))
+        | map('extract', _uname_to_id)
+        | list
+      }}
+  when: project_deploy_config.users_access is defined
+  tags:
+    - project_deploy
+    - users
+    - facts
+
+- name: "Debug prune candidates (users)"
+  when: project_deploy_debug | bool
   ansible.builtin.debug:
-    var: _proj_users
-  when: project_deploy_debug
+    msg:
+      current_user_ids: "{{ (_proj_users.users | default([])) | map(attribute='id') | list }}"
+      desired_user_ids: "{{ _desired_user_ids | default([]) }}"
+      delete_ids: >-
+        {{
+          (_proj_users.users | default([]) | map(attribute='id') | list)
+          | difference(_desired_user_ids | default([]))
+        }}
+  tags:
+    - project_deploy
+    - users
+    - debug
+
+- name: "Delete project users not in desired list"
+  ebdruplab.semaphoreui.project_user_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ current_project_id }}"
+    user_id: "{{ item.id }}"
+  loop: "{{ _proj_users.users | default([]) }}"
+  loop_control:
+    label: "{{ item.id }}"
+  when:
+    - project_deploy_variable_delete | default(false) | bool
+    - item.id not in (_desired_user_ids | default([]))
+  tags:
+    - project_deploy
+    - users
+    - prune

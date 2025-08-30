@@ -1,0 +1,72 @@
+
+# SPDX-License-Identifier: MIT-0
+---
+- name: "Backup the project"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "vars/example_vars.yml"
+
+  tasks:
+    - name: "Backup flow"
+      block:
+        - name: "Login"
+          ebdruplab.semaphoreui.login:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            username: "{{ project_deploy_semaphore_username }}"
+            password: "{{ project_deploy_semaphore_password }}"
+          register: login_result
+          tags:
+            - auth
+            - login
+
+        - name: "Get all projects"
+          ebdruplab.semaphoreui.project_list:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          register: _all_projects
+          tags:
+            - projects
+            - list
+
+        - name: "Extract project ID for '{{ project_deploy_config.project.name }}'"
+          set_fact:
+            ebdruplab_example_project_id: >-
+              {{
+                (_all_projects.projects
+                  | selectattr('name', 'equalto', project_deploy_config.project.name)
+                  | list).0.id
+              }}
+          tags:
+            - projects
+            - id
+
+        - name: "Backup '{{ project_deploy_config.project.name }}' project"
+          ebdruplab.semaphoreui.project_backup:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ ebdruplab_example_project_id }}"
+          register: project_backup_result
+          tags:
+            - projects
+            - backup
+
+        - name: "Debug backup result"
+          debug:
+            var: project_backup_result
+          tags:
+            - projects
+            - debug
+
+      always:
+        - name: "Logout"
+          ebdruplab.semaphoreui.logout:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          tags:
+            - auth
+            - logout

@@ -221,7 +221,7 @@
   ansible.builtin.assert:
     that:
       - item.name is defined and item.name | length > 0
-      - item.type is defined and item.type in ['job']   # extend as your module supports
+      - item.type is defined and item.type in ['','job','build','deploy']   # extend as your module supports
       - item.playbook is defined and item.playbook | length > 0
       - item.repository_name is defined and item.repository_name | length > 0
       # Optional references by name; they’ll be resolved later

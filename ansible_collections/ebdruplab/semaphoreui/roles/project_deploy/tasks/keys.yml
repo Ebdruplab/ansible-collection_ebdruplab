@@ -1,6 +1,65 @@
 ---
+- name: "List Project Keys"
+  ebdruplab.semaphoreui.project_key_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _key_list
+  tags:
+    - project_deploy
+    - keys
+    - list
 
-- name: "Create project keys"
+- name: "Build Map: keys_by_name"
+  ansible.builtin.set_fact:
+    keys_by_name: >-
+      {{
+        dict(
+          (_key_list['keys'] | default([])) | map(attribute='name') | list
+          | zip((_key_list['keys'] | default([])) | map(attribute='id') | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - keys
+    - facts
+
+- name: "Compute Desired Keys Dict"
+  ansible.builtin.set_fact:
+    _desired_keys: "{{ (project_deploy_config['keys'] if (project_deploy_config is defined and project_deploy_config is mapping and 'keys' in project_deploy_config) else {}) }}"
+  tags:
+    - project_deploy
+    - keys
+    - facts
+
+- name: "Update Project Key By Name"
+  ebdruplab.semaphoreui.project_key_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    key_id: "{{ (keys_by_name[item.name] | int) }}"
+    name: "{{ item.name }}"
+    type: "{{ item.type }}"
+    ssh: "{{ item.ssh | default(omit) }}"
+    login_password: "{{ item.login_password | default(omit) }}"
+    override_secret: "{{ item.override_secret | default(true) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (keys_by_name | default({}))
+  loop: "{{ _desired_keys | dict2items | map(attribute='value') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - keys
+    - update
+
+- name: "Create Project Key When Missing"
   ebdruplab.semaphoreui.project_key_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -11,10 +70,40 @@
     type: "{{ item.type }}"
     ssh: "{{ item.ssh | default(omit) }}"
     login_password: "{{ item.login_password | default(omit) }}"
-  loop: "{{ project_deploy_config['keys'].values() }}"
-  register: created_keys_result
+    override_secret: "{{ item.override_secret | default(true) }}"
+  when: item.name not in (keys_by_name | default({}))
+  loop: "{{ _desired_keys | dict2items | map(attribute='value') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - keys
+    - create
 
-- name: "Set created keys fact"
+- name: "Refresh Project Keys List"
+  ebdruplab.semaphoreui.project_key_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _key_list_after
+  tags:
+    - project_deploy
+    - keys
+    - list
+
+- name: "Set Created Keys Fact"
   ansible.builtin.set_fact:
-    created_keys_by_name: "{{ created_keys_by_name | default({}) | combine({ item.item.name: item.key }) }}"
-  loop: "{{ created_keys_result.results }}"
+    created_keys_by_name: >-
+      {{
+        dict(
+          (_key_list_after['keys'] | default([])) | map(attribute='name') | list
+          | zip((_key_list_after['keys'] | default([])) | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - keys
+    - facts
