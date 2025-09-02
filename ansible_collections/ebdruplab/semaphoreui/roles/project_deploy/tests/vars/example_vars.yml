@@ -151,14 +151,12 @@ project_deploy_config:
       allow_override_branch_in_task: true
       allow_parallel_tasks: true
       suppress_success_alerts: false
-      prompt_inventory: false
-      prompt_limit: false
-      prompt_tags: false
-      prompt_skip_tags: false
-      prompt_vault_password: false
+      prompt_inventory: true
+      prompt_limit: true
+      prompt_tags: true
+      prompt_skip_tags: true
       prompt_arguments: false
-      prompt_branch: false
-      prompt_environment: false
+      prompt_branch: true
       task_params:
         allow_debug: true
         allow_override_inventory: true
@@ -166,22 +164,28 @@ project_deploy_config:
         allow_override_tags: true
         allow_override_skip_tags: true
       survey_vars:
+        - name: "release_version"
+          title: "Release version"
+          type: "string"
+          required: true
+          default_value: "1.0.0"
         - name: "targets"
           title: "What is our target?"
+          description: "The target"
           type: "string"
           required: true
           default_value: "localhost"
 
     job_example:
-      name: "Run Example Playbook"
-      type: "job"
-      playbook: "playbooks/pb-semaphore-example.yml"
+      name: "Example Playbook"
       inventory_name: "A repository Inventory"
       repository_name: "Repositorie Ebdruplab Demo"
       environment_name: "Test Environment"
-      view_title: ExamplePos_1
-      description: "Runs the example Ansible playbook"
+      type: "job"
+      playbook: "playbooks/pb-semaphore-example.yml"
       arguments: []
+      description: "Runs the example Ansible playbook"
+      view_title: ExamplePos_1
       git_branch: "main"
       limit: "localhost"
       tags:
@@ -216,11 +220,11 @@ project_deploy_config:
         - name: "batch_size"
           title: "Batch size"
           type: "int"
+          required: false
           default_value: 5
         - name: "api_key"
           title: "API key"
           type: "secret"
-          required: true
         - name: "env"
           title: "Environment"
           type: "enum"

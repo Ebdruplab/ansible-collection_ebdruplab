@@ -111,13 +111,11 @@
           item.playbook
           | default(templates_by_name_full[item.name].playbook | default(omit))
         }}
-
-      # IMPORTANT: For some Semaphore versions, 'job' is internally represented as empty string.
-      # We **keep** whatever type the existing template currently has to avoid mismatches,
-      # falling back to 'job' when neither side specifies it.
       type: >-
         {{
-          (item.type | default(templates_by_name_full[item.name].type | default('job')))
+          (item.type)
+          if (item.type is defined and item.type != 'job')
+          else ""
         }}
       description: "{{ item.description | default(omit) }}"
       git_branch: "{{ item.git_branch | default(omit) }}"
@@ -219,14 +217,11 @@
       name: "{{ item.name }}"
       app: "{{ item.app | default('ansible') }}"
       playbook: "{{ item.playbook }}"
-
-      # For CREATE: omit 'type' when 'job' to avoid older API issues that may reject '' for job.
-      # Always send for non-job types.
       type: >-
         {{
           (item.type)
           if (item.type is defined and item.type != 'job')
-          else omit
+          else ""
         }}
       description: "{{ item.description | default(omit) }}"
       git_branch: "{{ item.git_branch | default(omit) }}"
@@ -272,6 +267,7 @@
 
       # Template-level flags
       allow_override_args_in_task: "{{ item.allow_override_args_in_task | default(omit) }}"
+      autorun: "{{ item.autorun | default(omit) }}"
       allow_override_branch_in_task: "{{ item.allow_override_branch_in_task | default(omit) }}"
       allow_parallel_tasks: >-
         {{
