@@ -6,199 +6,260 @@
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
 import json
-
 DOCUMENTATION = r"""
 ---
 module: project_template_update
 short_description: Update a Semaphore template (job/deploy/build) with surveys, vaults, and task params
 version_added: "1.0.0"
 description:
-  - Updates an existing template in a specified Semaphore project.
-  - Ensures the body contains C(id) and C(project_id) matching the URL params.
-  - Coerces numeric identifiers to integers, normalizes C(arguments) to a JSON string, joins list-style tags with newlines, and prunes null fields.
-  - Supports C(task_params) (including list C(tags)), and validates/normalizes C(survey_vars).
-  - Accepts common aliases (camelCase & legacy names) and maps them to canonical API fields, e.g. C(allow_parallel_tasks) -> C(allow_parallel).
-  - For job templates (i.e. when C(type) is omitted, C(None), C(""), or C("job")), Semaphore does not accept C(task_params) or surveys; this module drops those to avoid API 400 errors.
-  - On update, C(vaults) entries can include C(id), C(name), C(type), C(vault_key_id), and C(script). If the list is empty or undefined, the field is omitted to avoid API errors.
+  - "Updates an existing template in a specified Semaphore project."
+  - "Ensures the body contains C(id) and C(project_id) matching the URL params."
+  - "Coerces numeric identifiers to integers, normalizes C(arguments) to a JSON string, joins list-style tags with newlines, and prunes null fields."
+  - "Supports C(task_params) (including list C(tags), C(skip_tags), C(limit)), and validates/normalizes C(survey_vars)."
+  - "Accepts common aliases (camelCase & legacy names) and maps them to canonical API fields, e.g. C(allow_parallel_tasks) -> C(allow_parallel)."
+  - "For job templates (i.e. when C(type) is omitted, C(None), C(\"\"), or C(\"job\")), Semaphore may reject C(task_params) and surveys; this module drops those to avoid API 400 errors."
+  - "On update, C(vaults) entries can include C(id), C(name), C(type), C(vault_key_id), and C(script). If the list is empty or undefined, the field is omitted to avoid API errors."
 
 options:
   host:
     description:
-      - Hostname or IP of the Semaphore server (including protocol).
-      - Example: C(http://localhost) or C(https://semaphore.example.com)
+      - "Hostname or IP of the Semaphore server (including protocol)."
+      - "Example: C(http://localhost) or C(https://semaphore.example.com)"
     type: str
     required: true
   port:
     description:
-      - Port of the Semaphore server (typically 3000).
+      - "Port of the Semaphore server (typically C(3000))."
     type: int
     required: true
   project_id:
     description:
-      - ID of the project the template belongs to.
+      - "ID of the project the template belongs to."
     type: int
     required: true
   template_id:
     description:
-      - ID of the template to update.
+      - "ID of the template to update."
     type: int
     required: true
   template:
     description:
-      - Template payload with updated fields.
+      - "Template payload with updated fields that should be applied to the existing template."
     type: dict
     required: true
     suboptions:
       name:
-        description: Template name.
+        description: "Human-readable template name."
         type: str
         required: true
       app:
-        description: Application type (e.g., C(ansible)).
+        description: "Application type (for example, C(ansible))."
         type: str
         required: true
       playbook:
-        description: Playbook path in the repository.
+        description: "Path to the playbook within the repository."
         type: str
         required: true
       id:
-        description: Template ID (will be set automatically to C(template_id)).
+        description: "Template ID; will be set automatically from C(template_id)."
         type: int
       project_id:
-        description: Project ID (will be set automatically to C(project_id)).
+        description: "Project ID; will be set automatically from C(project_id)."
         type: int
       repository_id:
-        description: Repository ID.
+        description: "Repository ID that the template uses."
         type: int
       inventory_id:
-        description: Inventory ID.
+        description: "Inventory ID used by the template."
         type: int
       environment_id:
-        description: Environment ID.
+        description: "Environment ID associated with the template."
         type: int
       view_id:
-        description: Board View ID.
+        description: "Board View ID used for organizing templates."
         type: int
       build_template_id:
-        description: Build template ID (for build pipelines).
+        description: "Build template ID used in build pipelines."
         type: int
       type:
-        description: One of C(job), C(deploy), C(build) or empty (job is represented as an empty string by the API).
+        description: "One of C(job), C(deploy), C(build) or empty string; API represents C(job) as an empty string."
         type: str
         choices: ["", "job", "deploy", "build"]
       description:
-        description: Human-friendly description.
+        description: "Human-friendly description for the template."
         type: str
       git_branch:
-        description: Git branch override.
+        description: "Default Git branch to use when running the template."
         type: str
       limit:
-        description: Ansible limit value.
+        description: "Ansible limit (string form) at template level."
         type: str
       tags:
-        description: Newline-delimited string of tags (list will be joined automatically).
+        description: "Newline-delimited string of tags; if a list is provided it will be joined with newlines."
         type: raw
       skip_tags:
-        description: Newline-delimited string of skip-tags (list will be joined automatically).
+        description: "Newline-delimited string of skip-tags; if a list is provided it will be joined with newlines."
         type: raw
       vault_password:
-        description: Ansible vault password (string value).
+        description: "Ansible Vault password value."
         type: str
       start_version:
-        description: Starting version (required by API for type C(build)).
+        description: "Starting version (required by API for C(type=build))."
         type: str
       allow_override_args_in_task:
-        description: Allow overriding arguments at task start.
+        description: "Allow overriding arguments at task start."
         type: bool
       allow_override_branch_in_task:
-        description: Allow overriding branch at task start.
+        description: "Allow overriding Git branch at task start."
         type: bool
       allow_parallel_tasks:
-        description: Alias accepted; will be sent as C(allow_parallel).
+        description: "Alias accepted by this module; will be sent to API as C(allow_parallel)."
         type: bool
       suppress_success_alerts:
-        description: Suppress success alerts.
+        description: "If true, suppress success alerts for tasks started from this template."
         type: bool
       autorun:
-        description: Auto-run newly created tasks.
+        description: "If true, automatically run newly created tasks for this template."
         type: bool
-      prompt_inventory: {type: bool}
-      prompt_limit: {type: bool}
-      prompt_tags: {type: bool}
-      prompt_skip_tags: {type: bool}
-      prompt_vault_password: {type: bool}
-      prompt_arguments: {type: bool}
-      prompt_branch: {type: bool}
-      prompt_environment: {type: bool}
+      prompt_inventory:
+        description: "Prompt for inventory when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_limit:
+        description: "Prompt for limit when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_tags:
+        description: "Prompt for tags when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_skip_tags:
+        description: "Prompt for skip-tags when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_vault_password:
+        description: "Prompt for Vault password when starting a task (often unsupported; sent for completeness)."
+        type: bool
+      prompt_arguments:
+        description: "Prompt for arguments when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_branch:
+        description: "Prompt for branch when starting a task (may be ignored by some servers)."
+        type: bool
+      prompt_environment:
+        description: "Prompt for environment when starting a task (often unsupported; sent for completeness)."
+        type: bool
       arguments:
         description:
-          - Arguments as the UI stores them (JSON string).
-          - Lists/dicts will be encoded; scalars wrapped into a single-element JSON list.
-          - Defaults to C("[]") when omitted/empty.
+          - "Arguments as the UI stores them (JSON string)."
+          - "Lists/dicts will be JSON-encoded; scalars are wrapped into a single-element JSON list."
+          - "Defaults to C(\"[]\") when omitted or empty."
         type: raw
       task_params:
         description:
-          - Task parameter overrides. Ignored for job templates (API limitation).
+          - "Task parameter overrides. For job templates, some servers reject this on update; the module may omit it."
         type: dict
         suboptions:
-          allow_debug: {type: bool}
-          allow_override_inventory: {type: bool}
-          allow_override_limit: {type: bool}
-          allow_override_tags: {type: bool}
-          allow_override_skip_tags: {type: bool}
+          allow_debug:
+            description: "Allow debug mode for tasks created from this template."
+            type: bool
+          allow_override_inventory:
+            description: "Allow overriding inventory at task start."
+            type: bool
+          allow_override_limit:
+            description: "Allow overriding limit at task start."
+            type: bool
+          allow_override_tags:
+            description: "Allow overriding tags at task start."
+            type: bool
+          allow_override_skip_tags:
+            description: "Allow overriding skip-tags at task start."
+            type: bool
           tags:
-            description: UI label tags for tasks.
-            type: list
-            elements: str
+            description: "Task-level labels; may be string (comma- or newline-delimited) or list of strings."
+            type: raw
+          skip_tags:
+            description: "Task-level skip-tags; may be string (comma- or newline-delimited) or list of strings."
+            type: raw
+          limit:
+            description: "Task-level limit hosts; may be string (comma- or newline-delimited) or list of strings."
+            type: raw
       vaults:
         description:
-          - List of vault references attached to the template.
-          - On update, you may include existing items by C(id) and/or specify new ones via C(vault_key_id).
+          - "List of vault references attached to the template."
+          - "On update, you may include existing items by C(id) and/or specify new ones via C(vault_key_id)."
         type: list
         elements: dict
         suboptions:
-          id: {type: int}
-          name: {type: str}
+          id:
+            description: "Existing vault attachment ID (when referring to an already attached item)."
+            type: int
+          name:
+            description: "Optional display name for the vault attachment."
+            type: str
           type:
-            description: Vault reference type.
+            description: "Vault reference type (password, key, or script)."
             type: str
             choices: [password, key, script]
             required: true
-          vault_key_id: {type: int}
-          script: {type: raw}
+          vault_key_id:
+            description: "ID of the vault key in Semaphore (required for password/key types when adding new attachments)."
+            type: int
+          script:
+            description: "Script content or reference (used when C(type=script)); server-specific behavior."
+            type: raw
       survey_vars:
         description:
-          - Survey definitions. API expects C(type) to be one of C(string), C(int), C(secret), or C(enum).
-          - This module accepts synonyms like C(integer)/C(number) and maps them to C(int).
+          - "Survey definitions shown when starting a task."
+          - "API expects C(type) to be one of C(string), C(int), C(secret), or C(enum). C(integer)/C(number) are mapped to C(int)."
         type: list
         elements: dict
         suboptions:
-          name: {type: str, required: true}
-          title: {type: str, required: true}
-          description: {type: str}
-          type: {type: str, choices: [string, int, secret, enum], required: true}
-          required: {type: bool, default: false}
-          default_value: {type: raw}
+          name:
+            description: "Internal variable name for the survey field."
+            type: str
+            required: true
+          title:
+            description: "Human-friendly label shown in the survey dialog."
+            type: str
+            required: true
+          description:
+            description: "Help text displayed under the field."
+            type: str
+          type:
+            description: "Field type for this survey variable."
+            type: str
+            choices: [string, int, secret, enum]
+            required: true
+          required:
+            description: "Whether the value must be provided by the user."
+            type: bool
+            default: false
+          default_value:
+            description: "Default value for the field (not used for C(secret) fields)."
+            type: raw
           values:
-            description: Only for C(enum); list of name/value pairs.
+            description: "Only for C(enum) fields; list of selectable name/value pairs."
             type: list
             elements: dict
             suboptions:
-              name: {type: str, required: true}
-              value: {type: raw, required: true}
+              name:
+                description: "Display name for the enum option."
+                type: str
+                required: true
+              value:
+                description: "Submitted value for the enum option."
+                type: raw
+                required: true
 
   session_cookie:
-    description: Session cookie for authentication.
+    description: "Session cookie for authentication."
     type: str
     required: false
     no_log: true
   api_token:
-    description: API token for authentication.
+    description: "API token for authentication."
     type: str
     required: false
     no_log: true
   validate_certs:
-    description: Whether to validate TLS certificates.
+    description: "Whether to validate TLS certificates."
     type: bool
     default: true
 
@@ -206,9 +267,138 @@ author:
   - "Kristian Ebdrup (@kris9854)"
 """
 
+
+
 EXAMPLES = r"""
-# (omitted for brevity; same usage as before)
+- name: Update a JOB template (type is empty string), set prompts & tags
+  ebdruplab.semaphoreui.project_template_update:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template_id: 223
+    template:
+      name: "Example Playbook"
+      app: "ansible"
+      playbook: "playbooks/pb-semaphore-example.yml"
+      type: ""                     # job -> API uses empty string
+      description: "Updated description"
+      git_branch: "main"
+      limit: "localhost"
+      tags: ["setup", "init"]      # will be joined into newline-separated string
+      skip_tags: ["db"]
+      allow_parallel_tasks: true   # alias; module sends as allow_parallel
+      prompt_inventory: true
+      prompt_limit: true
+      prompt_tags: true
+      prompt_skip_tags: true
+      prompt_arguments: true
+      prompt_branch: true
+  register: update_job
+
+
+- name: Update a DEPLOY template with task_params and surveys
+  ebdruplab.semaphoreui.project_template_update:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template_id: 224
+    template:
+      name: "Deploy Service"
+      app: "ansible"
+      playbook: "playbooks/deploy.yml"
+      type: "deploy"
+      description: "Deploys the service"
+      git_branch: "release"
+      tags: ["deploy", "web"]
+      task_params:
+        allow_debug: true
+        allow_override_inventory: false
+        allow_override_limit: false
+        allow_override_tags: false
+        allow_override_skip_tags: false
+        tags: ["canary", "blue-green"]   # task-level labels
+        skip_tags: "db,cache"            # string accepted; module normalizes
+        limit: ["web01", "web02"]        # string/list accepted; module normalizes
+      survey_vars:
+        - name: "target_env"
+          title: "Target environment"
+          type: "enum"
+          required: true
+          values:
+            - { name: "dev",  value: "dev" }
+            - { name: "prod", value: "prod" }
+  register: update_deploy
+
+
+- name: Update a BUILD template with start_version and vaults
+  ebdruplab.semaphoreui.project_template_update:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template_id: 225
+    template:
+      name: "Build Artifact"
+      app: "ansible"
+      playbook: "playbooks/build.yml"
+      type: "build"
+      description: "Builds the application artifact"
+      start_version: "1.0.0.1"
+      git_branch: "release"
+      arguments: '["--no-cache"]'        # JSON string or list accepted
+      tags: "ci\nbuild"                  # already newline-delimited
+      vaults:
+        - id: 555                        # keep existing vault attachment
+          type: password
+          name: "Existing Project Vault"
+        - type: password                 # add a new vault attachment
+          vault_key_id: 469
+          name: "Project Vault Password"
+        - type: script                   # script-style attachment (server-specific behavior)
+          name: "extension-client"
+          script: "extension-client"
+  register: update_build
+
+
+- name: Update using API token instead of session cookie (minimal patch)
+  ebdruplab.semaphoreui.project_template_update:
+    host: https://semaphore.example.com
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
+    project_id: 55
+    template_id: 226
+    template:
+      name: "Ops Playbook"
+      app: "ansible"
+      playbook: "playbooks/ops.yml"
+      tags: ["ops", "maintenance"]
+      skip_tags: "slow,expensive"
+  register: update_token_auth
+
+
+- name: Update with camelCase aliases (module maps to canonical API fields)
+  ebdruplab.semaphoreui.project_template_update:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template_id: 227
+    template:
+      name: "Example With Aliases"
+      app: "ansible"
+      playbook: "playbooks/pb.yml"
+      type: ""
+      allowParallelTasks: true          # alias of allow_parallel
+      gitBranch: "main"                 # alias of git_branch
+      taskParams:                       # alias of task_params (ignored for job type)
+        allowDebug: true
+        tagsList: ["audit"]
+      surveyVars:                       # alias of survey_vars (ignored for job type)
+        - { name: "release_version", title: "Release version", type: "string", default: "1.0.0" }
 """
+
 
 RETURN = r"""
 template:
@@ -273,11 +463,30 @@ def _normalize_arguments(v):
     return json.dumps([str(v)])
 
 def _normalize_tag_block(v):
+    """
+    Accept list or string and normalize to newline-delimited string as expected by the API.
+    Strings with commas are split, whitespace is trimmed, and empty entries removed.
+    """
     if v is None:
         return None
     if isinstance(v, (list, tuple)):
-        return "\n".join([str(x) for x in v])
-    return str(v)
+        items = [str(x).strip() for x in v if str(x).strip()]
+    else:
+        text = str(v).replace(",", "\n")
+        items = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    return "\n".join(items) if items else None
+
+def _split_to_list(v):
+    """
+    Accept list or string and normalize to list[str].
+    For strings, split on commas and newlines, trim whitespace, drop empties.
+    """
+    if v is None:
+        return []
+    if isinstance(v, (list, tuple)):
+        return [str(x).strip() for x in v if str(x).strip()]
+    text = str(v).replace(",", "\n")
+    return [ln.strip() for ln in text.splitlines() if ln.strip()]
 
 def _normalize_task_params(tp):
     if not isinstance(tp, dict):
@@ -291,6 +500,8 @@ def _normalize_task_params(tp):
         "allow_override_tags": ["allowOverrideTags"],
         "allow_override_skip_tags": ["allowOverrideSkipTags"],
         "tags": ["tagList", "tags_list", "tagsList"],
+        "skip_tags": ["skipTags"],
+        "limit": ["hosts", "hostList", "limits"],
     }
     for canon, aliases in tp_alias_map.items():
         for a in aliases:
@@ -303,14 +514,26 @@ def _normalize_task_params(tp):
         "allow_override_limit": bool(tp.get("allow_override_limit", False)),
         "allow_override_tags": bool(tp.get("allow_override_tags", False)),
         "allow_override_skip_tags": bool(tp.get("allow_override_skip_tags", False)),
-        "tags": [],
+        "tags": _split_to_list(tp.get("tags")),
+        "skip_tags": _split_to_list(tp.get("skip_tags")),
+        "limit": _split_to_list(tp.get("limit")),
     }
-    tags = tp.get("tags", [])
-    if isinstance(tags, str):
-        out["tags"] = [t for t in (x.strip() for x in tags.split(",")) if t]
-    elif isinstance(tags, list):
-        out["tags"] = [str(t) for t in tags]
     return out
+
+def _merge_template_blocks_into_task_params(tpl):
+    """
+    If template-level limit/tags/skip_tags exist, ensure task_params has list-form defaults.
+    This helps when servers only respect list-style values under task_params.
+    """
+    tp = _normalize_task_params(tpl.get("task_params") or {})
+    # Only inject when missing/empty
+    if not tp.get("limit"):
+        tp["limit"] = _split_to_list(tpl.get("limit"))
+    if not tp.get("tags"):
+        tp["tags"] = _split_to_list(tpl.get("tags"))
+    if not tp.get("skip_tags"):
+        tp["skip_tags"] = _split_to_list(tpl.get("skip_tags"))
+    return tp
 
 def _validate_and_normalize_surveys(svars, module):
     if svars is None:
@@ -342,19 +565,22 @@ def _validate_and_normalize_surveys(svars, module):
         desc = sv.get("description", "")
         default_value = sv.get("default_value", None)
 
+        values = None
         if stype_l == "int":
+            # Many server builds store int defaults as STRING values (e.g., "5"), not numeric.
             if default_value is not None:
                 try:
-                    default_value = int(default_value)
+                    default_value = str(int(default_value))
                 except Exception:
                     module.fail_json(msg=f"survey_vars[{idx}].default_value must be integer-compatible")
-            values = None
-        elif stype_l in ("string", "secret"):
+        elif stype_l == "string":
             if default_value is not None and not isinstance(default_value, (str, int, float)):
                 module.fail_json(msg=f"survey_vars[{idx}].default_value must be scalar")
             if isinstance(default_value, (int, float)):
                 default_value = str(default_value)
-            values = None
+        elif stype_l == "secret":
+            # server rejects defaults for secret — drop it entirely
+            default_value = None
         else:  # enum
             values = sv.get("values", [])
             if not isinstance(values, list) or len(values) == 0:
@@ -489,6 +715,8 @@ def _apply_aliases(tpl):
             "allow_override_tags": ["allowOverrideTags"],
             "allow_override_skip_tags": ["allowOverrideSkipTags"],
             "tags": ["tagList", "tags_list", "tagsList"],
+            "skip_tags": ["skipTags"],
+            "limit": ["hosts", "hostList", "limits"],
         }
         for canon, aliases in tp_alias_map.items():
             for a in aliases:
@@ -555,7 +783,7 @@ def main():
         module.fail_json(msg="template.type must be one of '', job, deploy, build (or omit/None).")
     tpl['type'] = norm_type  # "" for job
 
-    # Arguments & tag blocks
+    # Arguments & tag blocks (template-level)
     tpl['arguments'] = _normalize_arguments(tpl.get('arguments'))
 
     if 'tags' in tpl:
@@ -572,9 +800,25 @@ def main():
         else:
             tpl.pop('skip_tags', None)
 
-    # task_params
+    if 'limit' in tpl and tpl['limit'] is not None:
+        # keep as plain string for the template; task_params will get list form
+        tpl['limit'] = str(tpl['limit'])
+
+    # task_params (ensure list-form tags/skip_tags/limit)
+    # NOTE: many servers only respect list-style values inside task_params during runs.
     if 'task_params' in tpl:
-        tpl['task_params'] = _normalize_task_params(tpl.get('task_params'))
+        tpl['task_params'] = _merge_template_blocks_into_task_params(tpl)
+    else:
+        # If user didn't pass task_params, still derive them from template-level blocks so they stick.
+        derived_tp = _merge_template_blocks_into_task_params(tpl)
+        # only include if any list is non-empty or any allow_* flag is present
+        if any(derived_tp.get(k) for k in ('tags', 'skip_tags', 'limit')) or any(
+            derived_tp.get(k) for k in (
+                'allow_debug','allow_override_inventory','allow_override_limit',
+                'allow_override_tags','allow_override_skip_tags'
+            )
+        ):
+            tpl['task_params'] = derived_tp
 
     # survey_vars (validate & normalize)
     if 'survey_vars' in tpl:
@@ -626,9 +870,8 @@ def main():
     # IMPORTANT: job-type quirks
     if tpl.get('type', '') == "":
         tpl.pop('task_params', None)
-        tpl.pop('survey_vars', None)  # job templates reject surveys
-        # keep allow_parallel (API represents job as "" but accepts allow_parallel), but ensure legacy alias is gone
-        tpl.pop('allow_parallel_tasks', None)
+        tpl.pop('survey_vars', None)  # some servers reject surveys for job-type on update
+        # keep allow_parallel (API represents job as "" but accepts allow_parallel)
 
     tpl = _prune_nones(tpl)
 

@@ -50,15 +50,19 @@ options:
       name:
         type: str
         required: true
+        description: Human-readable name of the repository.
       git_url:
         type: str
         required: true
+        description: Git URL for the repository (SSH or HTTPS).
       git_branch:
         type: str
         required: true
+        description: Default branch to use when running tasks (e.g., C(main)).
       ssh_key_id:
         type: int
         required: true
+        description: ID of the SSH key stored in Semaphore to use for Git access.
   validate_certs:
     type: bool
     default: true

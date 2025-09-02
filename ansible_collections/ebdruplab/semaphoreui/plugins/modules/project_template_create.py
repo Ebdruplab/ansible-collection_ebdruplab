@@ -21,111 +21,224 @@ description:
   - C(prompt_*) flags are not honored by the create endpoint on some servers; this module applies them with a follow-up PUT.
   - Normalizes integers, JSON arguments, tag lists (list or string -> newline string), and survey defs (drop defaults for secret).
 options:
-  host: {type: str, required: true}
-  port: {type: int, required: true}
-  project_id: {type: int, required: true}
+  host:
+    type: str
+    required: true
+    description: Hostname or IP of the Semaphore server, including the scheme (e.g., C(http://localhost)).
+  port:
+    type: int
+    required: true
+    description: TCP port where Semaphore is listening (typically C(3000)).
+  project_id:
+    type: int
+    required: true
+    description: ID of the Semaphore project in which to create the template.
   template:
     type: dict
     required: true
+    description: Template definition to create.
     suboptions:
-      name: {type: str, required: true}
-      app: {type: str, description: "Application type. Usually 'ansible'. Defaults to ansible."}
-      playbook: {type: str, required: true}
-      repository_id: {type: int, required: true}
-      inventory_id: {type: int, required: true}
-      environment_id: {type: int}
-      view_id: {type: int}
-      build_template_id: {type: int}
+      name:
+        type: str
+        required: true
+        description: Human-friendly name of the template.
+      app:
+        type: str
+        description: Application type; usually C(ansible). If omitted, C(ansible) is assumed.
+      playbook:
+        type: str
+        required: true
+        description: Path to the playbook within the repository.
+      repository_id:
+        type: int
+        required: true
+        description: Repository ID that contains the playbook.
+      inventory_id:
+        type: int
+        required: true
+        description: Inventory ID to use when running the template.
+      environment_id:
+        type: int
+        description: Environment ID associated with the template (optional).
+      view_id:
+        type: int
+        description: Board view ID for grouping templates (optional).
+      build_template_id:
+        type: int
+        description: Build template ID used by pipelines (optional; mainly for build flows).
       type:
         type: str
         choices: [job, deploy, build, ""]
-        description: "Omit/empty for job (API uses empty string)."
-      description: {type: str}
-      git_branch: {type: str}
+        description: Template kind. Use empty string or omit for C(job); use C(deploy) or C(build) otherwise.
+      description:
+        type: str
+        description: Free-form human-readable description of the template.
+      git_branch:
+        type: str
+        description: Default Git branch to use when running this template.
       arguments:
         type: raw
         description:
-          - JSON string as stored by UI.
-          - Lists/dicts encoded to JSON; scalars wrapped into a one-element JSON list.
-          - Defaults to "[]".
-      allow_override_args_in_task: {type: bool}
-      allow_override_branch_in_task: {type: bool}
-      allow_parallel_tasks: {type: bool}
-      suppress_success_alerts: {type: bool}
-      autorun: {type: bool}
-      limit: {type: str}
+          - Arguments as stored by the UI (JSON string).
+          - Lists/dicts are JSON-encoded; scalars are wrapped into a one-element JSON list.
+          - Defaults to C("[]") when omitted or empty.
+      allow_override_args_in_task:
+        type: bool
+        description: Whether the task start dialog may override arguments for this template.
+      allow_override_branch_in_task:
+        type: bool
+        description: Whether the task start dialog may override the Git branch.
+      allow_parallel_tasks:
+        type: bool
+        description: Whether multiple tasks from this template can run in parallel.
+      suppress_success_alerts:
+        type: bool
+        description: If true, suppresses success alerts for tasks started from this template.
+      autorun:
+        type: bool
+        description: If true, tasks created from this template will auto-start.
+      limit:
+        type: str
+        description: Ansible limit expression (string form) applied at template level.
       tags:
         type: raw
-        description: "Template tags (list or string). Lists -> newline-separated string."
+        description: Template tags; may be a list or string. Lists are joined with newlines for API compatibility.
       skip_tags:
         type: raw
-        description: "Template skip-tags (list or string). Lists -> newline-separated string."
-      vault_password: {type: str}
-      start_version: {type: str, description: "Required for type=build (create only)."}
-      # You may pass prompt_* in input; they will be applied via PUT after create.
-      prompt_inventory: {type: bool}
-      prompt_limit: {type: bool}
-      prompt_tags: {type: bool}
-      prompt_skip_tags: {type: bool}
-      prompt_arguments: {type: bool}
-      prompt_branch: {type: bool}
-      # Some servers don't support these two at all; we ignore them if present.
-      prompt_vault_password: {type: bool}
-      prompt_environment: {type: bool}
+        description: Template skip-tags; may be a list or string. Lists are joined with newlines for API compatibility.
+      vault_password:
+        type: str
+        description: Ansible Vault password string (if applicable).
+      start_version:
+        type: str
+        description: Required by API when C(type=build); starting version value for build templates.
+      prompt_inventory:
+        type: bool
+        description: If true, prompt for inventory at task start (applied by a follow-up PUT on some servers).
+      prompt_limit:
+        type: bool
+        description: If true, prompt for limit at task start (applied by a follow-up PUT on some servers).
+      prompt_tags:
+        type: bool
+        description: If true, prompt for tags at task start (applied by a follow-up PUT on some servers).
+      prompt_skip_tags:
+        type: bool
+        description: If true, prompt for skip-tags at task start (applied by a follow-up PUT on some servers).
+      prompt_arguments:
+        type: bool
+        description: If true, prompt for arguments at task start (applied by a follow-up PUT on some servers).
+      prompt_branch:
+        type: bool
+        description: If true, prompt for branch at task start (applied by a follow-up PUT on some servers).
+      prompt_vault_password:
+        type: bool
+        description: Some servers do not support prompting for the Vault password; included for completeness but may be ignored.
+      prompt_environment:
+        type: bool
+        description: Some servers do not support prompting for environment; included for completeness but may be ignored.
       task_params:
         type: dict
-        description: >
-          Task parameter overrides. Server accepts allow_debug (even for job on many builds),
-          allow_override_* flags, plus list-style limit/tags/skip_tags.
+        description: Task parameter overrides for tasks created from this template.
         suboptions:
-          allow_debug: {type: bool}
-          allow_override_inventory: {type: bool}
-          allow_override_limit: {type: bool}
-          allow_override_tags: {type: bool}
-          allow_override_skip_tags: {type: bool}
+          allow_debug:
+            type: bool
+            description: If true, allows debug mode for tasks (some servers reject this at create time for job templates).
+          allow_override_inventory:
+            type: bool
+            description: Allow the task start dialog to override the inventory.
+          allow_override_limit:
+            type: bool
+            description: Allow the task start dialog to override the limit.
+          allow_override_tags:
+            type: bool
+            description: Allow the task start dialog to override tags.
+          allow_override_skip_tags:
+            type: bool
+            description: Allow the task start dialog to override skip-tags.
           tags:
             type: raw
-            description: "List or string; normalized to a list of strings."
+            description: List or string of task-level tags; normalized to a list of strings in the request.
           skip_tags:
             type: raw
-            description: "List or string; normalized to a list of strings."
+            description: List or string of task-level skip-tags; normalized to a list of strings in the request.
           limit:
             type: raw
-            description: "List or string; normalized to a list of strings."
+            description: List or string of task-level limit hosts; normalized to a list of strings in the request.
       survey_vars:
         type: list
         elements: dict
+        description: Survey variable definitions displayed when starting a task.
         suboptions:
-          name: {type: str, required: true}
-          title: {type: str, required: true}
+          name:
+            type: str
+            required: true
+            description: Internal variable name used in the survey payload.
+          title:
+            type: str
+            required: true
+            description: Human-friendly label shown in the survey UI.
           type:
             type: str
             choices: [string, int, secret, enum]
             required: true
-          description: {type: str}
-          required: {type: bool, default: false}
-          default_value: {type: raw}
+            description: Field type for this survey variable.
+          description:
+            type: str
+            description: Help text shown under the field in the survey dialog.
+          required:
+            type: bool
+            default: false
+            description: Whether the field must be provided by the user.
+          default_value:
+            type: raw
+            description: Default value for the field (not used for C(secret) types).
           values:
             type: list
             elements: dict
-            description: "Only for enum"
+            description: Only for C(enum) type; list of selectable name/value pairs.
             suboptions:
-              name: {type: str, required: true}
-              value: {type: raw, required: true}
+              name:
+                type: str
+                required: true
+                description: Display name for the enum option.
+              value:
+                type: raw
+                required: true
+                description: Submitted value for the enum option.
       vaults:
         type: list
         elements: dict
         description:
-          - Provide C(vault_key_id) for password/key attachments. Script entries may omit it.
+          - Vault references to attach to the template. Provide C(vault_key_id) for password/key entries; script entries may omit it.
         suboptions:
-          type: {type: str, choices: [password, key, script], required: true}
-          vault_key_id: {type: int}
-          name: {type: str}
-          script: {type: raw}
-  session_cookie: {type: str, no_log: true}
-  api_token: {type: str, no_log: true}
-  validate_certs: {type: bool, default: true}
-author: ["Kristian Ebdrup (@kris9854)"]
+          type:
+            type: str
+            choices: [password, key, script]
+            required: true
+            description: Type of vault reference to attach.
+          vault_key_id:
+            type: int
+            description: ID of the vault key in Semaphore (required for password/key types).
+          name:
+            type: str
+            description: Optional display name for the vault attachment.
+          script:
+            type: raw
+            description: Script content/name for C(script) type entries (server dependent).
+  session_cookie:
+    type: str
+    no_log: true
+    description: Session cookie for authentication (alternative to C(api_token)).
+  api_token:
+    type: str
+    no_log: true
+    description: API token for authentication (alternative to C(session_cookie)).
+  validate_certs:
+    type: bool
+    default: true
+    description: Whether to validate TLS certificates for HTTPS connections.
+author:
+  - "Kristian Ebdrup (@kris9854)"
 '''
 
 EXAMPLES = r'''
@@ -181,14 +294,17 @@ EXAMPLES = r'''
 
 RETURN = r'''
 template:
-  description: Created template object (as returned by API).
+  description: Created template object as returned by the API.
   type: dict
+  returned: success
 status:
-  description: HTTP status code.
+  description: HTTP status code from the API.
   type: int
+  returned: always
 attempts:
-  description: Payloads tried (create + optional fallbacks + optional prompt update).
+  description: List of payloads tried (create, any fallbacks, and optional prompt update).
   type: list
+  returned: success
 '''
 
 TYPE_NORMALIZE = {
