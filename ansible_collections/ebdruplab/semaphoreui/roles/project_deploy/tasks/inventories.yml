@@ -1,6 +1,74 @@
 ---
+- name: "List Project Inventories"
+  ebdruplab.semaphoreui.project_inventory_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _inv_list
+  tags:
+    - project_deploy
+    - inventories
+    - list
 
-- name: "Create inventories"
+- name: "Build Map: inventories_by_name"
+  ansible.builtin.set_fact:
+    inventories_by_name: "{{ dict((_inv_list['inventories'] | default([])) | map(attribute='name') | zip((_inv_list['inventories'] | default([])) | map(attribute='id'))) }}"
+  tags:
+    - project_deploy
+    - inventories
+    - facts
+
+- name: "Compute Desired Inventories Dict"
+  ansible.builtin.set_fact:
+    _desired_inventories: "{{ (project_deploy_config['inventories'] if (project_deploy_config is defined and project_deploy_config is mapping and 'inventories' in project_deploy_config) else {}) }}"
+  tags:
+    - project_deploy
+    - inventories
+    - facts
+
+- name: "Update Project Inventory By Name"
+  ebdruplab.semaphoreui.project_inventory_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    inventory_id: "{{ inventories_by_name[item.name] }}"
+    inventory:
+      name: "{{ item.name }}"
+      type: "{{ item.type }}"
+      repository_id: >-
+        {{
+          created_repos_by_name[item.repository_name].id
+          if (item.repository_name is defined and created_repos_by_name is defined and item.repository_name in created_repos_by_name)
+          else (item.repository_id | default(omit))
+        }}
+      inventory_file: "{{ item.inventory_file | default(omit) }}"
+      ssh_key_id: >-
+        {{
+          created_keys_by_name[item.ssh_key_name].id
+          if (item.ssh_key_name is defined and created_keys_by_name is defined and item.ssh_key_name in created_keys_by_name)
+          else (item.ssh_key_id | default(omit))
+        }}
+      become_key_id: >-
+        {{
+          created_keys_by_name[item.become_key_name].id
+          if (item.become_key_name is defined and created_keys_by_name is defined and item.become_key_name in created_keys_by_name)
+          else (item.become_key_id | default(omit))
+        }}
+      inventory: "{{ item.inventory | default(omit) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (inventories_by_name | default({}))
+  loop: "{{ _desired_inventories | dict2items | map(attribute='value') | list }}"
+  tags:
+    - project_deploy
+    - inventories
+    - update
+
+- name: "Create Project Inventory When Missing"
   ebdruplab.semaphoreui.project_inventory_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -10,24 +78,50 @@
     inventory:
       name: "{{ item.name }}"
       type: "{{ item.type }}"
-      repository_id: "{{ created_repos_by_name[item.repository_name].id
-                   if item.repository_name is defined
-                   else omit }}"
-      inventory_file: "{{ item.inventory_file if item.inventory_file is defined | default(omit) }}"
+      repository_id: >-
+        {{
+          created_repos_by_name[item.repository_name].id
+          if (item.repository_name is defined and created_repos_by_name is defined and item.repository_name in created_repos_by_name)
+          else (item.repository_id | default(omit))
+        }}
+      inventory_file: "{{ item.inventory_file | default(omit) }}"
+      ssh_key_id: >-
+        {{
+          created_keys_by_name[item.ssh_key_name].id
+          if (item.ssh_key_name is defined and created_keys_by_name is defined and item.ssh_key_name in created_keys_by_name)
+          else (item.ssh_key_id | default(omit))
+        }}
+      become_key_id: >-
+        {{
+          created_keys_by_name[item.become_key_name].id
+          if (item.become_key_name is defined and created_keys_by_name is defined and item.become_key_name in created_keys_by_name)
+          else (item.become_key_id | default(omit))
+        }}
       inventory: "{{ item.inventory | default(omit) }}"
-      ssh_key_id: "{{ created_keys_by_name[item.ssh_key_name].id }}"
-      become_key_id: "{{ created_keys_by_name[item.become_key_name].id
-                   if item.become_key_name is defined
-                   else omit }}"
-  loop: "{{ project_deploy_config['inventories'].values() }}"
-  register: created_inventory_result
+  when: item.name not in (inventories_by_name | default({}))
+  loop: "{{ _desired_inventories | dict2items | map(attribute='value') | list }}"
+  tags:
+    - project_deploy
+    - inventories
+    - create
 
-- name: "Set created inventories fact"
+- name: "Refresh Project Inventories List"
+  ebdruplab.semaphoreui.project_inventory_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _inv_list_after
+  tags:
+    - project_deploy
+    - inventories
+    - list
+
+- name: "Set Created Inventories Fact"
   ansible.builtin.set_fact:
-    created_inventory_by_name: "{{ created_inventory_by_name | default({}) | combine({ item.item.name: item.inventory }) }}"
-  loop: "{{ created_inventory_result.results }}"
-
-- name: "Debug task (inventories)"
-  ansible.builtin.debug:
-    var: created_inventory_by_name
-  when: project_deploy_debug
+    created_inventory_by_name: "{{ dict((_inv_list_after['inventories'] | default([])) | map(attribute='name') | zip((_inv_list_after['inventories'] | default([])))) }}"
+  tags:
+    - project_deploy
+    - inventories
+    - facts

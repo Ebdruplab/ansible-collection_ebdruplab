@@ -14,6 +14,9 @@ project_deploy_force_project_creation: false
 # Will find the project named xyz and just recreate everything
 project_deploy_force_project_update: false
 
+# Delete variables not present in our YAML (env.extra_variables/env/env.json)
+project_deploy_variable_delete: false
+
 # If set to true it will delete a project named the given name
 project_deploy_force_project_delete: false
 # A timer for what to wait before deleting the project so a user can interrupt the play
@@ -37,3 +40,4 @@ project_deploy_config:
   environments: []
   templates: []
   schedules: []
+  integrations: []

@@ -1,0 +1,312 @@
+---
+- name: "List Project Integrations"
+  ebdruplab.semaphoreui.project_integration_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _int_list
+  tags:
+    - project_deploy
+    - integrations
+    - list
+
+- name: "Build Maps: integrations_by_name & integrations_by_name_full"
+  ansible.builtin.set_fact:
+    integrations_by_name: >-
+      {{
+        dict(
+          (_int_list.integrations | default([])) | map(attribute='name') | list
+          | zip((_int_list.integrations | default([])) | map(attribute='id') | list)
+        )
+      }}
+    integrations_by_name_full: >-
+      {{
+        dict(
+          (_int_list.integrations | default([])) | map(attribute='name') | list
+          | zip((_int_list.integrations | default([])) | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "List Project Templates (for integration template_id resolution)"
+  ebdruplab.semaphoreui.project_template_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _tpl_list_for_integrations
+  tags:
+    - project_deploy
+    - integrations
+    - list
+
+- name: "Build Map: templates_by_name_api"
+  ansible.builtin.set_fact:
+    templates_by_name_api: >-
+      {{
+        dict(
+          (_tpl_list_for_integrations.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list_for_integrations.templates | default([])) | map(attribute='id') | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "Build Map: templates_by_name_created (from earlier tasks)"
+  ansible.builtin.set_fact:
+    templates_by_name_created: >-
+      {{
+        created_templates_by_name is defined
+          | ternary(
+              dict(
+                (created_templates_by_name | default({})) | dict2items | map(attribute='key') | list
+                | zip((created_templates_by_name | default({})) | dict2items | map(attribute='value') | map(attribute='id') | list)
+              ),
+              {}
+            )
+      }}
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "Combine Template Maps"
+  ansible.builtin.set_fact:
+    templates_by_name_all: "{{ (templates_by_name_created | default({})) | combine(templates_by_name_api | default({})) }}"
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "Compute Desired Integrations List"
+  ansible.builtin.set_fact:
+    _desired_integrations: "{{ project_deploy_config.integrations | default({}) | dict2items | map(attribute='value') | list }}"
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "Debug (integrations maps)"
+  when: project_deploy_debug | bool
+  ansible.builtin.debug:
+    msg:
+      desired_integrations: "{{ _desired_integrations | map(attribute='name') | list }}"
+      known_templates: "{{ (templates_by_name_all | default({})).keys() | list }}"
+      existing_integrations: "{{ integrations_by_name | default({}) }}"
+      raw_list_result: "{{ _int_list }}"
+  tags:
+    - project_deploy
+    - integrations
+    - debug
+
+- name: "Debug integration payload (update)"
+  when:
+    - project_deploy_debug | bool
+    - project_deploy_force_project_update | bool
+  ansible.builtin.debug:
+    msg:
+      will_update: "{{ item.name if (item.name in (integrations_by_name | default({}))) else 'skip' }}"
+      template_id_resolved: >-
+        {{
+          (item.template_id | default('unset'))
+          if (item.template_id is defined)
+          else (
+            (templates_by_name_all[item.template_name] | default('unset'))
+            if (item.template_name is defined) else 'unset'
+          )
+        }}
+      auth_secret_resolved: >-
+        {{
+          (item.auth_secret_id | default('unset'))
+          if (item.auth_secret_id is defined)
+          else (
+            (created_keys_by_name[item.auth_secret_name].id | default('unset'))
+            if (item.auth_secret_name is defined and created_keys_by_name is defined and item.auth_secret_name in created_keys_by_name)
+            else 'unset'
+          )
+        }}
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - integrations
+    - debug
+
+- name: "Update Project Integration By Name"
+  ebdruplab.semaphoreui.project_integration_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ integrations_by_name[item.name] | int }}"
+    integration:
+      name: "{{ item.name }}"
+      template_id: >-
+        {{
+          (item.template_id | int)
+          if (item.template_id is defined)
+          else (
+            (templates_by_name_all[item.template_name] | int)
+            if (item.template_name is defined and (item.template_name in (templates_by_name_all | default({}))))
+            else (integrations_by_name_full[item.name].template_id | int)
+          )
+        }}
+      auth_method: "{{ item.auth_method | default(omit) }}"
+      auth_header: "{{ item.auth_header | default(omit) }}"
+      auth_secret_id: >-
+        {{
+          (item.auth_secret_id | int)
+          if (item.auth_secret_id is defined)
+          else (
+            created_keys_by_name[item.auth_secret_name].id | int
+            if (item.auth_secret_name is defined and created_keys_by_name is defined and (item.auth_secret_name in created_keys_by_name))
+            else omit
+          )
+        }}
+      task_params:
+        diff: "{{ item.task_params.diff | default(false) }}"
+        dry_run: "{{ item.task_params.dry_run | default(false) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (integrations_by_name | default({}))
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - integrations
+    - update
+
+- name: "Debug integration payload (create)"
+  when:
+    - project_deploy_debug | bool
+  ansible.builtin.debug:
+    msg:
+      will_create: "{{ item.name if (item.name not in (integrations_by_name | default({}))) else 'skip' }}"
+      template_id_resolved: >-
+        {{
+          (item.template_id | default('unset'))
+          if (item.template_id is defined)
+          else (
+            (templates_by_name_all[item.template_name] | default('unset'))
+            if (item.template_name is defined) else 'unset'
+          )
+        }}
+      auth_secret_resolved: >-
+        {{
+          (item.auth_secret_id | default('unset'))
+          if (item.auth_secret_id is defined)
+          else (
+            (created_keys_by_name[item.auth_secret_name].id | default('unset'))
+            if (item.auth_secret_name is defined and created_keys_by_name is defined and item.auth_secret_name in created_keys_by_name)
+            else 'unset'
+          )
+        }}
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - integrations
+    - debug
+
+- name: "Create Project Integration When Missing"
+  ebdruplab.semaphoreui.project_integration_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration:
+      name: "{{ item.name }}"
+      template_id: >-
+        {{
+          (item.template_id | int)
+          if (item.template_id is defined)
+          else (templates_by_name_all[item.template_name] | int)
+        }}
+      auth_method: "{{ item.auth_method | default(omit) }}"
+      auth_header: "{{ item.auth_header | default(omit) }}"
+      auth_secret_id: >-
+        {{
+          (item.auth_secret_id | int)
+          if (item.auth_secret_id is defined)
+          else (
+            created_keys_by_name[item.auth_secret_name].id | int
+            if (item.auth_secret_name is defined and created_keys_by_name is defined and (item.auth_secret_name in created_keys_by_name))
+            else omit
+          )
+        }}
+      task_params:
+        diff: "{{ item.task_params.diff | default(false) }}"
+        dry_run: "{{ item.task_params.dry_run | default(false) }}"
+  when:
+    - item.name not in (integrations_by_name | default({}))
+    - >
+      (item.template_id is defined)
+      or (item.template_name is defined and (item.template_name in (templates_by_name_all | default({}))))
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - integrations
+    - create
+
+- name: "Prune Project Integrations not in YAML"
+  ebdruplab.semaphoreui.project_integration_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ item.id }}"
+  when:
+    - project_deploy_variable_delete | default(false) | bool
+    - item.name not in (_desired_integrations | map(attribute='name') | list)
+  loop: "{{ _int_list.integrations | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - integrations
+    - prune
+
+- name: "Refresh Project Integrations List"
+  ebdruplab.semaphoreui.project_integration_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _int_list_after
+  tags:
+    - project_deploy
+    - integrations
+    - list
+
+- name: "Set Created Integrations Fact"
+  ansible.builtin.set_fact:
+    created_integrations_by_name: >-
+      {{
+        dict(
+          (_int_list_after.integrations | default([])) | map(attribute='name') | list
+          | zip((_int_list_after.integrations | default([])))
+        )
+      }}
+  tags:
+    - project_deploy
+    - integrations
+    - facts

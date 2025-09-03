@@ -13,16 +13,18 @@ module: project_backup
 short_description: Backup a Semaphore project
 version_added: "1.0.0"
 description:
-  - Fetches a complete backup of a Semaphore project by project ID.
+  - Fetches a complete backup of a Semaphore project by project ID via C(GET /api/project/{project_id}/backup).
+  - Useful for discovering resources (e.g. schedules) when list endpoints are not available.
 options:
   host:
     description:
-      - The URL or IP address of the Semaphore server.
+      - Base URL or IP of the Semaphore server, including protocol.
+      - Example C(http://localhost) or C(https://semaphore.example.com).
     required: true
     type: str
   port:
     description:
-      - The port on which the Semaphore API is running.
+      - Port on which the Semaphore API is running (e.g. C(3000)).
     required: true
     type: int
   project_id:
@@ -53,31 +55,32 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Backup Semaphore project
+- name: Get project backup
   ebdruplab.semaphoreui.project_backup:
     host: http://localhost
     port: 3000
     project_id: 1
-    api_token: "abcd1234"
+    api_token: "{{ semaphore_api_token }}"
   register: project_backup
 
-- name: Show backup data
-  debug:
-    var: project_backup.backup
+- name: Use schedules from backup
+  ansible.builtin.debug:
+    var: project_backup.backup.schedules
 """
 
 RETURN = r"""
+changed:
+  description: Always false; read-only operation.
+  type: bool
+  returned: always
+status:
+  description: HTTP status code returned by the API.
+  type: int
+  returned: success
 backup:
   description: Backup data of the specified Semaphore project.
-  returned: success
   type: dict
-  sample:
-    project:
-      id: 1
-      name: MyProject
-    templates:
-      - id: 10
-        name: deploy
+  returned: success
 """
 
 def main():
@@ -105,16 +108,29 @@ def main():
         session_cookie=module.params.get("session_cookie"),
         api_token=module.params.get("api_token")
     )
-    headers["Content-Type"] = "application/json"
 
     try:
-        response_body, status, _ = semaphore_get(url, headers=headers, validate_certs=validate_certs)
+        response_body, status, _ = semaphore_get(
+            url=url,
+            headers=headers,
+            validate_certs=validate_certs
+        )
 
         if status != 200:
-            module.fail_json(msg=f"Failed to backup project: HTTP {status}", response=response_body)
+            # response_body could be bytes/str/dict depending on your module_utils
+            body_text = response_body.decode() if isinstance(response_body, (bytes, bytearray)) else (
+                json.dumps(response_body) if isinstance(response_body, dict) else str(response_body)
+            )
+            module.fail_json(msg=f"Failed to backup project: HTTP {status}", status=status, response=body_text)
 
-        backup_data = json.loads(response_body)
-        module.exit_json(changed=False, backup=backup_data)
+        if isinstance(response_body, (bytes, bytearray)):
+            backup_data = json.loads(response_body.decode())
+        elif isinstance(response_body, str):
+            backup_data = json.loads(response_body)
+        else:
+            backup_data = response_body
+
+        module.exit_json(changed=False, status=status, backup=backup_data)
 
     except Exception as e:
         module.fail_json(msg=str(e))
@@ -122,4 +138,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

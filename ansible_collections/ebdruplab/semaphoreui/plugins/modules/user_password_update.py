@@ -11,7 +11,7 @@ DOCUMENTATION = r"""
 ---
 module: user_password_update
 short_description: Update a user's password in Semaphore
-version_added: "1.0.0"
+version_added: "2.0.2"
 description:
   - Updates the password for a specific Semaphore user.
 options:

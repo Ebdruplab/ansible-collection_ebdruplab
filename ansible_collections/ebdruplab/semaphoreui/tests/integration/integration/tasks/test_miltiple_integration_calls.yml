@@ -1,5 +1,5 @@
 ---
-- name: "Integration test: integrations, matchers, extracted values (create → list/get → update → delete)"
+- name: "Integration test: integrations, matchers, extracted values (create -> list/get -> update -> delete)"
   hosts: localhost
   gather_facts: false
 

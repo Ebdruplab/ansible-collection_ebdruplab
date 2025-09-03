@@ -1,6 +1,126 @@
 ---
 
-- name: 'Create project schedules'
+- name: "List Project Templates (for schedule resolution)"
+  ebdruplab.semaphoreui.project_template_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _tpl_list
+  tags:
+    - project_deploy
+    - schedules
+    - list
+
+- name: "Build Map: templates_by_name"
+  ansible.builtin.set_fact:
+    templates_by_name: >-
+      {{
+        dict(
+          (_tpl_list.templates | default([])) | map(attribute='name') | list
+          | zip((_tpl_list.templates | default([])) | map(attribute='id') | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - schedules
+    - facts
+
+- name: "List Project Schedules"
+  ebdruplab.semaphoreui.project_schedule_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _sch_list
+  tags:
+    - project_deploy
+    - schedules
+    - list
+
+- name: "Build Maps: schedules_by_name and schedules_by_name_full"
+  ansible.builtin.set_fact:
+    schedules_by_name: >-
+      {{
+        dict(
+          (_sch_list.schedules | default([])) | map(attribute='name') | list
+          | zip((_sch_list.schedules | default([])) | map(attribute='id') | list)
+        )
+      }}
+    schedules_by_name_full: >-
+      {{
+        dict(
+          (_sch_list.schedules | default([])) | map(attribute='name') | list
+          | zip((_sch_list.schedules | default([])) | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - schedules
+    - facts
+
+- name: "Compute Desired Schedules List"
+  ansible.builtin.set_fact:
+    _desired_schedules: "{{ project_deploy_config.schedules | default({}) | dict2items | map(attribute='value') | list }}"
+  tags:
+    - project_deploy
+    - schedules
+    - facts
+
+- name: "Debug schedules/template maps"
+  when: project_deploy_debug | bool
+  ansible.builtin.debug:
+    msg:
+      desired_schedules: "{{ _desired_schedules }}"
+      known_templates: "{{ templates_by_name }}"
+      existing_schedules: "{{ schedules_by_name }}"
+  tags:
+    - project_deploy
+    - schedules
+    - debug
+
+- name: "Update Project Schedule By Name"
+  ebdruplab.semaphoreui.project_schedule_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    schedule_id: "{{ schedules_by_name[item.name] | int }}"
+    schedule:
+      name: "{{ item.name }}"
+      cron_format: "{{ item.cron_format }}"
+      template_id: >-
+        {{
+          (item.template_id | int)
+          if (item.template_id is defined)
+          else (
+            (templates_by_name[item.template_name] | int)
+            if (item.template_name is defined and (item.template_name in (templates_by_name | default({}))))
+            else (schedules_by_name_full[item.name].template_id | int)
+          )
+        }}
+      active: "{{ item.active | default(false) }}"
+      arguments: "{{ item.arguments | default(omit) }}"
+      vaults: "{{ item.vaults | default(omit) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (schedules_by_name | default({}))
+  loop: "{{ _desired_schedules }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - schedules
+    - update
+
+- name: "Create Project Schedule When Missing"
   ebdruplab.semaphoreui.project_schedule_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -8,30 +128,72 @@
     session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     schedule:
-      name: "{{ item.value.name }}"
-      cron_format: "{{ item.value.cron_format }}"
+      name: "{{ item.name }}"
+      cron_format: "{{ item.cron_format }}"
       template_id: >-
-        {{ (item.value.template_id | int)
-           if (item.value.template_id is defined)
-           else (created_templates_by_name[item.value.template_name].id | int) }}
-      active: "{{ item.value.active | default(false) }}"
-  loop: "{{ project_deploy_config.schedules | default({}) | dict2items }}"
-  loop_control:
-    label: "{{ item.value.name }}"
-  register: created_schedules_result
-  when: project_deploy_config.schedules is defined
-
-- name: 'Set created schedules fact'
-  ansible.builtin.set_fact:
-    created_schedules_by_name: "{{ created_schedules_by_name | default({}) | combine({ item.item.value.name: item.schedule }) }}"
-  loop: "{{ created_schedules_result.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item.value.name | default('unnamed-schedule') }}"
+        {{
+          (item.template_id | int)
+          if (item.template_id is defined)
+          else (templates_by_name[item.template_name] | int)
+        }}
+      active: "{{ item.active | default(false) }}"
+      arguments: "{{ item.arguments | default(omit) }}"
+      vaults: "{{ item.vaults | default(omit) }}"
   when:
-    - project_deploy_config.schedules is defined
-    - created_schedules_result is defined
+    - item.name not in (schedules_by_name | default({}))
+    - (item.template_id is defined) or (item.template_name in (templates_by_name | default({})))
+  loop: "{{ _desired_schedules }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - schedules
+    - create
 
-- name: "Debug task (schedules)"
-  ansible.builtin.debug:
-    var: created_schedules_by_name
-  when: project_deploy_debug
+- name: "Prune Project Schedules not in YAML"
+  ebdruplab.semaphoreui.project_schedule_delete:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    schedule_id: "{{ item.id }}"
+  when:
+    - project_deploy_variable_delete | bool
+    - item.name not in (_desired_schedules | map(attribute='name') | list)
+  loop: "{{ _sch_list.schedules | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+  tags:
+    - project_deploy
+    - schedules
+    - prune
+
+- name: "Refresh Project Schedules List"
+  ebdruplab.semaphoreui.project_schedule_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    sort: name
+    order: asc
+  register: _sch_list_after
+  tags:
+    - project_deploy
+    - schedules
+    - list
+
+- name: "Set Created Schedules Fact"
+  ansible.builtin.set_fact:
+    created_schedules_by_name: >-
+      {{
+        dict(
+          (_sch_list_after.schedules | default([])) | map(attribute='name') | list
+          | zip((_sch_list_after.schedules | default([])))
+        )
+      }}
+  tags:
+    - project_deploy
+    - schedules
+    - facts

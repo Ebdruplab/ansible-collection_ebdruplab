@@ -13,71 +13,60 @@ module: project_repository_update
 short_description: Update a repository in a Semaphore project
 version_added: "1.0.0"
 description:
-  - Sends a PUT request to update an existing repository for a specified Semaphore project.
+  - Updates an existing repository for a specified Semaphore project.
+  - Ensures the body contains C(id) and C(project_id) matching the URL params to satisfy strict API servers.
 options:
   host:
-    description:
-      - Hostname or IP of the Semaphore server (with http or https).
     type: str
     required: true
+    description: Hostname or IP of the Semaphore server (with http/https).
   port:
-    description:
-      - Port on which Semaphore is running.
     type: int
     required: true
+    description: Port on which Semaphore is running.
   session_cookie:
-    description:
-      - Session cookie for authentication.
     type: str
     required: false
     no_log: true
+    description: Session cookie for authentication.
   api_token:
-    description:
-      - API token for authentication.
     type: str
     required: false
     no_log: true
+    description: API token for authentication.
   project_id:
-    description:
-      - ID of the Semaphore project.
     type: int
     required: true
+    description: ID of the Semaphore project.
   repository_id:
-    description:
-      - ID of the repository to update.
     type: int
     required: true
+    description: ID of the repository to update.
   repository:
-    description:
-      - Dictionary describing the repository fields to update.
     type: dict
     required: true
+    description: Repository fields to update.
     suboptions:
       name:
-        description:
-          - The name of the repository.
         type: str
         required: true
+        description: Human-readable name of the repository.
       git_url:
-        description:
-          - Git URL of the repository.
         type: str
         required: true
+        description: Git URL for the repository (SSH or HTTPS).
       git_branch:
-        description:
-          - Default Git branch to use.
         type: str
         required: true
+        description: Default branch to use when running tasks (e.g., C(main)).
       ssh_key_id:
-        description:
-          - ID of the SSH key to use with the repository.
         type: int
         required: true
+        description: ID of the SSH key stored in Semaphore to use for Git access.
   validate_certs:
-    description:
-      - Whether to validate TLS certificates.
     type: bool
     default: true
+    description: Whether to validate TLS certificates.
 author:
   - Kristian Ebdrup (@kris9854)
 '''
@@ -99,16 +88,26 @@ EXAMPLES = r'''
 
 RETURN = r'''
 repository:
-  description:
-    - The updated repository object returned by the API. If no body is returned, this is an empty dict.
+  description: The updated repository object returned by the API (empty when 204).
   type: dict
   returned: success
 status:
-  description:
-    - HTTP status code returned by the Semaphore API.
+  description: HTTP status code.
   type: int
   returned: always
+debug:
+  description: Echo of URL/body IDs to help diagnose 400 mismatches.
+  type: dict
+  returned: on failure or when status not in (200,201,204)
 '''
+
+def _as_text(b):
+    if isinstance(b, (bytes, bytearray)):
+        try:
+            return b.decode()
+        except Exception:
+            return str(b)
+    return b
 
 def main():
     module = AnsibleModule(
@@ -128,49 +127,77 @@ def main():
 
     p = module.params
     host = p["host"].rstrip("/")
-    port = p["port"]
-    project_id = p["project_id"]
-    repository_id = p["repository_id"]
+    port = int(p["port"])
+    project_id = int(p["project_id"])
+    repository_id = int(p["repository_id"])
     validate_certs = p["validate_certs"]
-    repo = p["repository"]
+    repo = dict(p["repository"] or {})
+
+    # Validate fields
+    for key in ("name", "git_url", "git_branch", "ssh_key_id"):
+        if key not in repo:
+            module.fail_json(msg=f"Missing required repository field: {key}")
+
+    try:
+        ssh_key_id = int(repo["ssh_key_id"])
+    except Exception:
+        module.fail_json(msg="repository.ssh_key_id must be an integer")
+
+    # Force body IDs to match URL params
+    repo["id"] = repository_id
+    repo["project_id"] = project_id
 
     url = f"{host}:{port}/api/project/{project_id}/repositories/{repository_id}"
 
-    payload = {
-        "id": repository_id,
-        "project_id": project_id,
-        "name": repo["name"],
-        "git_url": repo["git_url"],
-        "git_branch": repo["git_branch"],
-        "ssh_key_id": repo["ssh_key_id"]
-    }
-
     headers = get_auth_headers(
         session_cookie=p.get("session_cookie"),
-        api_token=p.get("api_token")
+        api_token=p.get("api_token"),
     )
     headers["Content-Type"] = "application/json"
+    headers.setdefault("Accept", "application/json")
+
+    # Final payload matches API example shape
+    payload = {
+        "id": repository_id,
+        "name": repo["name"],
+        "project_id": project_id,
+        "git_url": repo["git_url"],
+        "git_branch": repo["git_branch"],
+        "ssh_key_id": ssh_key_id,
+    }
 
     try:
         body = json.dumps(payload).encode("utf-8")
-        response_body, status, _ = semaphore_put(
-            url, body=body, headers=headers, validate_certs=validate_certs
+        resp_body, status, _ = semaphore_put(
+            url=url, body=body, headers=headers, validate_certs=validate_certs
         )
 
         if status not in (200, 201, 204):
-            msg = response_body.decode() if isinstance(response_body, bytes) else str(response_body)
-            module.fail_json(msg=f"PUT failed with status {status}: {msg}", status=status)
+            module.fail_json(
+                msg=f"PUT failed with status {status}: {_as_text(resp_body)}",
+                status=status,
+                debug={
+                    "url": url,
+                    "url_repository_id": repository_id,
+                    "url_project_id": project_id,
+                    "body_id": payload.get("id"),
+                    "body_project_id": payload.get("project_id"),
+                },
+            )
 
-        if status == 204 or not response_body:
+        if status == 204 or not resp_body:
             module.exit_json(changed=True, repository={}, status=status)
 
-        result = json.loads(response_body.decode()) if isinstance(response_body, bytes) else json.loads(response_body)
+        text = _as_text(resp_body)
+        try:
+            result = json.loads(text) if isinstance(text, str) else text
+        except Exception:
+            result = {"raw": text}
+
         module.exit_json(changed=True, repository=result, status=status)
 
     except Exception as e:
         module.fail_json(msg=str(e))
 
-
 if __name__ == "__main__":
     main()
-

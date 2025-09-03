@@ -53,6 +53,10 @@
     - name: "Include schedules file"
       ansible.builtin.include_tasks:
         file: schedules.yml
+
+    - name: "Include integrations file"
+      ansible.builtin.include_tasks:
+        file: integrations.yml
   always:
 
     - name: "Include Logout to Semaphoreui"

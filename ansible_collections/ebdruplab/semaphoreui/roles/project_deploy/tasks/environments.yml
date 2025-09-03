@@ -1,33 +1,139 @@
 ---
+- name: "List Project Environments"
+  ebdruplab.semaphoreui.project_environment_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _env_list
+  tags:
+    - project_deploy
+    - environments
+    - list
 
-- name: "Create project environments"
+- name: "Build Map: environments_by_name"
+  ansible.builtin.set_fact:
+    environments_by_name: "{{ dict((_env_list['environments'] | default([])) | map(attribute='name') | zip((_env_list['environments'] | default([])) | map(attribute='id'))) }}"
+  tags:
+    - project_deploy
+    - environments
+    - facts
+
+- name: "Compute Desired Environments Dict"
+  ansible.builtin.set_fact:
+    _desired_environments: "{{ (project_deploy_config['environments'] if (project_deploy_config is defined and project_deploy_config is mapping and 'environments' in project_deploy_config) else {}) }}"
+  tags:
+    - project_deploy
+    - environments
+    - facts
+
+# Safety: ensure each desired env defines at most one of json/extra_variables
+- name: "Assert Only One Of Json Or Extra Variables Per Environment"
+  ansible.builtin.assert:
+    that:
+      - not ( (item.value.json is defined) and (item.value.extra_variables is defined) )
+    fail_msg: "Environment '{{ item.value.name | default(item.key) }}' defines both 'json' and 'extra_variables'. Please specify only one."
+    success_msg: "Environment '{{ item.value.name | default(item.key) }}' validation OK."
+  loop: "{{ _desired_environments | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name | default(item.key) }}"
+  tags:
+    - project_deploy
+    - environments
+    - validate
+
+- name: "Update Project Environment By Name"
+  ebdruplab.semaphoreui.project_environment_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    environment_id: "{{ environments_by_name[item.name] }}"
+    environment:
+      name: "{{ item.name }}"
+      password: "{{ item.password | default(omit) }}"
+      env: "{{ (item.env is defined) | ternary(item.env, omit) }}"
+      json: "{{ (item.json is defined and (item.extra_variables is not defined)) | ternary(item.json, omit) }}"
+      extra_variables: "{{ (item.extra_variables is defined and (item.json is not defined)) | ternary(item.extra_variables, omit) }}"
+      secrets: "{{ item.secrets | default(omit) }}"
+  when:
+    - project_deploy_force_project_update | bool
+    - item.name in (environments_by_name | default({}))
+  loop: "{{ _desired_environments | dict2items | map(attribute='value') | list }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - environments
+    - update
+
+- name: "Create Project Environment When Missing"
   ebdruplab.semaphoreui.project_environment_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
-    session_cookie: "{{ login_result.session_cookie }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     environment:
       name: "{{ item.name }}"
       password: "{{ item.password | default(omit) }}"
-      env: "{{ item.env | default(omit) }}"
-      json: "{{ item.json | default(omit) }}"
-      extra_variables: "{{ item.extra_variables | default(omit) }}"
+      env: "{{ (item.env is defined) | ternary(item.env, omit) }}"
+      json: "{{ (item.json is defined and (item.extra_variables is not defined)) | ternary(item.json, omit) }}"
+      extra_variables: "{{ (item.extra_variables is defined and (item.json is not defined)) | ternary(item.extra_variables, omit) }}"
       secrets: "{{ item.secrets | default(omit) }}"
-  loop: "{{ project_deploy_config.environments | default({}) | dict2items | map(attribute='value') | list }}"
-  loop_control:
-    label: "{{ item.name }}"
-  register: created_environments_result
+  when: item.name not in (environments_by_name | default({}))
+  loop: "{{ _desired_environments | dict2items | map(attribute='value') | list }}"
   no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - environments
+    - create
 
-- name: "Set created environments fact"
+- name: "Refresh Project Environments List"
+  ebdruplab.semaphoreui.project_environment_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+  register: _env_list_after
+  tags:
+    - project_deploy
+    - environments
+    - list
+
+- name: "Set Created Environments Fact"
   ansible.builtin.set_fact:
-    created_environments_by_name: "{{ created_environments_by_name | default({}) | combine({ (item.environment.name): item.environment }) }}"
-  loop: "{{ created_environments_result.results | default([]) }}"
-  loop_control:
-    label: "{{ item.environment.name | default('unknown') }}"
-  when: item.environment is defined
+    created_environments_by_name: "{{ dict((_env_list_after['environments'] | default([])) | map(attribute='name') | zip((_env_list_after['environments'] | default([])))) }}"
+  tags:
+    - project_deploy
+    - environments
+    - facts
 
-- name: "Debug task (environments)"
-  ansible.builtin.debug:
-    var: created_environments_by_name
-  when: project_deploy_debug
+# Optional prune: forcibly set env/json/extra to exactly what's in vars (replaces any stray keys).
+# We do NOT touch 'secrets' here.
+- name: "Prune Project Environment Variables To Desired (Replace Maps)"
+  ebdruplab.semaphoreui.project_environment_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    environment_id: "{{ environments_by_name[item.value.name] }}"
+    environment:
+      name: "{{ item.value.name }}"
+      env: "{{ (item.value.env is defined) | ternary(item.value.env, omit) }}"
+      json: "{{ (item.value.json is defined and (item.value.extra_variables is not defined)) | ternary(item.value.json, omit) }}"
+      extra_variables: "{{ (item.value.extra_variables is defined and (item.value.json is not defined)) | ternary(item.value.extra_variables, omit) }}"
+  when:
+    - project_deploy_variable_delete | bool
+    - item.value.name in (environments_by_name | default({}))
+  loop: "{{ _desired_environments | dict2items }}"
+  loop_control:
+    label: "{{ item.value.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - environments
+    - prune
