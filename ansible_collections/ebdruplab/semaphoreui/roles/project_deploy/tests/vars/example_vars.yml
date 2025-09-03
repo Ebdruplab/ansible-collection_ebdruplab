@@ -38,7 +38,6 @@ project_deploy_config:
     - username: "ServiceDeskRunner"
       role: "Owner"
 
-  # Credentials to create/ensure
   keys:
     project_ssh_key_ebdlab:
       name: "Ebdruplab example ssh key"
@@ -46,7 +45,7 @@ project_deploy_config:
       ssh:
         login: "ansibleuser"
         passphrase: "INSERT_VALUT_ENCRYPTED_SECRET"
-        private_key: "ssh-rsa vaultencryptedsecretkey"   # example only; use Vault/multiline key
+        private_key: "ssh-rsa vaultencryptedsecretkey"
 
     project_login_user_ebdlab:
       name: "Ebdruplab Example User"
@@ -55,10 +54,9 @@ project_deploy_config:
         login: "Ebdruplab Fake Git User"
         password: "vaultencryptedsecretpassword"
 
-    # NEW: Vault password key (required by templates' vaults[type=password])
     project_vault_pass_key:
-      name: "Project Vault Password"     # must match templates' vault_key_name exactly (case-sensitive)
-      type: login_password               # key type handled by the role’s key task
+      name: "Project Vault Password"
+      type: login_password
       login_password:
         login: "ansible-ebdruplab vault"
         password: "{{ vault_project_vault_password | default('TopSecret900', true) }}"
@@ -67,17 +65,14 @@ project_deploy_config:
       name: "CI Trigger Token"
       type: login_password
       login_password:
-        login: "token"                               # not used by the integration, but required by key type
-        password: "{{ vault_ci_trigger_token | default('Token1234', true) }}"     # <-- your actual token (store it in Vault)
+        login: "token"
+        password: "{{ vault_ci_trigger_token | default('Token1234', true) }}"
 
-  # Repositories to add; this one uses the login/password credential above
   repositories:
     - name: "Repositorie Ebdruplab Demo"
       git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"
       git_branch: "main"
-      key_name: "Ebdruplab Example User"   # matches the login_password key's name
-
-  # Optional board views
+      key_name: "Ebdruplab Example User"
   views:
     pos_0:
       title: "Examples"
@@ -86,12 +81,11 @@ project_deploy_config:
       title: "ExamplePos_1"
       position: 1
 
-  # Inventories (ensure an SSH credential is associated)
   inventories:
     inventory_one:
       name: "A Yaml Inventory"
       type: "static-yaml"
-      ssh_key_name: "Ebdruplab example ssh key"   # role should resolve name -> id (or use ssh_key_id)
+      ssh_key_name: "Ebdruplab example ssh key"
       inventory: |
         all:
           hosts:
@@ -112,13 +106,11 @@ project_deploy_config:
       ssh_key_name: "Ebdruplab example ssh key"
       become_key_name: "Ebdruplab example ssh key"
 
-  # Environments
   environments:
     environment_1:
       name: "Test Environment"
       password: "mysecret"
 
-      # Environment variables (non-secret)
       env:
         KEY: "value"
 
