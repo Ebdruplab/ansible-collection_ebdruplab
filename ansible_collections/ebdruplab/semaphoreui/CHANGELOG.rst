@@ -4,11 +4,39 @@ Changelog
 Version 2.0.1
 -------------
 
-**Fetures**
+**Fetures, fixes and documentation**
 
 - Adding new feature to the ``project_deploy`` role.
   - Added and reworked the role to be able to handle ``project_deploy_force_project_update``.
   - It will then update ``projects``, ``templates``, ``keys``, ``schedules``, ``integrations``, ``users_access``, ``inventories``, ``views``, ``environments`` and ``repositories``.
+
+- **plugins/modules/project_integration_update.py**
+  - Accepts both UI labels and slugs for auth_method (e.g., Token and token, HMAC and hmac).
+  - Normalizes to API slugs and applies smart defaults for auth_header:
+    - token → token
+    - hmac → X-Hub-Signature-256
+  - Resolves the error: “value of auth_method must be one of … got: token” when playbooks pass the slug.
+
+- **plugins/modules/project_integration_create.py**
+  - Documentation/examples clarified that labels and slugs are accepted.
+  - Default header logic documented; task_params.environment is JSON-encoded when a dict/list is provided.
+
+- **plugins/modules/project_template_update.py**
+  - Rewrote DOCUMENTATION to satisfy ansible-doc (no nested mappings in a description list item; every (sub-)option has a description).
+  - Added complete EXAMPLES.
+  - Normalizes tags / skip_tags (list or string → newline-separated string).
+  - Accepts task_params.tags, task_params.skip_tags, task_params.limit as string or list.
+  - Maps common aliases (camelCase & legacy) to canonical fields.
+  - Drops task_params and survey_vars for job templates (API quirk) to avoid 400s.
+
+- **plugins/modules/semaphore_template_create.py**
+  - Documentation aligned with the original example style while fixing invalid/missing bits to pass ansible-doc.
+  - Fix: tags / skip_tags normalization; applies prompt_* via follow-up PUT (includes app and type to avoid “Invalid app id”).
+  - Create fallbacks for job templates that reject task_params.allow_debug.
+
+- **plugins/modules/project_repository_update.py**
+  - Added missing description on all options/suboptions/returns to resolve:
+    - “All (sub-)options and return values must have a 'description' field.”
 
 Module Added
 ~~~~~~~~~~~~
@@ -24,6 +52,8 @@ Module Added
 
 Module update
 ~~~~~~~~~~~~~
+- **plugins/modules/project_integration_update.py**  
+  Fixed the documentation and fixed problems with updating integrations as there where a missing key.
 
 - **project_backup.py**
   - ``plugins/modules/project_backup.py``: Hardened response handling
@@ -39,7 +69,14 @@ Module update
   - ``plugins/modules/project_backup.py``: Documentation polish
     - Clarified endpoint path (``GET /api/project/{project_id}/backup``), examples include schedules discovery, and documented new return fields.
 
-Version 2.0.1
+Role
+----
+- **roles/project_deploy**
+  - Integration tasks now tolerate label/slug inputs and resolve template_id from either explicit template_id, template_name, or newly created templates.
+  - Additional facts/maps and optional debug output to make schedule/integration resolution visible.
+  - (Docs) Provided schedule management snippets clarifying create/update/prune flow.
+
+Bug fixes
 -------------
 
 **Bug fix:**
