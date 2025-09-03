@@ -140,7 +140,6 @@ status:
   returned: always
 """
 
-
 # UI label -> API value
 AUTH_MAP = {
     "None": "none",
@@ -149,6 +148,18 @@ AUTH_MAP = {
     "Token": "token",
     "HMAC": "hmac",
     "BasicAuth": "basic",
+}
+
+# Accept common slugs/aliases too (for runtime normalization & choices)
+AUTH_SLUGS = {
+    "none": "none",
+    "github": "github_webhooks",
+    "github_webhooks": "github_webhooks",
+    "bitbucket": "bitbucket_webhooks",
+    "bitbucket_webhooks": "bitbucket_webhooks",
+    "token": "token",
+    "hmac": "hmac",
+    "basic": "basic",
 }
 
 def _normalize_task_params(tp):
@@ -167,7 +178,26 @@ def _opt_int(module, obj, key):
         except Exception:
             module.fail_json(msg=f"{key} must be an integer")
 
+def _normalize_auth_method(module, value):
+    """
+    Accept either UI labels (from AUTH_MAP) or slugs/aliases (from AUTH_SLUGS).
+    Returns API slug or fails.
+    """
+    if value is None:
+        return None
+    if value in AUTH_MAP:
+        return AUTH_MAP[value]
+    if value in AUTH_SLUGS:
+        return AUTH_SLUGS[value]
+    # already a valid slug value?
+    if value in set(AUTH_MAP.values()):
+        return value
+    module.fail_json(msg=f"Unsupported auth_method: {value}")
+
 def main():
+    # Allow both labels and slugs as choices so validation doesn't fail early
+    auth_choices = list(AUTH_MAP.keys()) + list(AUTH_SLUGS.keys())
+
     module = AnsibleModule(
         argument_spec=dict(
             host=dict(type="str", required=True),
@@ -180,7 +210,7 @@ def main():
                 options=dict(
                     name=dict(type="str", required=False),
                     template_id=dict(type="int", required=False),
-                    auth_method=dict(type="str", required=False, choices=list(AUTH_MAP.keys())),
+                    auth_method=dict(type="str", required=False, choices=auth_choices),
                     auth_header=dict(type="str", required=False),
                     auth_secret_id=dict(type="int", required=False),
                     task_params=dict(
@@ -216,14 +246,15 @@ def main():
     _opt_int(module, payload, "template_id")
     _opt_int(module, payload, "auth_secret_id")
 
-    # Normalize auth method & header
+    # Normalize auth method (labels/slugs -> API slug)
     if "auth_method" in payload and payload["auth_method"] is not None:
-        api_method = AUTH_MAP.get(payload["auth_method"])
-        if not api_method:
-            module.fail_json(msg="Unsupported auth_method")
-        payload["auth_method"] = api_method
+        payload["auth_method"] = _normalize_auth_method(module, payload["auth_method"])
+
+    # Normalize auth_header for token/hmac; ensure default even if None was passed
     if payload.get("auth_method") in ("token", "hmac"):
-        payload["auth_header"] = payload.get("auth_header", "token")
+        default_header = "X-Hub-Signature-256" if payload["auth_method"] == "hmac" else "token"
+        ah = payload.get("auth_header")
+        payload["auth_header"] = ah if (isinstance(ah, str) and ah.strip()) else default_header
     else:
         payload.pop("auth_header", None)
 

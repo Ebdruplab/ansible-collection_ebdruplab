@@ -19,7 +19,7 @@ project_deploy_force_project_update: true
 # Delete variables not present in our YAML (env.extra_variables/env/env.json)
 project_deploy_variable_delete: true
 
-project_deploy_force_project_delete: true
+project_deploy_force_project_delete: false
 project_deploy_force_project_delete_timer: 2
 
 # Project and resource definitions
@@ -62,6 +62,13 @@ project_deploy_config:
       login_password:
         login: "ansible-ebdruplab vault"
         password: "{{ vault_project_vault_password | default('TopSecret900', true) }}"
+
+    ci_trigger_token:
+      name: "CI Trigger Token"
+      type: login_password
+      login_password:
+        login: "token"                               # not used by the integration, but required by key type
+        password: "{{ vault_ci_trigger_token | default('Token1234', true) }}"     # <-- your actual token (store it in Vault)
 
   # Repositories to add; this one uses the login/password credential above
   repositories:
@@ -237,10 +244,9 @@ project_deploy_config:
       vaults:
         - type: password
           vault_key_name: "Project Vault Password"
-          # name: "Default"   # optional vault-id label; server defaults to "Default" if omitted
         - type: script
-          name: "exist"              # optional vault-id label
-          script: "extension-client" # client script identifier/path
+          name: "exist"
+          script: "extension-client"
 
     deploy_example:
       name: "Deploy Service"
@@ -275,7 +281,7 @@ project_deploy_config:
     build_example:
       name: "Build Artifact"
       type: "build"
-      start_version: "1.0.0.0"         # REQUIRED for type=build
+      start_version: "1.0.0.0"
       playbook: "playbooks/build.yml"
       repository_name: "Repositorie Ebdruplab Demo"
       inventory_name: "A repository Inventory"
@@ -294,3 +300,30 @@ project_deploy_config:
         - type: script
           name: "exist"
           script: "extension-client"
+
+  schedules:
+    nightly_deploy:
+      name: "Nightly Deploy"
+      cron_format: "0 3 * * *"
+      template_name: "Deploy Service"
+      active: true
+      arguments: []                     # can be list or JSON string; your module normalizes
+      vaults:
+        - type: password
+          vault_key_name: "Project Vault Password"
+    hourly_build:
+      name: "Hourly Build"
+      cron_format: "0 * * * *"
+      template_name: "Build Artifact"
+      active: false
+
+  integrations:
+    ci_token_trigger:
+      name: "CI Token Trigger"
+      template_name: "Deploy Service"     # will resolve to template_id via your maps
+      auth_method: "token"                # UI label "Token" or slug "token" both work
+      auth_secret_name: "CI Trigger Token" # will resolve to auth_secret_id from created_keys_by_name
+      # auth_header: "X-Auth-Token"       # optional; your module defaults to "token" if omitted
+      task_params:
+        diff: false
+        dry_run: false
