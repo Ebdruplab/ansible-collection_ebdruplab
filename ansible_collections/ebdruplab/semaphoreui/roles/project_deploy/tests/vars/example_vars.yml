@@ -17,7 +17,7 @@ project_deploy_sensitive_data_no_log: false
 project_deploy_force_project_creation: false
 project_deploy_force_project_update: true
 # Delete variables not present in our YAML (env.extra_variables/env/env.json)
-project_deploy_variable_delete: true
+project_deploy_variable_delete: false
 
 project_deploy_force_project_delete: false
 project_deploy_force_project_delete_timer: 2
@@ -299,7 +299,7 @@ project_deploy_config:
       cron_format: "0 3 * * *"
       template_name: "Deploy Service"
       active: true
-      arguments: []                     # can be list or JSON string; your module normalizes
+      arguments: []                     # can be list or JSON string; module normalizes
       vaults:
         - type: password
           vault_key_name: "Project Vault Password"
@@ -312,10 +312,10 @@ project_deploy_config:
   integrations:
     ci_token_trigger:
       name: "CI Token Trigger"
-      template_name: "Deploy Service"     # will resolve to template_id via your maps
+      template_name: "Deploy Service"     # will resolve to template_id via maps
       auth_method: "token"                # UI label "Token" or slug "token" both work
       auth_secret_name: "CI Trigger Token" # will resolve to auth_secret_id from created_keys_by_name
-      # auth_header: "X-Auth-Token"       # optional; your module defaults to "token" if omitted
+      # auth_header: "X-Auth-Token"       # optional; module defaults to "token" if omitted
       task_params:
         diff: false
         dry_run: false
