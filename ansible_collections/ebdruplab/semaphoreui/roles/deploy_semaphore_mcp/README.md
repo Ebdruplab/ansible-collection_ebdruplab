@@ -1,37 +1,181 @@
-Role Name
-=========
+# deploy_semaphore_mcp
 
-Will install the https://github.com/cloin/semaphore-mcp project locally. Some user interaction would be needed
-> Windows is not supported for this installation.
+Installs and configures the [`semaphore-mcp`](https://github.com/cloin/semaphore-mcp) MCP server **locally** so Claude Desktop (or another MCP client) can talk to your SemaphoreUI instance. Some user interaction is required (e.g., generating an API token).
 
-Requirements
-------------
+> **OS support:** Ubuntu/Debian/Fedora and macOS (Darwin).
+> **Windows is not supported** for this installation.
 
-1. Cloude Desktop application
-2. A semaphoreUI instance.
+---
 
+## Requirements
 
-Role Variables
---------------
+1. **Claude Desktop** installed (or another MCP-capable client).
+2. A running **SemaphoreUI** instance you can reach.
+3. **Python 3.10+** on the target host.
+4. (Recommended) `pipx` if you want isolated CLI install via pipx.
+5. Ansible collections:
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+   * `community.general` (for the `pipx` module)
 
+Install the collection:
 
-Example Playbook
-----------------
+```bash
+ansible-galaxy collection install community.general
+# or via a file:
+# echo -e "collections:\n  - community.general" > collections/requirements.yml
+# ansible-galaxy collection install -r collections/requirements.yml
+```
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+---
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+## Role Variables
 
-License
--------
+Below are the primary variables (defaults shown). Override as needed (e.g., in `group_vars`, `host_vars`, or at the play level).
 
-BSD
+```yaml
+# sensitive data
+semaphore_mcp_no_log: true
 
-Author Information
-------------------
+# Installation options
+semaphore_mcp_install_method: "pipx"          # "pipx" or "pip"
+semaphore_mcp_version: ""                     # e.g. "0.1.9" or empty for latest
+semaphore_mcp_python: "python3"               # used by runtime fallback
+semaphore_mcp_pip_executable: "pip3"
+semaphore_mcp_pipx_executable: "pipx"
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+# (Optional) manage wrapper/env file – usually disabled when configuring Claude directly
+semaphore_mcp_manage_wrapper: false
+semaphore_mcp_env_file: "/etc/semaphore-mcp.env"
+semaphore_mcp_wrapper_path: "/usr/local/bin/semaphore-mcp-run"
+
+# Claude Desktop command settings (used if writing the Claude config)
+semaphore_mcp_command: "semaphore-mcp"
+semaphore_mcp_command_args: []
+
+# Runtime env for the MCP server
+semaphore_mcp_url: "http://localhost:3000"
+semaphore_mcp_api_token: ""                   # REQUIRED – set via vars or Ansible Vault
+semaphore_mcp_log_level: ""                   # e.g. DEBUG | INFO | WARN | ERROR
+
+# Validate after install
+semaphore_mcp_validate: true
+
+# Supported Systems (preflight gate)
+semaphore_mcp_supported_distributions:
+  - Ubuntu
+  - Debian
+  - Fedora
+semaphore_mcp_supported_systems:
+  - Darwin
+
+# Claude Desktop config paths
+semaphore_mcp_claude_config_mac: "~/Library/Application Support/Claude/claude_desktop_config.json"
+semaphore_mcp_claude_config_linux: "~/.config/claude-desktop/claude_desktop_config.json"
+
+# Whether the role should modify Claude Desktop config on the target
+semaphore_mcp_config_claude: false
+```
+
+### Notes
+
+* **API Token is required.** The role fails early if `semaphore_mcp_api_token` is empty. Store it with **Ansible Vault**.
+* If `semaphore_mcp_config_claude: true`, the role **adds only missing** keys under `mcpServers.semaphore` in Claude’s config:
+
+  * Adds `SEMAPHORE_URL` and `SEMAPHORE_API_TOKEN` if missing.
+  * Adds `command`/`args` if missing.
+  * **Does not overwrite** an existing `command`; a warning is shown instead.
+* By default we **do not** create a wrapper script or env file. You can enable them by setting `semaphore_mcp_manage_wrapper: true`.
+
+---
+
+## What the Role Does
+
+* Installs `semaphore-mcp` via **pipx** (default) or **pip**.
+* Verifies the CLI is available.
+* Optionally updates **Claude Desktop** config with the minimal MCP server block (without disturbing other settings).
+* Enforces OS support in **preflight** and fails if unsupported.
+
+**Tags you can use:**
+
+* `install` – installation steps
+* `configure` – configuration steps (Claude config, etc.)
+* `validate` – verification steps
+* `semaphore`, `mcp` – logical grouping
+* `secrets` – tasks touching sensitive values
+
+Example:
+
+```bash
+ansible-playbook play.yml --tags install,configure
+```
+
+---
+
+## Example Playbook
+
+### Minimal (install only, bring your own Claude config)
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  roles:
+    - role: ebdruplab.semaphoreui.deploy_semaphore_mcp
+      vars:
+        semaphore_mcp_install_method: pipx
+        semaphore_mcp_url: "http://localhost:3000"
+        semaphore_mcp_api_token: "{{ vault_semaphore_mcp_token }}"
+```
+
+### Install + configure Claude Desktop (adds missing env/command)
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  roles:
+    - role: ebdruplab.semaphoreui.deploy_semaphore_mcp
+      vars:
+        semaphore_mcp_config_claude: true
+        semaphore_mcp_command: "semaphore-mcp"
+        semaphore_mcp_command_args: []
+        semaphore_mcp_url: "http://localhost:3000"
+        semaphore_mcp_api_token: "{{ vault_semaphore_mcp_token }}"
+        semaphore_mcp_log_level: "INFO"
+```
+
+> Tip: If `semaphore-mcp` isn’t on PATH (common with `pip --user`), set a full path in `semaphore_mcp_command`.
+
+---
+
+## Post-Install Check
+
+On the target:
+
+```bash
+semaphore-mcp --help
+```
+
+If configuring Claude Desktop, your file will contain a `"mcpServers": { "semaphore": { ... } }` block with your URL/token. Restart Claude Desktop and test:
+
+```
+List all projects in SemaphoreUI
+```
+
+---
+
+## Dependencies
+
+* Ansible collection: `community.general` (for `community.general.pipx`)
+* No role dependencies.
+
+---
+
+## License
+
+MIT-0
+
+---
+
+## Author Information
+
+Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
+
