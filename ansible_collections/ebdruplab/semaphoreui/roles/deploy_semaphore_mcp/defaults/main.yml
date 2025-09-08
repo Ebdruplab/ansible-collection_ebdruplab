@@ -1,0 +1,40 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for ebdruplab.semaphoreui.deploy_semaphore_mcp---
+
+# sensitive data
+semaphore_mcp_no_log: true
+
+# Installation options
+
+semaphore_mcp_install_method: "pipx"          # "pipx" or "pip"
+semaphore_mcp_version: ""                     # e.g. "0.1.9" or empty for latest
+semaphore_mcp_python: "python3"               # used by wrapper fallback
+semaphore_mcp_pip_executable: "pip3"          # "pip3" on Ubuntu and Homebrew Python
+semaphore_mcp_pipx_executable: "pipx"
+
+semaphore_mcp_manage_wrapper: true
+semaphore_mcp_env_file: "/etc/semaphore-mcp.env"
+semaphore_mcp_log_level: ''
+semaphore_mcp_wrapper_path: "/usr/local/bin/semaphore-mcp-run"
+
+semaphore_mcp_url: "http://localhost:3000"
+semaphore_mcp_api_token: ""
+
+semaphore_mcp_validate: true
+
+
+# Supported Systems
+semaphore_mcp_supported_distributions:
+  - Ubuntu        # e.g. 22.04, 24.04
+  - Debian
+  - Fedora
+
+semaphore_mcp_supported_systems:
+  - Darwin        # macOS
+
+semaphore_mcp_claude_config_mac: "~/Library/Application Support/Claude/claude_desktop_config.json"
+semaphore_mcp_claude_config_linux: "~/.config/claude-desktop/claude_desktop_config.json"
+
+# Whether the role should modify Claude Desktop config
+semaphore_mcp_config_claude: false

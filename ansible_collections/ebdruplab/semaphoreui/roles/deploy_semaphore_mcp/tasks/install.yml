@@ -1,0 +1,69 @@
+---
+# Decide per-OS base packages (use the generic 'package' module; it chooses the right backend)
+- name: "Set base packages for this OS"
+  ansible.builtin.set_fact:
+    semaphore_mcp_base_packages: >-
+      {{ ['python3', 'python3-pip'] if ansible_distribution == 'Ubuntu' else ['python'] }}
+  tags:
+    - install
+    - deps
+    - semaphore
+    - mcp
+
+- name: "Install base packages"
+  ansible.builtin.package:
+    name: "{{ semaphore_mcp_base_packages }}"
+    state: present
+  become: true
+  tags:
+    - install
+    - deps
+    - semaphore
+    - mcp
+
+# Only install pipx if requested
+- name: "Install pipx (only when install_method is pipx)"
+  ansible.builtin.package:
+    name: "pipx"
+    state: present
+  become: true
+  when: semaphore_mcp_install_method == "pipx"
+  tags:
+    - install
+    - deps
+    - semaphore
+    - mcp
+
+- name: "Install semaphore-mcp via pipx"
+  community.general.pipx:
+    name: "{{ 'semaphore-mcp=='+semaphore_mcp_version if (semaphore_mcp_version | default('') | length) > 0 else 'semaphore-mcp' }}"
+    state: present
+    executable: "{{ semaphore_mcp_pipx_executable | default(omit) }}"
+  when: semaphore_mcp_install_method == "pipx"
+  tags:
+    - install
+    - semaphore
+    - mcp
+
+
+- name: "Install semaphore-mcp via pip"
+  ansible.builtin.pip:
+    name: "{{ 'semaphore-mcp=='+semaphore_mcp_version if semaphore_mcp_version|length > 0 else 'semaphore-mcp' }}"
+    executable: "{{ semaphore_mcp_pip_executable }}"
+    state: present
+  when: semaphore_mcp_install_method == "pip"
+  tags:
+    - install
+    - semaphore
+    - mcp
+
+# Basic validation (don’t fail the whole run if it's not on PATH yet)
+- name: "Verify semaphore-mcp is available"
+  ansible.builtin.command: "semaphore-mcp --help"
+  changed_when: false
+  failed_when: false
+  tags:
+    - install
+    - validate
+    - semaphore
+    - mcp

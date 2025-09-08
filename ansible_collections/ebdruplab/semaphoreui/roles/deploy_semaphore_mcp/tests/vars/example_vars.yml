@@ -1,0 +1,29 @@
+#SPDX-License-Identifier: MIT-0
+---
+semaphore_mcp_cleanup_api_key: false
+
+# example vars
+semaphore_mcp_no_log: false
+# Connection and authentication variables
+project_deploy_semaphore_host: "http://localhost"
+project_deploy_semaphore_port: 3000
+project_deploy_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
+project_deploy_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
+# If your role supports it, you can use an API token instead of username/password:
+# project_deploy_semaphore_api_token: "KEY"
+
+semaphore_mcp_install_method: "pipx"          # "pipx" or "pip"
+semaphore_mcp_version: ""                     # e.g. "0.1.9" or empty for latest
+semaphore_mcp_python: "python3"               # used by wrapper fallback
+semaphore_mcp_pip_executable: "pip3"          # "pip3" on Ubuntu and Homebrew Python
+semaphore_mcp_pipx_executable: "pipx"
+
+semaphore_mcp_manage_wrapper: true
+semaphore_mcp_env_file: "/etc/semaphore-mcp.env"
+semaphore_mcp_log_level: ''
+semaphore_mcp_wrapper_path: "/usr/local/bin/semaphore-mcp-run"
+
+semaphore_mcp_url: "http://localhost:3000"
+semaphore_mcp_api_token: ""
+
+semaphore_mcp_validate: true

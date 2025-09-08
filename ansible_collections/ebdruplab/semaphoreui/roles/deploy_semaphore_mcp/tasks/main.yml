@@ -1,0 +1,25 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for ebdruplab.semaphoreui.deploy_semaphore_mcp
+
+- name: "Include preflight checks"
+  ansible.builtin.import_tasks: "preflight.yml"
+  tags:
+    - always
+    - preflight
+    - validate
+    - semaphore_mcp
+
+- name: "Include install tasks"
+  ansible.builtin.import_tasks: "install.yml"
+  tags:
+    - install
+    - semaphore_mcp
+
+
+- name: "Include configure tasks"
+  ansible.builtin.import_tasks: "configure.yml"
+  tags:
+    - configure
+    - semaphore
+    - semaphore_mcp
