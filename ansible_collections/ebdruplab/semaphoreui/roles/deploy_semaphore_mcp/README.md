@@ -5,7 +5,7 @@ Installs and configures the [`semaphore-mcp`](https://github.com/cloin/semaphore
 > **OS support:** Ubuntu/Debian/Fedora and macOS (Darwin).
 > **Windows is not supported** for this installation.
 
----
+
 
 ## Requirements
 
@@ -26,7 +26,7 @@ ansible-galaxy collection install community.general
 # ansible-galaxy collection install -r collections/requirements.yml
 ```
 
----
+
 
 ## Role Variables
 
@@ -54,7 +54,7 @@ semaphore_mcp_command_args: []
 
 # Runtime env for the MCP server
 semaphore_mcp_url: "http://localhost:3000"
-semaphore_mcp_api_token: ""                   # REQUIRED – set via vars or Ansible Vault
+semaphore_mcp_api_token: ""                   # REQUIRED – set via vars or Ansible Vault (see tests for example creation)
 semaphore_mcp_log_level: ""                   # e.g. DEBUG | INFO | WARN | ERROR
 
 # Validate after install
@@ -86,7 +86,7 @@ semaphore_mcp_config_claude: false
   * **Does not overwrite** an existing `command`; a warning is shown instead.
 * By default we **do not** create a wrapper script or env file. You can enable them by setting `semaphore_mcp_manage_wrapper: true`.
 
----
+
 
 ## What the Role Does
 
@@ -106,10 +106,10 @@ semaphore_mcp_config_claude: false
 Example:
 
 ```bash
-ansible-playbook play.yml --tags install,configure
+ansible-playbook test.yml -K --diff -e semaphore_mcp_config_claude=true
 ```
 
----
+
 
 ## Example Playbook
 
@@ -129,22 +129,100 @@ ansible-playbook play.yml --tags install,configure
 ### Install + configure Claude Desktop (adds missing env/command)
 
 ```yaml
-- hosts: localhost
-  gather_facts: false
+---
+- name: "Example Use"
+  hosts: localhost
+  gather_facts: true
+  vars_files:
+    - "vars/example_vars.yml"
+
+  pre_tasks:
+    - name: "Pre | Login"
+      ebdruplab.semaphoreui.login:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        username: "{{ project_deploy_semaphore_username | default('admin') }}"
+        password: "{{ project_deploy_semaphore_password | default('changeme') }}"
+      register: login_result
+      tags:
+        - token
+        - create
+        - auth
+        - login
+
+    - name: "Generate API token and fact for role"
+      block:
+        - name: "Create API KEY"
+          ebdruplab.semaphoreui.user_token_create:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          register: _api_key
+          tags:
+            - token
+            - create
+      always:
+        - name: "Pre | Logout"
+          ebdruplab.semaphoreui.logout:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          tags:
+            - token
+            - create
+            - auth
+            - logout
+
   roles:
-    - role: ebdruplab.semaphoreui.deploy_semaphore_mcp
+    - name: "Import role: deploy_semaphore_mcp"
+      role: ebdruplab.semaphoreui.deploy_semaphore_mcp
       vars:
-        semaphore_mcp_config_claude: true
-        semaphore_mcp_command: "semaphore-mcp"
-        semaphore_mcp_command_args: []
-        semaphore_mcp_url: "http://localhost:3000"
-        semaphore_mcp_api_token: "{{ vault_semaphore_mcp_token }}"
-        semaphore_mcp_log_level: "INFO"
+        semaphore_mcp_api_token: "{{ _api_key.token.id }}"
+
+
+  post_tasks:
+    - name: "Post | Login"
+      ebdruplab.semaphoreui.login:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        username: "{{ project_deploy_semaphore_username | default('admin') }}"
+        password: "{{ project_deploy_semaphore_password | default('changeme') }}"
+      register: login_result
+      tags:
+        - users
+        - auth
+        - login
+
+    - name: "Reconcile Service Desk User"
+      block:
+        - name: "Delete API KEY"
+          ebdruplab.semaphoreui.user_token_delete:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            api_token_id: "{{ _api_key.token.id }}"
+          when: semaphore_mcp_cleanup_api_key
+          tags:
+            - token
+            - delete
+
+      always:
+        - name: "Post | Logout"
+          ebdruplab.semaphoreui.logout:
+            host: "{{ project_deploy_semaphore_host }}"
+            port: "{{ project_deploy_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          tags:
+            - token
+            - delete
+            - auth
+            - logout
+
 ```
 
 > Tip: If `semaphore-mcp` isn’t on PATH (common with `pip --user`), set a full path in `semaphore_mcp_command`.
 
----
+
 
 ## Post-Install Check
 
@@ -160,20 +238,20 @@ If configuring Claude Desktop, your file will contain a `"mcpServers": { "semaph
 List all projects in SemaphoreUI
 ```
 
----
+
 
 ## Dependencies
 
 * Ansible collection: `community.general` (for `community.general.pipx`)
 * No role dependencies.
 
----
+
 
 ## License
 
-MIT-0
+MIT
 
----
+
 
 ## Author Information
 
