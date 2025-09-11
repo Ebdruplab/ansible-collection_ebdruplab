@@ -1,0 +1,221 @@
+- name: "Configure Claude Desktop (conditionally)"
+  when: semaphore_mcp_config_claude | bool
+  block:
+
+    - name: "Gather minimal facts (for OS detection)"
+      ansible.builtin.setup:
+        gather_subset:
+          - min
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    - name: "Set Claude config path per-OS"
+      ansible.builtin.set_fact:
+        semaphore_mcp_claude_config_path: >-
+          {{ semaphore_mcp_claude_config_mac if (ansible_system | default('Linux')) == 'Darwin'
+             else semaphore_mcp_claude_config_linux }}
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    - name: "Ensure Claude config directory exists"
+      ansible.builtin.file:
+        path: "{{ semaphore_mcp_claude_config_path | dirname }}"
+        state: directory
+        mode: "0755"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    - name: "Check if Claude config exists"
+      ansible.builtin.stat:
+        path: "{{ semaphore_mcp_claude_config_path }}"
+      register: _claude_cfg_stat
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    - name: "Read existing Claude config JSON (if any)"
+      ansible.builtin.slurp:
+        path: "{{ semaphore_mcp_claude_config_path }}"
+      register: _claude_cfg_slurp
+      when: _claude_cfg_stat.stat.exists
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    # ---- Initialize and parse safely (no cross-task references) ----
+    - name: "Init existing Claude config to empty dict"
+      ansible.builtin.set_fact:
+        _existing_cfg: {}
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Parse existing Claude config JSON (file exists)"
+      ansible.builtin.set_fact:
+        _existing_cfg: "{{ _claude_cfg_slurp.content | b64decode | from_json }}"
+      when: _claude_cfg_stat.stat.exists
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Extract mcpServers block"
+      ansible.builtin.set_fact:
+        _existing_mcpServers: "{{ _existing_cfg.get('mcpServers', {}) }}"
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Extract semaphore block"
+      ansible.builtin.set_fact:
+        _existing_semaphore: "{{ _existing_mcpServers.get('semaphore', {}) }}"
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Extract env/cmd/args from semaphore block"
+      ansible.builtin.set_fact:
+        _existing_env: "{{ _existing_semaphore.get('env', {}) }}"
+        _existing_cmd: "{{ _existing_semaphore.get('command', none) }}"
+        _existing_args: "{{ _existing_semaphore.get('args', none) }}"
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    # ---- Build merged content (add-only-if-missing) ----
+    - name: "Compute env with only-missing keys added"
+      ansible.builtin.set_fact:
+        _env_with_missing_only: >-
+          {{
+            _existing_env
+            | combine({'SEMAPHORE_URL': semaphore_mcp_url}
+                      if 'SEMAPHORE_URL' not in _existing_env else {}, recursive=True)
+            | combine({'SEMAPHORE_API_TOKEN': semaphore_mcp_api_token}
+                      if 'SEMAPHORE_API_TOKEN' not in _existing_env else {}, recursive=True)
+          }}
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Build updated semaphore block (only set command/args if missing)"
+      ansible.builtin.set_fact:
+        _updated_semaphore: >-
+          {{
+            _existing_semaphore
+            | combine({'env': _env_with_missing_only}, recursive=True)
+            | combine({} if _existing_cmd is not none else {'command': (semaphore_mcp_command | default('semaphore-mcp'))}, recursive=True)
+            | combine({} if _existing_args is not none else {'args': (semaphore_mcp_command_args | default([]))}, recursive=True)
+          }}
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Build final merged config object"
+      ansible.builtin.set_fact:
+        _merged_cfg: >-
+          {{
+            _existing_cfg
+            | combine({'mcpServers': (_existing_mcpServers | combine({'semaphore': _updated_semaphore}, recursive=True))}, recursive=True)
+          }}
+        _warn_existing_cmd: "{{ (_existing_cmd is not none) }}"
+        _warn_cmd_differs: "{{ (_existing_cmd is not none) and (_existing_cmd | string != (semaphore_mcp_command | default('semaphore-mcp')) | string) }}"
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    # ---- User-facing notes/warnings ----
+    - name: "Warn: existing command found in Claude config (left unchanged)"
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: Claude Desktop already has mcpServers.semaphore.command="{{ _existing_cmd }}".
+          The role will NOT overwrite it. Desired command is "{{ semaphore_mcp_command | default('semaphore-mcp') }}".
+          If you want the role's command, remove/adjust the existing value.
+      when: _claude_cfg_stat.stat.exists and _warn_existing_cmd | bool
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    - name: "Note: existing command equals desired (no change needed)"
+      ansible.builtin.debug:
+        msg: >-
+          NOTE: mcpServers.semaphore.command already equals "{{ semaphore_mcp_command | default('semaphore-mcp') }}". No changes required.
+      when: _claude_cfg_stat.stat.exists and (_warn_existing_cmd | bool) and (not _warn_cmd_differs | bool)
+      tags:
+        - configure
+        - semaphore
+        - mcp
+
+    # ---- Write file (create minimal if missing, else merge) ----
+    - name: "Create minimal Claude config with env/command/args (file did not exist)"
+      ansible.builtin.copy:
+        dest: "{{ semaphore_mcp_claude_config_path }}"
+        mode: "0600"
+        backup: true
+        content: >-
+          {{
+            {
+              "mcpServers": {
+                "semaphore": {
+                  "command": (semaphore_mcp_command | default('semaphore-mcp')),
+                  "args": (semaphore_mcp_command_args | default([])),
+                  "env": {
+                    "SEMAPHORE_URL": semaphore_mcp_url,
+                    "SEMAPHORE_API_TOKEN": semaphore_mcp_api_token
+                  }
+                }
+              }
+            } | to_nice_json
+          }}
+      when: not _claude_cfg_stat.stat.exists
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets
+
+    - name: "Write merged Claude config back (preserving all other keys)"
+      ansible.builtin.copy:
+        dest: "{{ semaphore_mcp_claude_config_path }}"
+        mode: "0600"
+        backup: true
+        content: "{{ _merged_cfg | to_nice_json }}"
+      when: _claude_cfg_stat.stat.exists
+      no_log: "{{ semaphore_mcp_no_log }}"
+      tags:
+        - configure
+        - semaphore
+        - mcp
+        - secrets

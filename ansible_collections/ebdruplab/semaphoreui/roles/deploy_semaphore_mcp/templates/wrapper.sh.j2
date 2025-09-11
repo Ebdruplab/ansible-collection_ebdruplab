@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Wrapper to launch semaphore-mcp with environment loaded from {{ semaphore_mcp_env_file }}
+set -euo pipefail
+
+# Load env (if present)
+if [ -f "{{ semaphore_mcp_env_file }}" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "{{ semaphore_mcp_env_file }}"
+  set +a
+fi
+
+# Sanity check — preflight should catch this, but double-check at runtime
+if [ -z "${SEMAPHORE_URL:-}" ] || [ -z "${SEMAPHORE_API_TOKEN:-}" ]; then
+  echo "Error: SEMAPHORE_URL and/or SEMAPHORE_API_TOKEN are not set. Edit {{ semaphore_mcp_env_file }} and try again." >&2
+  exit 1
+fi
+
+# Prefer the installed console script; fall back to python -m (if available)
+if command -v semaphore-mcp >/dev/null 2>&1; then
+  exec semaphore-mcp "$@"
+else
+  # Note: this fallback only works if 'semaphore_mcp' is importable to {{ semaphore_mcp_python }}
+  exec {{ semaphore_mcp_python }} -m semaphore_mcp "$@"
+fi

@@ -1,0 +1,39 @@
+---
+# Ensure we're on a supported OS
+- name: "Fail if OS is unsupported (only Ubuntu or Darwin/macOS allowed)"
+  ansible.builtin.fail:
+    msg: >
+      Unsupported operating system "{{ ansible_distribution }} {{ ansible_distribution_version }} ({{ ansible_system }})".
+      This role supports "Ubuntu" and "Darwin" (macOS) only.
+  when: not (
+          (ansible_distribution in semaphore_mcp_supported_distributions)
+          or
+          (ansible_system in semaphore_mcp_supported_systems)
+        )
+  tags:
+    - always
+    - preflight
+    - validate
+    - semaphore
+    - mcp
+
+# Ensure API token exists
+- name: "Fail if 'semaphore_mcp_api_token' is missing"
+  ansible.builtin.fail:
+    msg: >
+      Missing required variable "semaphore_mcp_api_token".
+      Retrieve an API token from "Semaphore" (the "API tokens" page) and set it for this role
+      (preferably via "Ansible Vault"), for example:
+      - in group_vars/host_vars: "semaphore_mcp_api_token: <your_token>"
+      - or at play level under "vars" or via "--extra-vars".
+      Check the "tests/test.yml" in the role to see an example.
+  when: >
+    semaphore_mcp_api_token is not defined or
+    (semaphore_mcp_api_token | trim | length) == 0
+  tags:
+    - always
+    - preflight
+    - validate
+    - semaphore
+    - mcp
+    - secrets

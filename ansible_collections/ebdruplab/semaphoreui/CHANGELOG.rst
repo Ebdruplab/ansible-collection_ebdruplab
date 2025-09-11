@@ -1,6 +1,31 @@
 Changelog
 =========
 
+Version 2.0.3
+-------------
+
+Role
+----
+- **Initial public release** of the role `ebdruplab.semaphoreui.deploy_semaphore_mcp`.
+  - Installs `semaphore-mcp` locally via **pipx** (default) or **pip**.
+  - **Preflight checks**:
+    - Enforce supported OS: Ubuntu/Debian/Fedora and macOS (Darwin).
+    - Fail fast if required variable `semaphore_mcp_api_token` is missing.
+  - **Claude Desktop integration (optional)** when `semaphore_mcp_config_claude: true`:
+    - Safely merges only missing keys under `mcpServers.semaphore` (does not overwrite existing values).
+    - Adds `SEMAPHORE_URL` and `SEMAPHORE_API_TOKEN` if absent.
+    - Adds `command`/`args` if absent and **warns** if an existing `command` differs.
+    - OS-aware config paths for macOS/Linux and automatic file backups.
+  - **Idempotent install & configure** tasks; organized tags: `install`, `configure`, `validate`, `semaphore`, `mcp`, `secrets`.
+  - **Secret-safe logging** with `semaphore_mcp_no_log: true`.
+  - Optional `MCP_LOG_LEVEL` via `semaphore_mcp_log_level`.
+  - Wrapper/env management is **disabled by default** (`semaphore_mcp_manage_wrapper: false`) but available if needed.
+
+
+Version 2.0.2
+-------------
+Minor bug fixes
+
 Version 2.0.1
 -------------
 

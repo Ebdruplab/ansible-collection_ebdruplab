@@ -1,0 +1,6 @@
+# templates/envfile.j2
+SEMAPHORE_URL="{{ semaphore_mcp_url }}"
+SEMAPHORE_API_TOKEN="{{ semaphore_mcp_api_token }}"
+{% if semaphore_mcp_log_level|default('') %}
+MCP_LOG_LEVEL={{ semaphore_mcp_log_level }}
+{% endif %}
