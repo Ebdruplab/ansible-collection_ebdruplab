@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Version 2.0.2
+Version 2.0.3
 -------------
 
 Role
@@ -21,6 +21,10 @@ Role
   - Optional `MCP_LOG_LEVEL` via `semaphore_mcp_log_level`.
   - Wrapper/env management is **disabled by default** (`semaphore_mcp_manage_wrapper: false`) but available if needed.
 
+
+Version 2.0.2
+-------------
+Minor bug fixes
 
 Version 2.0.1
 -------------
