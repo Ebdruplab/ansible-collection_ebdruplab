@@ -16,7 +16,9 @@ tags:
   - devops
   - linux
   - infrastructure
-dependencies: {}
+dependencies: {
+  community.general: ">=11.2.1",
+}
 repository: https://github.com/ebdruplab/ansible-collection_ebdruplab
 documentation: https://github.com/ebdruplab/ansible-collection_ebdruplab
 homepage: https://github.com/Ebdruplab/ansible-collection_ebdruplab/tree/main/ebdruplab/semaphoreui
