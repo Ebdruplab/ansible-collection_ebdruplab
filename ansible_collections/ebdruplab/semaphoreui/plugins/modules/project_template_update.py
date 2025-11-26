@@ -17,7 +17,7 @@ description:
   - "Coerces numeric identifiers to integers, normalizes C(arguments) to a JSON string, joins list-style tags with newlines, and prunes null fields."
   - "Supports C(task_params) (including list C(tags), C(skip_tags), C(limit)), and validates/normalizes C(survey_vars)."
   - "Accepts common aliases (camelCase & legacy names) and maps them to canonical API fields, e.g. C(allow_parallel_tasks) -> C(allow_parallel)."
-  - "For job templates (i.e. when C(type) is omitted, C(None), C(\"\"), or C(\"job\")), Semaphore may reject C(task_params) and surveys; this module drops those to avoid API 400 errors."
+  - "For job templates (i.e. when C(type) is omitted, C(None), C(\"\"), or C(\"job\")), some Semaphore versions may reject C(task_params), C(arguments), or surveys; this module always drops C(task_params) for job templates and can optionally drop C(arguments) and C(survey_vars) via C(allow_job_arguments) and C(allow_job_surveys)."
   - "On update, C(vaults) entries can include C(id), C(name), C(type), C(vault_key_id), and C(script). If the list is empty or undefined, the field is omitted to avoid API errors."
 
 options:
@@ -262,11 +262,22 @@ options:
     description: "Whether to validate TLS certificates."
     type: bool
     default: true
+  allow_job_surveys:
+    description:
+      - "Whether to include C(survey_vars) when updating job templates (C(type) omitted, C(None), C(\"\") or C(\"job\"))."
+      - "If C(false), C(survey_vars) will be dropped from the payload for job templates to avoid API 400 errors on older Semaphore versions."
+    type: bool
+    default: true
+  allow_job_arguments:
+    description:
+      - "Whether to include C(arguments) when updating job templates (C(type) omitted, C(None), C(\"\") or C(\"job\"))."
+      - "If C(false), C(arguments) will be dropped from the payload for job templates to avoid API errors on servers that reject arguments for job templates."
+    type: bool
+    default: true
 
 author:
   - "Kristian Ebdrup (@kris9854)"
 """
-
 
 
 EXAMPLES = r"""
@@ -395,8 +406,28 @@ EXAMPLES = r"""
       taskParams:                       # alias of task_params (ignored for job type)
         allowDebug: true
         tagsList: ["audit"]
-      surveyVars:                       # alias of survey_vars (ignored for job type)
+      surveyVars:                       # alias of survey_vars (may be dropped for job type if allow_job_surveys is false)
         - { name: "release_version", title: "Release version", type: "string", default: "1.0.0" }
+
+
+- name: Job template using legacy-safe behavior (drop surveys & arguments)
+  ebdruplab.semaphoreui.project_template_update:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template_id: 228
+    allow_job_surveys: false
+    allow_job_arguments: false
+    template:
+      name: "Legacy Job"
+      app: "ansible"
+      playbook: "playbooks/legacy.yml"
+      type: ""
+      arguments: ["--verbose"]
+      survey_vars:
+        - { name: "env", title: "Environment", type: "string", default_value: "dev" }
+  register: update_legacy_job
 """
 
 
@@ -428,6 +459,7 @@ TYPE_NORMALIZE = {
 SURVEY_TYPES = {"string", "int", "secret", "enum"}
 VAULT_TYPES = {"password", "key", "script"}
 
+
 def _as_text(b):
     if isinstance(b, (bytes, bytearray)):
         try:
@@ -436,6 +468,7 @@ def _as_text(b):
             return str(b)
     return b
 
+
 def _int_or_none(val):
     if val is None or val == "":
         return None
@@ -443,6 +476,7 @@ def _int_or_none(val):
         return int(val)
     except Exception:
         return None
+
 
 def _normalize_arguments(v):
     # Always a JSON string; default to "[]"
@@ -462,6 +496,7 @@ def _normalize_arguments(v):
     # Unknown scalar -> treat as single argument
     return json.dumps([str(v)])
 
+
 def _normalize_tag_block(v):
     """
     Accept list or string and normalize to newline-delimited string as expected by the API.
@@ -476,6 +511,7 @@ def _normalize_tag_block(v):
         items = [ln.strip() for ln in text.splitlines() if ln.strip()]
     return "\n".join(items) if items else None
 
+
 def _split_to_list(v):
     """
     Accept list or string and normalize to list[str].
@@ -487,6 +523,7 @@ def _split_to_list(v):
         return [str(x).strip() for x in v if str(x).strip()]
     text = str(v).replace(",", "\n")
     return [ln.strip() for ln in text.splitlines() if ln.strip()]
+
 
 def _normalize_task_params(tp):
     if not isinstance(tp, dict):
@@ -520,6 +557,7 @@ def _normalize_task_params(tp):
     }
     return out
 
+
 def _merge_template_blocks_into_task_params(tpl):
     """
     If template-level limit/tags/skip_tags exist, ensure task_params has list-form defaults.
@@ -534,6 +572,7 @@ def _merge_template_blocks_into_task_params(tpl):
     if not tp.get("skip_tags"):
         tp["skip_tags"] = _split_to_list(tpl.get("skip_tags"))
     return tp
+
 
 def _validate_and_normalize_surveys(svars, module):
     if svars is None:
@@ -606,6 +645,7 @@ def _validate_and_normalize_surveys(svars, module):
         out.append(out_item)
     return out
 
+
 def _validate_and_normalize_vaults(vaults, module):
     if vaults is None:
         return None
@@ -643,8 +683,10 @@ def _validate_and_normalize_vaults(vaults, module):
         validated.append(item)
     return validated
 
+
 def _prune_nones(d):
     return {k: v for k, v in d.items() if v is not None}
+
 
 PROMPT_KEYS = [
     "prompt_inventory",
@@ -657,10 +699,12 @@ PROMPT_KEYS = [
     "prompt_environment",
 ]
 
+
 def _drop_falsey_prompts(d):
     for k in PROMPT_KEYS:
         if not d.get(k):
             d.pop(k, None)
+
 
 def _apply_aliases(tpl):
     """
@@ -730,6 +774,7 @@ def _apply_aliases(tpl):
             if isinstance(sv, dict) and "default_value" not in sv and "default" in sv:
                 sv["default_value"] = sv.pop("default")
 
+
 def main():
     module = AnsibleModule(
         argument_spec=dict(
@@ -741,6 +786,8 @@ def main():
             session_cookie=dict(type='str', required=False, no_log=True),
             api_token=dict(type='str', required=False, no_log=True),
             validate_certs=dict(type='bool', default=True),
+            allow_job_surveys=dict(type='bool', default=True),
+            allow_job_arguments=dict(type='bool', default=True),
         ),
         required_one_of=[['session_cookie', 'api_token']],
         supports_check_mode=False,
@@ -753,6 +800,8 @@ def main():
     template_id = int(p['template_id'])
     tpl = dict(p['template'] or {})
     validate_certs = p['validate_certs']
+    allow_job_surveys = p['allow_job_surveys']
+    allow_job_arguments = p['allow_job_arguments']
 
     # Accept common aliases before validations
     _apply_aliases(tpl)
@@ -814,8 +863,8 @@ def main():
         # only include if any list is non-empty or any allow_* flag is present
         if any(derived_tp.get(k) for k in ('tags', 'skip_tags', 'limit')) or any(
             derived_tp.get(k) for k in (
-                'allow_debug','allow_override_inventory','allow_override_limit',
-                'allow_override_tags','allow_override_skip_tags'
+                'allow_debug', 'allow_override_inventory', 'allow_override_limit',
+                'allow_override_tags', 'allow_override_skip_tags'
             )
         ):
             tpl['task_params'] = derived_tp
@@ -869,8 +918,13 @@ def main():
 
     # IMPORTANT: job-type quirks
     if tpl.get('type', '') == "":
+        # Always drop task_params for job templates (legacy server compatibility)
         tpl.pop('task_params', None)
-        tpl.pop('survey_vars', None)  # some servers reject surveys for job-type on update
+        # Surveys & arguments are conditionally dropped based on module options
+        if not allow_job_surveys:
+            tpl.pop('survey_vars', None)
+        if not allow_job_arguments:
+            tpl.pop('arguments', None)
         # keep allow_parallel (API represents job as "" but accepts allow_parallel)
 
     tpl = _prune_nones(tpl)
@@ -921,5 +975,7 @@ def main():
     except Exception as e:
         module.fail_json(msg=str(e), debug={'url': url, 'payload': tpl})
 
+
 if __name__ == '__main__':
     main()
+
