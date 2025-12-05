@@ -130,7 +130,9 @@ Roles added
 
 - **project_deploy** — Added to support a high level YAML vars file to populate with project, inventory keys and more.
 
-Version 1.0.0
+Version 2.0.4
 -------------
+Fixed bug: https://github.com/Ebdruplab/ansible-collection_ebdruplab/issues/11
+
 
 Initial release; no further info.

@@ -11,13 +11,14 @@
     semaphore_username: "{{ lookup('env', 'ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
     ebd_project_name: "project_ebdruplab_linux"
-    edb_alert_chat: "ebdruplab"
-    edb_inventory_name: "ebdruplab_homelab"
+    ebd_alert_chat: "ebdruplab"
+    ebd_inventory_name: "ebdruplab_homelab"
     ebd_inventory_data: |
       [homeserver]
       homeserver01  ansible_host=10.0.0.100
-    edb_ssh_key: "ssh-rsa 23102801283123"
-    edb_ssh_key_name: "ssh-machine-connection"
+    ebd_ssh_key: "ssh-rsa 23102801283123"
+    ebd_ssh_key_name: "ssh-machine-connection"
+    ebd_ssh_key_login: "testesen"
   tasks:
 
     - name: 'Log in to Semaphore'
@@ -35,7 +36,7 @@
         session_cookie: "{{ login_result.session_cookie }}"
         name: "{{ ebd_project_name }}"
         alert: true
-        alert_chat: "{{ edb_alert_chat }}"
+        alert_chat: "{{ ebd_alert_chat }}"
         max_parallel_tasks: 20
         demo: false
       register: created_project
@@ -45,6 +46,19 @@
       ansible.builtin.debug:
         var: created_project
 
+    - name: 'Create SSH key within the new project'
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        name: "{{ ebd_ssh_key_name }}"
+        type: ssh
+        ssh:
+          login: "{{ ebd_ssh_key_login }}"
+          private_key: "{{ ebd_ssh_key }}"
+      register: created_key
+
     - name: 'Create inventory in the new project'
       ebdruplab.semaphoreui.project_inventory_create:
         host: "{{ semaphore_host }}"
@@ -52,31 +66,23 @@
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
         inventory:
+          ssh_key_id: "{{ created_key.key.id | int }}"
           name: "{{ ebd_inventory_name }}"
           type: "static"
           inventory: "{{ ebd_inventory_data }}"
       register: created_inventory
 
-    - name: 'Create SSH key within the new project'
-      ebdruplab.semaphoreui.project_key_create:
-        host: "{{ semaphore_host }}"
-        port: "{{ semaphore_port }}"
-        session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ created_project.project.id }}"
-        name: "{{ edb_ssh_key_name }}"
-        key: "{{ edb_ssh_key }}"
-      register: created_key
-
     - name: 'Create ebdruplab example repository in project'
-      ebdruplab.semaphoreui.repository_create:
+      ebdruplab.semaphoreui.project_repository_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ created_project.project.id }}"
-        name: "Repository - ansible-ebdruplab_example"
-        git_url: "https://github.com/ebdruplab/ansible-ebdruplab_example"
-        git_branch: "main"
-        ssh_key_id: "{{ created_key.key.id }}"
+        repository:	
+          name: "Repository - ansible-ebdruplab_example"
+          git_url: "https://github.com/ebdruplab/ansible-ebdruplab_example"
+          git_branch: "main"
+          ssh_key_id: "{{ created_key.key.id }}"
       register: created_repo1
 
     - name: 'Log out'

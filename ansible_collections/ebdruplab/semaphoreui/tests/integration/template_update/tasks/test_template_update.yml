@@ -68,6 +68,14 @@
           type: ""
           arguments: "[]"
           autorun: true
+          survey_vars:
+            - name: "target_env"
+              title: "Target environment"
+              type: "enum"
+              required: true
+              values:
+                - { name: "dev",  value: "dev" }
+                - { name: "prod", value: "prod" }
       register: update_result
 
     - name: Show update result
