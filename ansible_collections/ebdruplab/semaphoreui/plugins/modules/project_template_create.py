@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# MIT License
+# Copyright (c) 2025 Kristian Ebdrup
+# MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import (
@@ -14,35 +15,240 @@ import copy
 DOCUMENTATION = r'''
 ---
 module: semaphore_template_create
-short_description: Create a Semaphore template and reliably apply prompt flags
+short_description: Create a Semaphore template and safely apply prompt flags
 version_added: "1.0.0"
+
 description:
-  - Creates a Semaphore template.
-  - Applies prompt_* flags using a full PUT update to avoid GUI state reversion.
+  - Creates a new Semaphore template (job, deploy, or build) in a project.
+  - Normalizes arguments, tags, surveys, vaults, and task parameters to API-compatible formats.
+  - Due to Semaphore API limitations, C(prompt_*) flags are NOT reliably honored by the create endpoint.
+  - When any C(prompt_*) flags are supplied, the module performs a follow-up
+    C(GET → merge → PUT) operation to apply them without resetting existing template fields.
+  - The update phase only modifies prompt flags explicitly provided by the user.
+
 options:
   host:
     type: str
     required: true
+    description:
+      - Hostname or IP of the Semaphore server, including scheme.
+      - Example: C(http://localhost), C(https://semaphore.example.com)
+
   port:
     type: int
     required: true
+    description:
+      - TCP port where Semaphore is listening (typically C(3000)).
+
   project_id:
     type: int
     required: true
+    description:
+      - ID of the Semaphore project.
+
   template:
     type: dict
     required: true
+    description:
+      - Template definition to create.
+
+    suboptions:
+      name:
+        type: str
+        required: true
+        description: Template display name.
+
+      app:
+        type: str
+        default: ansible
+        description: Application type.
+
+      playbook:
+        type: str
+        required: true
+        description: Playbook path in the repository.
+
+      repository_id:
+        type: int
+        required: true
+        description: Repository ID.
+
+      inventory_id:
+        type: int
+        required: true
+        description: Inventory ID.
+
+      environment_id:
+        type: int
+        description: Environment ID.
+
+      view_id:
+        type: int
+        description: Board view ID.
+
+      type:
+        type: str
+        choices: ["", job, deploy, build]
+        description:
+          - Template type.
+          - The API represents C(job) as an empty string.
+
+      description:
+        type: str
+        description: Human-readable description.
+
+      git_branch:
+        type: str
+        description: Default Git branch.
+
+      arguments:
+        type: raw
+        description:
+          - Arguments as stored by the UI.
+          - Scalars are wrapped into a JSON list.
+          - Lists/dicts are JSON-encoded.
+          - Defaults to C("[]").
+
+      tags:
+        type: raw
+        description:
+          - Template-level tags.
+          - Lists are joined into newline-delimited strings.
+
+      skip_tags:
+        type: raw
+        description:
+          - Template-level skip-tags.
+          - Lists are joined into newline-delimited strings.
+
+      limit:
+        type: str
+        description: Template-level Ansible limit.
+
+      allow_override_args_in_task:
+        type: bool
+
+      allow_override_branch_in_task:
+        type: bool
+
+      allow_parallel_tasks:
+        type: bool
+
+      suppress_success_alerts:
+        type: bool
+
+      autorun:
+        type: bool
+
+      task_params:
+        type: dict
+        description:
+          - Task-level overrides used at execution time.
+          - List-style tags, skip_tags, and limit are normalized.
+
+      survey_vars:
+        type: list
+        elements: dict
+        description:
+          - Survey definitions shown at task start.
+
+      vaults:
+        type: list
+        elements: dict
+        description:
+          - Vault references attached to the template.
+
+      prompt_inventory:
+        type: bool
+        description:
+          - Prompt for inventory at task start.
+          - Applied via follow-up PUT.
+
+      prompt_limit:
+        type: bool
+        description:
+          - Prompt for limit at task start.
+          - Applied via follow-up PUT.
+
+      prompt_tags:
+        type: bool
+        description:
+          - Prompt for tags at task start.
+          - Applied via follow-up PUT.
+
+      prompt_skip_tags:
+        type: bool
+        description:
+          - Prompt for skip-tags at task start.
+          - Applied via follow-up PUT.
+
+      prompt_arguments:
+        type: bool
+        description:
+          - Prompt for arguments at task start.
+          - Applied via follow-up PUT.
+
+      prompt_branch:
+        type: bool
+        description:
+          - Prompt for branch at task start.
+          - Applied via follow-up PUT.
+
   session_cookie:
     type: str
     no_log: true
+    description: Semaphore session cookie.
+
   api_token:
     type: str
     no_log: true
+    description: Semaphore API token.
+
   validate_certs:
     type: bool
     default: true
+    description: Validate TLS certificates.
+
 author:
   - Kristian Ebdrup (@kris9854)
+'''
+
+EXAMPLES = r'''
+- name: Create job template with prompts
+  ebdruplab.semaphoreui.semaphore_template_create:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 55
+    template:
+      name: "Example Job"
+      app: ansible
+      playbook: playbooks/example.yml
+      repository_id: 48
+      inventory_id: 121
+      type: ""
+      tags: ["setup", "init"]
+      prompt_inventory: true
+      prompt_tags: true
+      prompt_arguments: true
+'''
+
+RETURN = r'''
+template:
+  description: Template object returned by the API.
+  type: dict
+  returned: success
+
+status:
+  description: HTTP status code.
+  type: int
+  returned: always
+
+attempts:
+  description:
+    - List of API operations performed (create and optional update).
+  type: list
+  returned: always
 '''
 
 PROMPT_KEYS = [
