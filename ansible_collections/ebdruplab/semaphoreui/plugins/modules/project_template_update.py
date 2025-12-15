@@ -4,8 +4,10 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_request, get_auth_headers
 import json
+import copy
+
 DOCUMENTATION = r"""
 ---
 module: project_template_update
@@ -430,7 +432,6 @@ EXAMPLES = r"""
   register: update_legacy_job
 """
 
-
 RETURN = r"""
 template:
   description: The updated template object (empty on 204).
@@ -439,6 +440,10 @@ template:
 status:
   description: HTTP status code from the Semaphore API.
   type: int
+  returned: always
+attempts:
+  description: List of attempts (GET + PUT payloads and fallback PUT payloads).
+  type: list
   returned: always
 debug:
   description: Debug data (only when a non-2xx is returned).
@@ -459,6 +464,17 @@ TYPE_NORMALIZE = {
 SURVEY_TYPES = {"string", "int", "secret", "enum"}
 VAULT_TYPES = {"password", "key", "script"}
 
+PROMPT_KEYS = [
+    "prompt_inventory",
+    "prompt_limit",
+    "prompt_tags",
+    "prompt_skip_tags",
+    "prompt_vault_password",
+    "prompt_arguments",
+    "prompt_branch",
+    "prompt_environment",
+]
+
 
 def _as_text(b):
     if isinstance(b, (bytes, bytearray)):
@@ -467,6 +483,32 @@ def _as_text(b):
         except Exception:
             return str(b)
     return b
+
+
+def _to_bool(val):
+    """
+    Safe bool coercion:
+      - bool -> bool
+      - "true/false/yes/no/1/0" -> bool
+      - other strings -> False (conservative)
+      - numbers -> bool(val)
+      - None -> None (so we can distinguish "unset" from false)
+    """
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    if isinstance(val, str):
+        s = val.strip().lower()
+        if s in ("true", "yes", "y", "1", "on"):
+            return True
+        if s in ("false", "no", "n", "0", "off", ""):
+            return False
+        # Unknown string: be conservative
+        return False
+    return bool(val)
 
 
 def _int_or_none(val):
@@ -493,7 +535,6 @@ def _normalize_arguments(v):
             return s
         except Exception:
             return json.dumps([v])
-    # Unknown scalar -> treat as single argument
     return json.dumps([str(v)])
 
 
@@ -526,9 +567,11 @@ def _split_to_list(v):
 
 
 def _normalize_task_params(tp):
+    if tp is None:
+        return None
     if not isinstance(tp, dict):
         return None
-    # accept aliases inside task_params
+
     tp = dict(tp)
     tp_alias_map = {
         "allow_debug": ["allowDebug"],
@@ -546,32 +589,16 @@ def _normalize_task_params(tp):
                 tp[canon] = tp.pop(a)
 
     out = {
-        "allow_debug": bool(tp.get("allow_debug", False)),
-        "allow_override_inventory": bool(tp.get("allow_override_inventory", False)),
-        "allow_override_limit": bool(tp.get("allow_override_limit", False)),
-        "allow_override_tags": bool(tp.get("allow_override_tags", False)),
-        "allow_override_skip_tags": bool(tp.get("allow_override_skip_tags", False)),
+        "allow_debug": bool(_to_bool(tp.get("allow_debug", False))),
+        "allow_override_inventory": bool(_to_bool(tp.get("allow_override_inventory", False))),
+        "allow_override_limit": bool(_to_bool(tp.get("allow_override_limit", False))),
+        "allow_override_tags": bool(_to_bool(tp.get("allow_override_tags", False))),
+        "allow_override_skip_tags": bool(_to_bool(tp.get("allow_override_skip_tags", False))),
         "tags": _split_to_list(tp.get("tags")),
         "skip_tags": _split_to_list(tp.get("skip_tags")),
         "limit": _split_to_list(tp.get("limit")),
     }
     return out
-
-
-def _merge_template_blocks_into_task_params(tpl):
-    """
-    If template-level limit/tags/skip_tags exist, ensure task_params has list-form defaults.
-    This helps when servers only respect list-style values under task_params.
-    """
-    tp = _normalize_task_params(tpl.get("task_params") or {})
-    # Only inject when missing/empty
-    if not tp.get("limit"):
-        tp["limit"] = _split_to_list(tpl.get("limit"))
-    if not tp.get("tags"):
-        tp["tags"] = _split_to_list(tpl.get("tags"))
-    if not tp.get("skip_tags"):
-        tp["skip_tags"] = _split_to_list(tpl.get("skip_tags"))
-    return tp
 
 
 def _validate_and_normalize_surveys(svars, module):
@@ -584,7 +611,6 @@ def _validate_and_normalize_surveys(svars, module):
         if not isinstance(sv, dict):
             module.fail_json(msg=f"survey_vars[{idx}] must be a dict")
 
-        # alias: default -> default_value
         if "default_value" not in sv and "default" in sv:
             sv["default_value"] = sv.get("default")
 
@@ -600,13 +626,12 @@ def _validate_and_normalize_surveys(svars, module):
         if stype_l not in SURVEY_TYPES:
             module.fail_json(msg=f"survey_vars[{idx}].type must be one of {sorted(SURVEY_TYPES)}")
 
-        required = bool(sv.get("required", False))
+        required = bool(_to_bool(sv.get("required", False)))
         desc = sv.get("description", "")
         default_value = sv.get("default_value", None)
 
         values = None
         if stype_l == "int":
-            # Many server builds store int defaults as STRING values (e.g., "5"), not numeric.
             if default_value is not None:
                 try:
                     default_value = str(int(default_value))
@@ -618,9 +643,8 @@ def _validate_and_normalize_surveys(svars, module):
             if isinstance(default_value, (int, float)):
                 default_value = str(default_value)
         elif stype_l == "secret":
-            # server rejects defaults for secret — drop it entirely
             default_value = None
-        else:  # enum
+        else:
             values = sv.get("values", [])
             if not isinstance(values, list) or len(values) == 0:
                 module.fail_json(msg=f"survey_vars[{idx}].values must be a non-empty list for enum type")
@@ -656,7 +680,6 @@ def _validate_and_normalize_vaults(vaults, module):
         if not isinstance(v, dict):
             module.fail_json(msg=f"template.vaults[{i}] must be a dict.")
 
-        # nested alias: vaultKeyId -> vault_key_id
         if "vault_key_id" not in v and "vaultKeyId" in v:
             v["vault_key_id"] = v.pop("vaultKeyId")
 
@@ -684,42 +707,18 @@ def _validate_and_normalize_vaults(vaults, module):
     return validated
 
 
-def _prune_nones(d):
-    return {k: v for k, v in d.items() if v is not None}
-
-
-PROMPT_KEYS = [
-    "prompt_inventory",
-    "prompt_limit",
-    "prompt_tags",
-    "prompt_skip_tags",
-    "prompt_vault_password",
-    "prompt_arguments",
-    "prompt_branch",
-    "prompt_environment",
-]
-
-
-def _drop_falsey_prompts(d):
-    for k in PROMPT_KEYS:
-        if not d.get(k):
-            d.pop(k, None)
-
-
 def _apply_aliases(tpl):
     """
     Accept common alternative spellings and camelCase for known fields.
     Maps them to canonical API names and removes the aliases.
     """
     alias_map = {
-        # booleans / toggles
         "allow_parallel": ["allow_parallel_tasks", "allowParallel", "allowParallelTasks"],
         "allow_override_args_in_task": ["allow_override_args", "allowOverrideArgsInTask", "allowOverrideArgs"],
         "allow_override_branch_in_task": ["allow_override_branch", "allowOverrideBranchInTask", "allowOverrideBranch"],
         "suppress_success_alerts": ["suppress_success_alert", "suppressSuccessAlerts", "suppressSuccessAlert"],
         "autorun": ["auto_run", "autoRun"],
 
-        # strings / ids
         "git_branch": ["branch", "gitBranch"],
         "start_version": ["startVersion"],
         "skip_tags": ["skipTags"],
@@ -727,18 +726,15 @@ def _apply_aliases(tpl):
         "arguments": ["args", "extra_args", "extra_cli_args", "cli_args"],
         "limit": ["hosts_limit", "host_limit", "hostsLimit", "hostLimit"],
 
-        # ids
         "repository_id": ["repositoryId"],
         "inventory_id": ["inventoryId"],
         "environment_id": ["environmentId"],
         "view_id": ["viewId"],
         "build_template_id": ["buildTemplateId"],
 
-        # nested objects
         "task_params": ["taskParams"],
         "survey_vars": ["surveyVars", "surveys"],
 
-        # misc
         "type": ["template_type", "templateType"],
         "app": ["application", "appType"],
         "vault_password": ["vaultPassword"],
@@ -749,30 +745,23 @@ def _apply_aliases(tpl):
             if canon not in tpl and a in tpl:
                 tpl[canon] = tpl.pop(a)
 
-    # Nested: task_params
-    if isinstance(tpl.get("task_params"), dict):
-        tp = tpl["task_params"]
-        tp_alias_map = {
-            "allow_debug": ["allowDebug"],
-            "allow_override_inventory": ["allowOverrideInventory"],
-            "allow_override_limit": ["allowOverrideLimit"],
-            "allow_override_tags": ["allowOverrideTags"],
-            "allow_override_skip_tags": ["allowOverrideSkipTags"],
-            "tags": ["tagList", "tags_list", "tagsList"],
-            "skip_tags": ["skipTags"],
-            "limit": ["hosts", "hostList", "limits"],
-        }
-        for canon, aliases in tp_alias_map.items():
-            for a in aliases:
-                if canon not in tp and a in tp:
-                    tp[canon] = tp.pop(a)
-        tpl["task_params"] = tp
-
-    # Nested: survey_vars
     if isinstance(tpl.get("survey_vars"), list):
         for sv in tpl["survey_vars"]:
             if isinstance(sv, dict) and "default_value" not in sv and "default" in sv:
                 sv["default_value"] = sv.pop("default")
+
+
+def _prune_none(d):
+    return {k: v for k, v in d.items() if v is not None}
+
+
+def _http_get(url, headers, validate_certs):
+    return semaphore_request("GET", url, body=None, headers=headers, validate_certs=validate_certs)
+
+
+def _http_put(url, payload, headers, validate_certs):
+    body = json.dumps(payload).encode("utf-8")
+    return semaphore_request("PUT", url, body=body, headers=headers, validate_certs=validate_certs)
 
 
 def main():
@@ -798,136 +787,14 @@ def main():
     port = int(p['port'])
     project_id = int(p['project_id'])
     template_id = int(p['template_id'])
-    tpl = dict(p['template'] or {})
     validate_certs = p['validate_certs']
     allow_job_surveys = p['allow_job_surveys']
     allow_job_arguments = p['allow_job_arguments']
 
-    # Accept common aliases before validations
-    _apply_aliases(tpl)
+    user_tpl = dict(p['template'] or {})
+    original_user_keys = set(user_tpl.keys())
 
-    # Required fields for update body
-    for req in ('name', 'app', 'playbook'):
-        if not tpl.get(req):
-            module.fail_json(msg=f"Missing required template field: {req}")
-
-    # Coerce integer fields
-    for key in ('repository_id', 'inventory_id', 'environment_id', 'view_id', 'build_template_id'):
-        if key in tpl and tpl[key] is not None:
-            coerced = _int_or_none(tpl[key])
-            if coerced is None and key in ('repository_id', 'inventory_id'):
-                module.fail_json(msg=f"{key} must be an integer")
-            if coerced is None:
-                tpl.pop(key, None)
-            else:
-                tpl[key] = coerced
-
-    # Type normalization
-    raw_type = tpl.get('type', "")
-    norm_type = TYPE_NORMALIZE.get(
-        raw_type if raw_type in ("", "job", "deploy", "build", None) else str(raw_type).lower(),
-        None
-    )
-    if norm_type is None:
-        module.fail_json(msg="template.type must be one of '', job, deploy, build (or omit/None).")
-    tpl['type'] = norm_type  # "" for job
-
-    # Arguments & tag blocks (template-level)
-    tpl['arguments'] = _normalize_arguments(tpl.get('arguments'))
-
-    if 'tags' in tpl:
-        tags = _normalize_tag_block(tpl.get('tags'))
-        if tags:
-            tpl['tags'] = tags
-        else:
-            tpl.pop('tags', None)
-
-    if 'skip_tags' in tpl:
-        skip_tags = _normalize_tag_block(tpl.get('skip_tags'))
-        if skip_tags:
-            tpl['skip_tags'] = skip_tags
-        else:
-            tpl.pop('skip_tags', None)
-
-    if 'limit' in tpl and tpl['limit'] is not None:
-        # keep as plain string for the template; task_params will get list form
-        tpl['limit'] = str(tpl['limit'])
-
-    # task_params (ensure list-form tags/skip_tags/limit)
-    # NOTE: many servers only respect list-style values inside task_params during runs.
-    if 'task_params' in tpl:
-        tpl['task_params'] = _merge_template_blocks_into_task_params(tpl)
-    else:
-        # If user didn't pass task_params, still derive them from template-level blocks so they stick.
-        derived_tp = _merge_template_blocks_into_task_params(tpl)
-        # only include if any list is non-empty or any allow_* flag is present
-        if any(derived_tp.get(k) for k in ('tags', 'skip_tags', 'limit')) or any(
-            derived_tp.get(k) for k in (
-                'allow_debug', 'allow_override_inventory', 'allow_override_limit',
-                'allow_override_tags', 'allow_override_skip_tags'
-            )
-        ):
-            tpl['task_params'] = derived_tp
-
-    # survey_vars (validate & normalize)
-    if 'survey_vars' in tpl:
-        norm_sv = _validate_and_normalize_surveys(tpl.get('survey_vars'), module)
-        if norm_sv is not None:
-            tpl['survey_vars'] = norm_sv
-
-    # vaults (validate & normalize)
-    if 'vaults' in tpl:
-        norm_vaults = _validate_and_normalize_vaults(tpl.get('vaults'), module)
-        if norm_vaults:
-            tpl['vaults'] = norm_vaults
-        else:
-            tpl.pop('vaults', None)
-
-    # Sync ids
-    tpl['id'] = template_id
-    tpl['project_id'] = project_id
-
-    # Booleans (normalize both canonical & legacy names)
-    for bkey in [
-        'allow_override_args_in_task',
-        'allow_override_branch_in_task',
-        'allow_parallel',           # canonical
-        'allow_parallel_tasks',     # alias (will be mapped below)
-        'suppress_success_alerts',
-        'autorun',
-        'prompt_inventory',
-        'prompt_limit',
-        'prompt_tags',
-        'prompt_skip_tags',
-        'prompt_vault_password',
-        'prompt_arguments',
-        'prompt_branch',
-        'prompt_environment',
-    ]:
-        if bkey in tpl and tpl[bkey] is not None:
-            tpl[bkey] = bool(tpl[bkey])
-
-    # Prefer canonical allow_parallel if both variants exist
-    if 'allow_parallel' not in tpl and 'allow_parallel_tasks' in tpl:
-        tpl['allow_parallel'] = tpl.pop('allow_parallel_tasks')
-    else:
-        tpl.pop('allow_parallel_tasks', None)
-
-    # Drop false-y prompt_* flags
-    _drop_falsey_prompts(tpl)
-
-    # IMPORTANT: job-type quirks
-    if tpl.get('type', '') == "":
-        # Always drop task_params for job templates (legacy server compatibility)
-        tpl.pop('task_params', None)
-        # Surveys & arguments are conditionally dropped based on module options
-        if not allow_job_surveys:
-            tpl.pop('survey_vars', None)
-        if not allow_job_arguments:
-            tpl.pop('arguments', None)
-        # keep allow_parallel (API represents job as "" but accepts allow_parallel)
-
-    tpl = _prune_nones(tpl)
+    _apply_aliases(user_tpl)
 
     headers = get_auth_headers(
         session_cookie=p.get('session_cookie'),
@@ -937,45 +804,213 @@ def main():
     headers.setdefault('Accept', 'application/json')
 
     url = f"{host}:{port}/api/project/{project_id}/templates/{template_id}"
+    attempts = []
 
-    try:
-        body = json.dumps(tpl).encode('utf-8')
-        response_body, status, _ = semaphore_put(
-            url=url,
-            body=body,
-            headers=headers,
-            validate_certs=validate_certs,
+    # 1) GET existing template (baseline for merge-safe PUT)
+    resp_body, status, _ = _http_get(url, headers, validate_certs)
+    attempts.append({"op": "get", "status": status, "url": url})
+
+    if status not in (200,):
+        module.fail_json(
+            msg=f"GET template failed with status {status}: {_as_text(resp_body)}",
+            status=status,
+            attempts=attempts,
+            debug={"url": url},
         )
 
-        if status not in (200, 201, 204):
-            module.fail_json(
-                msg=f"PUT failed with status {status}: {_as_text(response_body)}",
-                status=status,
-                debug={
-                    'url': url,
-                    'url_project_id': project_id,
-                    'url_template_id': template_id,
-                    'body_project_id': tpl.get('project_id'),
-                    'body_id': tpl.get('id'),
-                    'payload': tpl,
-                },
-            )
+    existing_text = _as_text(resp_body)
+    try:
+        existing = json.loads(existing_text) if isinstance(existing_text, str) else existing_text
+    except Exception:
+        module.fail_json(
+            msg="GET returned non-JSON body; cannot safely merge for PUT.",
+            status=status,
+            attempts=attempts,
+            debug={"raw": existing_text},
+        )
 
-        if status == 204 or not response_body:
-            module.exit_json(changed=True, template={}, status=status)
+    if not isinstance(existing, dict):
+        module.fail_json(
+            msg="GET returned unexpected structure (expected JSON object).",
+            status=status,
+            attempts=attempts,
+            debug={"existing_type": str(type(existing))},
+        )
 
-        text = _as_text(response_body)
-        try:
-            result = json.loads(text) if isinstance(text, str) else text
-        except Exception:
-            result = {'raw': text}
+    # 2) Normalize user-provided fields (ONLY those they provided)
+    # Required fields for update remain required by your module contract:
+    for req in ('name', 'app', 'playbook'):
+        if not user_tpl.get(req):
+            module.fail_json(msg=f"Missing required template field: {req}")
 
-        module.exit_json(changed=True, template=result, status=status)
+    # Normalize type (based on user input if provided; otherwise keep existing)
+    if "type" in user_tpl or "type" in original_user_keys:
+        raw_type = user_tpl.get('type', "")
+        norm_type = TYPE_NORMALIZE.get(
+            raw_type if raw_type in ("", "job", "deploy", "build", None) else str(raw_type).lower(),
+            None
+        )
+        if norm_type is None:
+            module.fail_json(msg="template.type must be one of '', job, deploy, build (or omit/None).")
+        user_tpl['type'] = norm_type
 
-    except Exception as e:
-        module.fail_json(msg=str(e), debug={'url': url, 'payload': tpl})
+    # Coerce integer fields only if user provided them
+    for key in ('repository_id', 'inventory_id', 'environment_id', 'view_id', 'build_template_id'):
+        if key in user_tpl:
+            coerced = _int_or_none(user_tpl.get(key))
+            if coerced is None and key in ('repository_id', 'inventory_id'):
+                module.fail_json(msg=f"{key} must be an integer")
+            if coerced is None:
+                user_tpl.pop(key, None)
+            else:
+                user_tpl[key] = coerced
+
+    # Normalize arguments if user provided them
+    if "arguments" in user_tpl:
+        user_tpl["arguments"] = _normalize_arguments(user_tpl.get("arguments"))
+
+    # Normalize tags/skip_tags if user provided them
+    if "tags" in user_tpl:
+        tags = _normalize_tag_block(user_tpl.get("tags"))
+        if tags is None:
+            user_tpl.pop("tags", None)
+        else:
+            user_tpl["tags"] = tags
+
+    if "skip_tags" in user_tpl:
+        skip_tags = _normalize_tag_block(user_tpl.get("skip_tags"))
+        if skip_tags is None:
+            user_tpl.pop("skip_tags", None)
+        else:
+            user_tpl["skip_tags"] = skip_tags
+
+    if "limit" in user_tpl and user_tpl["limit"] is not None:
+        user_tpl["limit"] = str(user_tpl["limit"])
+
+    # Normalize task_params only if user provided it
+    if "task_params" in user_tpl:
+        user_tpl["task_params"] = _normalize_task_params(user_tpl.get("task_params"))
+
+    # Normalize survey_vars only if user provided it
+    if "survey_vars" in user_tpl:
+        user_tpl["survey_vars"] = _validate_and_normalize_surveys(user_tpl.get("survey_vars"), module)
+
+    # Normalize vaults only if user provided it
+    if "vaults" in user_tpl:
+        norm_vaults = _validate_and_normalize_vaults(user_tpl.get("vaults"), module)
+        if norm_vaults:
+            user_tpl["vaults"] = norm_vaults
+        else:
+            user_tpl.pop("vaults", None)
+
+    # Normalize booleans only if user provided them.
+    bool_keys = [
+        'allow_override_args_in_task',
+        'allow_override_branch_in_task',
+        'allow_parallel',
+        'suppress_success_alerts',
+        'autorun',
+    ] + PROMPT_KEYS
+
+    for bk in bool_keys:
+        if bk in user_tpl:
+            bval = _to_bool(user_tpl.get(bk))
+            # Preserve explicit None? For bools, treat None as "unset" and drop.
+            if bval is None:
+                user_tpl.pop(bk, None)
+            else:
+                user_tpl[bk] = bval
+
+    # 3) Merge user changes into existing object (full PUT semantics)
+    merged = copy.deepcopy(existing)
+
+    # Ensure IDs match URL
+    merged["id"] = template_id
+    merged["project_id"] = project_id
+
+    # Apply user-provided fields onto merged
+    # IMPORTANT: Only apply prompt_* if user explicitly provided them
+    for k, v in user_tpl.items():
+        if k in PROMPT_KEYS and k not in original_user_keys and k not in user_tpl:
+            # Defensive; should never hit due to dict iteration
+            continue
+        merged[k] = v
+
+    # Keep allow_parallel alias stable
+    if "allow_parallel_tasks" in merged:
+        merged.pop("allow_parallel_tasks", None)
+
+    # If user did NOT provide prompt keys, ensure we do not accidentally null them
+    # (merge already protects this as we start from existing)
+
+    # 4) Job-type compatibility handling (apply AFTER merge)
+    eff_type = merged.get("type", "")
+    if eff_type is None:
+        eff_type = ""
+    if str(eff_type).lower() == "job":
+        eff_type = ""
+    merged["type"] = eff_type
+
+    # For job templates: optionally drop surveys/arguments based on module flags
+    # BUT do not drop unless the user was trying to set them or options require it.
+    if merged.get("type", "") == "":
+        if not allow_job_surveys and "survey_vars" in merged:
+            merged.pop("survey_vars", None)
+        if not allow_job_arguments and "arguments" in merged:
+            merged.pop("arguments", None)
+
+    merged = _prune_none(merged)
+
+    # 5) PUT (with fallback strategy if the server rejects some fields)
+    def do_put(payload, op):
+        rb, st, _ = _http_put(url, payload, headers, validate_certs)
+        attempts.append({"op": op, "status": st, "url": url, "payload": payload})
+        return rb, st
+
+    resp2, status2 = do_put(merged, "put-merged")
+
+    # Fallbacks primarily for older servers rejecting job-template extras
+    if status2 == 400 and merged.get("type", "") == "":
+        # FB1: drop task_params
+        fb1 = copy.deepcopy(merged)
+        fb1.pop("task_params", None)
+        resp2, status2 = do_put(fb1, "put-fb1-drop-task_params")
+
+        # FB2: also drop survey_vars
+        if status2 == 400:
+            fb2 = copy.deepcopy(fb1)
+            fb2.pop("survey_vars", None)
+            resp2, status2 = do_put(fb2, "put-fb2-drop-survey_vars")
+
+        # FB3: also drop arguments
+        if status2 == 400:
+            fb3 = copy.deepcopy(fb2)
+            fb3.pop("arguments", None)
+            resp2, status2 = do_put(fb3, "put-fb3-drop-arguments")
+
+    if status2 not in (200, 201, 204):
+        module.fail_json(
+            msg=f"PUT failed with status {status2}: {_as_text(resp2)}",
+            status=status2,
+            attempts=attempts,
+            debug={
+                "url": url,
+                "url_project_id": project_id,
+                "url_template_id": template_id,
+            },
+        )
+
+    if status2 == 204 or not resp2:
+        module.exit_json(changed=True, template={}, status=status2, attempts=attempts)
+
+    text = _as_text(resp2)
+    try:
+        result = json.loads(text) if isinstance(text, str) else text
+    except Exception:
+        result = {"raw": text}
+
+    module.exit_json(changed=True, template=result, status=status2, attempts=attempts)
 
 
 if __name__ == '__main__':
     main()
-
