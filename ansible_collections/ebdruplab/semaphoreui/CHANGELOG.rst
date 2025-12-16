@@ -134,5 +134,9 @@ Version 2.0.4
 -------------
 Fixed bug: https://github.com/Ebdruplab/ansible-collection_ebdruplab/issues/11
 
+Version 2.0.5
+-------------
+Fixed bug: https://github.com/Ebdruplab/ansible-collection_ebdruplab/issues/15
+
 
 Initial release; no further info.
