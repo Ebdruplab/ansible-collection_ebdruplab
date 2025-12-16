@@ -32,7 +32,7 @@ options:
     required: true
     description:
       - Hostname or IP of the Semaphore server, including scheme.
-      - Example: C(http://localhost), C(https://semaphore.example.com)
+      - "Example: C(http://localhost), C(https://semaphore.example.com)"
 
   port:
     type: int
@@ -88,7 +88,11 @@ options:
 
       type:
         type: str
-        choices: ["", job, deploy, build]
+        choices:
+          - ""
+          - job
+          - deploy
+          - build
         description:
           - Template type.
           - The API represents C(job) as an empty string.
@@ -127,18 +131,23 @@ options:
 
       allow_override_args_in_task:
         type: bool
+        description: Allow task runs to override Ansible arguments.
 
       allow_override_branch_in_task:
         type: bool
+        description: Allow task runs to override the Git branch.
 
       allow_parallel_tasks:
         type: bool
+        description: Allow multiple tasks from this template to run in parallel.
 
       suppress_success_alerts:
         type: bool
+        description: Suppress notifications/alerts on successful runs.
 
       autorun:
         type: bool
+        description: Automatically run the template on relevant triggers (if supported by Semaphore).
 
       task_params:
         type: dict
