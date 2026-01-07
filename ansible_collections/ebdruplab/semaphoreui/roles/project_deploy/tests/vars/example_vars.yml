@@ -319,3 +319,23 @@ project_deploy_config:
       task_params:
         diff: false
         dry_run: false
+    ci_token_trigger_secondary:
+      name: "CI Token Trigger (Secondary)"
+      template_name: "Deploy Service"
+      auth_method: "token"
+      auth_secret_name: "CI Trigger Token Secondary"
+      task_params:
+        diff: false
+        dry_run: false
+      extraction_values:
+        - name: "Extract Branch"
+          key: "X-Branch"
+          value_source: "header"
+          variable_type: "environment"
+          variable: "git_branch"
+
+        - name: "Extract Commit"
+          key: "X-Commit"
+          value_source: "header"
+          variable_type: "environment"
+          variable: "git_commit"
