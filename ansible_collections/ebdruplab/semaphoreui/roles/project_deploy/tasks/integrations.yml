@@ -86,7 +86,7 @@
     - integrations
     - facts
 
-- name: "Compute Desired Integrations List"
+- name: "Compute Desired Integrations List (backwards compatible)"
   ansible.builtin.set_fact:
     _desired_integrations: "{{ project_deploy_config.integrations | default({}) | dict2items | map(attribute='value') | list }}"
   tags:
@@ -94,54 +94,7 @@
     - integrations
     - facts
 
-- name: "Debug (integrations maps)"
-  when: project_deploy_debug | bool
-  ansible.builtin.debug:
-    msg:
-      desired_integrations: "{{ _desired_integrations | map(attribute='name') | list }}"
-      known_templates: "{{ (templates_by_name_all | default({})).keys() | list }}"
-      existing_integrations: "{{ integrations_by_name | default({}) }}"
-      raw_list_result: "{{ _int_list }}"
-  tags:
-    - project_deploy
-    - integrations
-    - debug
-
-- name: "Debug integration payload (update)"
-  when:
-    - project_deploy_debug | bool
-    - project_deploy_force_project_update | bool
-  ansible.builtin.debug:
-    msg:
-      will_update: "{{ item.name if (item.name in (integrations_by_name | default({}))) else 'skip' }}"
-      template_id_resolved: >-
-        {{
-          (item.template_id | default('unset'))
-          if (item.template_id is defined)
-          else (
-            (templates_by_name_all[item.template_name] | default('unset'))
-            if (item.template_name is defined) else 'unset'
-          )
-        }}
-      auth_secret_resolved: >-
-        {{
-          (item.auth_secret_id | default('unset'))
-          if (item.auth_secret_id is defined)
-          else (
-            (created_keys_by_name[item.auth_secret_name].id | default('unset'))
-            if (item.auth_secret_name is defined and created_keys_by_name is defined and item.auth_secret_name in created_keys_by_name)
-            else 'unset'
-          )
-        }}
-  loop: "{{ _desired_integrations }}"
-  loop_control:
-    label: "{{ item.name }}"
-  tags:
-    - project_deploy
-    - integrations
-    - debug
-
-- name: "Update Project Integration By Name"
+- name: "Update Project Integration By Name (resolve template & secret by id or name)"
   ebdruplab.semaphoreui.project_integration_update:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -168,14 +121,16 @@
           (item.auth_secret_id | int)
           if (item.auth_secret_id is defined)
           else (
-            created_keys_by_name[item.auth_secret_name].id | int
-            if (item.auth_secret_name is defined and created_keys_by_name is defined and (item.auth_secret_name in created_keys_by_name))
+            (created_keys_by_name[item.auth_secret_name].id | int)
+            if (
+              item.auth_secret_name is defined and
+              created_keys_by_name is defined and
+              (item.auth_secret_name in created_keys_by_name)
+            )
             else omit
           )
         }}
-      task_params:
-        diff: "{{ item.task_params.diff | default(false) }}"
-        dry_run: "{{ item.task_params.dry_run | default(false) }}"
+      task_params: "{{ item.task_params | default(omit) }}"
   when:
     - project_deploy_force_project_update | bool
     - item.name in (integrations_by_name | default({}))
@@ -188,40 +143,7 @@
     - integrations
     - update
 
-- name: "Debug integration payload (create)"
-  when:
-    - project_deploy_debug | bool
-  ansible.builtin.debug:
-    msg:
-      will_create: "{{ item.name if (item.name not in (integrations_by_name | default({}))) else 'skip' }}"
-      template_id_resolved: >-
-        {{
-          (item.template_id | default('unset'))
-          if (item.template_id is defined)
-          else (
-            (templates_by_name_all[item.template_name] | default('unset'))
-            if (item.template_name is defined) else 'unset'
-          )
-        }}
-      auth_secret_resolved: >-
-        {{
-          (item.auth_secret_id | default('unset'))
-          if (item.auth_secret_id is defined)
-          else (
-            (created_keys_by_name[item.auth_secret_name].id | default('unset'))
-            if (item.auth_secret_name is defined and created_keys_by_name is defined and item.auth_secret_name in created_keys_by_name)
-            else 'unset'
-          )
-        }}
-  loop: "{{ _desired_integrations }}"
-  loop_control:
-    label: "{{ item.name }}"
-  tags:
-    - project_deploy
-    - integrations
-    - debug
-
-- name: "Create Project Integration When Missing"
+- name: "Create Project Integration When Missing (resolve template & secret by id or name)"
   ebdruplab.semaphoreui.project_integration_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -234,7 +156,11 @@
         {{
           (item.template_id | int)
           if (item.template_id is defined)
-          else (templates_by_name_all[item.template_name] | int)
+          else (
+            (templates_by_name_all[item.template_name] | int)
+            if (item.template_name is defined and (item.template_name in (templates_by_name_all | default({}))))
+            else omit
+          )
         }}
       auth_method: "{{ item.auth_method | default(omit) }}"
       auth_header: "{{ item.auth_header | default(omit) }}"
@@ -243,14 +169,16 @@
           (item.auth_secret_id | int)
           if (item.auth_secret_id is defined)
           else (
-            created_keys_by_name[item.auth_secret_name].id | int
-            if (item.auth_secret_name is defined and created_keys_by_name is defined and (item.auth_secret_name in created_keys_by_name))
+            (created_keys_by_name[item.auth_secret_name].id | int)
+            if (
+              item.auth_secret_name is defined and
+              created_keys_by_name is defined and
+              (item.auth_secret_name in created_keys_by_name)
+            )
             else omit
           )
         }}
-      task_params:
-        diff: "{{ item.task_params.diff | default(false) }}"
-        dry_run: "{{ item.task_params.dry_run | default(false) }}"
+      task_params: "{{ item.task_params | default(omit) }}"
   when:
     - item.name not in (integrations_by_name | default({}))
     - >
@@ -296,6 +224,48 @@
     - project_deploy
     - integrations
     - list
+
+- name: "Build Map: integrations_by_name_after"
+  ansible.builtin.set_fact:
+    integrations_by_name_after: >-
+      {{
+        dict(
+          (_int_list_after.integrations | default([])) | map(attribute='name') | list
+          | zip((_int_list_after.integrations | default([])) | map(attribute='id') | list)
+        )
+      }}
+  tags:
+    - project_deploy
+    - integrations
+    - facts
+
+- name: "Create Integration Extraction Values (additive; no impact if not configured)"
+  ebdruplab.semaphoreui.project_integration_extraction_value_create:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ integrations_by_name_after[item.0.name] | int }}"
+    extraction_value:
+      name: "{{ item.1.name }}"
+      key: "{{ item.1.key }}"
+      value_source: "{{ item.1.value_source }}"
+      variable_type: "{{ item.1.variable_type }}"
+      variable: "{{ item.1.variable }}"
+  when:
+    - item.0.name is defined
+    - item.0.name in (integrations_by_name_after | default({}))
+    - (item.0.extraction_values | default([])) | length > 0
+  loop: "{{ _desired_integrations | subelements('extraction_values', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} :: {{ item.1.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - integrations
+    - extractions
+    - create
 
 - name: "Set Created Integrations Fact"
   ansible.builtin.set_fact:
