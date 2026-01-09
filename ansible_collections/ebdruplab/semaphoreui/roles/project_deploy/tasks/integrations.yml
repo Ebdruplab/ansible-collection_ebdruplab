@@ -1,3 +1,4 @@
+# roles/project_deploy/tasks/integrations.yml
 ---
 - name: "List Project Integrations"
   ebdruplab.semaphoreui.project_integration_list:
@@ -239,7 +240,10 @@
     - integrations
     - facts
 
-- name: "Create Integration Extraction Values (additive; no impact if not configured)"
+# IMPORTANT: project_integration_extraction_value_create expects a DICT argument named "value"
+# (not a scalar, and not "extraction_value"). The dict should match the API shape.
+# Backwards compatible: allow "key" or "value" in vars; map to API "key".
+- name: "Create Integration Extraction Values (additive; supports key/value; no impact if not configured)"
   ebdruplab.semaphoreui.project_integration_extraction_value_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -247,9 +251,9 @@
     session_cookie: "{{ login_result.session_cookie | default(omit) }}"
     project_id: "{{ current_project_id }}"
     integration_id: "{{ integrations_by_name_after[item.0.name] | int }}"
-    extraction_value:
+    value:
       name: "{{ item.1.name }}"
-      key: "{{ item.1.key }}"
+      key: "{{ item.1.key | default(item.1.value) }}"
       value_source: "{{ item.1.value_source }}"
       variable_type: "{{ item.1.variable_type }}"
       variable: "{{ item.1.variable }}"
@@ -257,6 +261,7 @@
     - item.0.name is defined
     - item.0.name in (integrations_by_name_after | default({}))
     - (item.0.extraction_values | default([])) | length > 0
+    - (item.1.key is defined) or (item.1.value is defined)
   loop: "{{ _desired_integrations | subelements('extraction_values', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} :: {{ item.1.name }}"
@@ -280,3 +285,4 @@
     - project_deploy
     - integrations
     - facts
+
