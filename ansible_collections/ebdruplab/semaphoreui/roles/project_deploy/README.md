@@ -1,8 +1,11 @@
 # Ansible Role — `ebdruplab.semaphoreui.project_deploy`
 
-Deploy a complete Semaphore project from one declarative variable tree. The role logs in (or uses an API token), validates your config, optionally deletes an existing project, then creates/links **keys, repositories, views, inventories, environments, templates, schedules,** and **integrations** — idempotently.
+Deploy a complete Semaphore project from one declarative variable tree.
+The role authenticates (API token or username/password), validates your configuration, optionally deletes an existing project, and then creates or synchronizes **keys, repositories, views, inventories, environments, templates, schedules, and integrations** — idempotently.
 
-You can see a working example under the repository’s **`tests/`** directory.
+From **v2.0.6**, integrations can also define **extraction values**, allowing request data (for example HTTP headers) to be mapped to environment variables for integration-triggered tasks.
+
+A working example can be found in the repository’s **`tests/`** directory.
 
 ---
 
@@ -25,59 +28,75 @@ project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
 
 # Safety
-project_deploy_debug: false                       # Extra debug logs
-project_deploy_sensitive_data_no_log: true        # Hide sensitive values in task logs
-project_deploy_force_project_creation: false      # Always create a new project (even if same name exists)
-project_deploy_force_project_update:   false      # Reuse first matching project and sync resources
-project_deploy_force_project_delete:   false      # Delete matching project(s) before creating fresh
-project_deploy_force_project_delete_timer: 5      # Seconds to pause before delete
+project_deploy_debug: false
+project_deploy_sensitive_data_no_log: true
+project_deploy_force_project_creation: false
+project_deploy_force_project_update: false
+project_deploy_force_project_delete: false
+project_deploy_force_project_delete_timer: 5
 
 # Pruning (delete items not present in your YAML)
 project_deploy_variable_delete: false
 
-# Declarative config (preferred shapes shown below)
+# Declarative config
 project_deploy_config:
   project: {}
-  users_access: []          # list
-  keys: {}                  # map (handle -> key spec)
-  repositories: []          # list
-  views: {}                 # map (handle -> {title, position})
-  inventories: {}           # map
-  environments: {}          # map
-  templates: {}             # map
-  schedules: {}             # map
-  integrations: {}          # map
+  users_access: []
+  keys: {}
+  repositories: []
+  views: {}
+  inventories: {}
+  environments: {}
+  templates: {}
+  schedules: {}
+  integrations: {}
 ```
 
-> If you previously used empty lists (`[]`) for maps, switch to `{}` to match the role’s expectations (most task files iterate with `dict2items`).
+> If you previously used empty lists (`[]`) for map-based sections, switch to `{}`.
+> Most task files iterate using `dict2items`.
 
 ---
 
 ## What the role does
 
-1. **Auth** via API token *or* username/password.
+1. **Authenticate**
 
-2. **Preflight** validation of your `project_deploy_config`.
+   * API token **or**
+   * Username/password
 
-3. **Existing projects**
+2. **Preflight validation** of `project_deploy_config`
 
-   * None → **create** a new one
-   * Found → behavior depends on flags
+3. **Project handling**
 
-     * `project_deploy_force_project_delete: true` → pause → **delete** → **create fresh**
-     * `project_deploy_force_project_creation: true` → **create another** project with same name
-     * `project_deploy_force_project_update: true` → **reuse** first match and **sync** resources
-     * Otherwise → **fail safely**
+   * No project found → **create**
+   * Project found → behavior controlled by flags:
 
-4. **Create/link resources in order**
-   keys → repositories → views → inventories → environments → templates → schedules → integrations
+     * `project_deploy_force_project_delete` → delete → create fresh
+     * `project_deploy_force_project_creation` → create another project with same name
+     * `project_deploy_force_project_update` → reuse and sync resources
+     * Otherwise → fail safely
 
-5. **Expose lookups** so later steps can resolve IDs by name/title:
-   `created_keys_by_name`, `created_repos_by_name`, `created_project_view_by_title`, `created_inventory_by_name`, `created_environments_by_name`, `created_templates_by_name`, `created_schedules_by_name`, `created_integrations_by_name`.
+4. **Create / sync resources in order**
 
-6. **Pruning** (when `project_deploy_variable_delete: true`)
+   ```
+   keys → repositories → views → inventories → environments
+        → templates → schedules → integrations → integration extraction values
+   ```
 
-   * Removes **schedules**, **integrations**, **templates** (and other supported resources) that exist in Semaphore but are **not** present in your YAML.
+5. **Expose lookup maps** for resolving IDs by name:
+
+   * `created_keys_by_name`
+   * `created_repos_by_name`
+   * `created_project_view_by_title`
+   * `created_inventory_by_name`
+   * `created_environments_by_name`
+   * `created_templates_by_name`
+   * `created_schedules_by_name`
+   * `created_integrations_by_name`
+
+6. **Pruning** (when enabled)
+
+   * Removes existing resources in Semaphore that are **not** present in your YAML
 
 ---
 
@@ -92,117 +111,131 @@ project_deploy_config:
     max_parallel_tasks: 0
     demo: false
 
-  users_access:                      # list (users must already exist in Semaphore)
+  users_access:
     - username: "admin"
-      role: "Owner"                  # Owner | Manager | Task Runner | Guest (case/space-insensitive)
+      role: "Owner"
 
-  keys:                              # map
+  keys:
     key_handle:
       name: "Human Name"
       type: ssh | login_password
       ssh:
         login: "ansibleuser"
         passphrase: "{{ vault_passphrase }}"
-        private_key: "{{ vault_private_key_multiline }}"
+        private_key: "{{ vault_private_key }}"
       login_password:
         login: "Git User"
         password: "{{ vault_git_password }}"
 
-  repositories:                      # list
+  repositories:
     - name: "Repo Name"
       git_url: "https://github.com/org/repo.git"
       git_branch: "main"
-      key_name: "Human Name of a key"      # or ssh_key_id
+      key_name: "Human Name of a key"
 
-  views:                             # map
+  views:
     my_view:
       title: "Board Column"
       position: 0
 
-  inventories:                       # map
+  inventories:
     inv1:
       name: "Static YAML"
       type: static-yaml | static | file
-      inventory: |                   # for static/static-yaml
-        all:
-          hosts:
-            localhost:
-              ansible_connection: local
-      repository_name: "Repo Name"   # for type=file (or repository_id)
+      inventory: {}
+      repository_name: "Repo Name"
       inventory_file: "path/in/repo.ini"
-      ssh_key_name: "SSH key name"   # required
-      become_key_name: "SSH key name (become)"   # optional
+      ssh_key_name: "SSH key name"
+      become_key_name: "SSH key name (become)"
 
-  environments:                      # map
+  environments:
     env1:
       name: "Env Name"
-      password: "{{ vault_env_password | default('', true) }}"
-      env: { KEY: "value" }          # environment variables (non-secret)
-      json: { foo: "bar" }           # extra variables (non-secret) – alias: extra_variables
-      secrets:                       # always created/ensured
+      env: { KEY: "value" }
+      json: { foo: "bar" }
+      secrets:
         - name: "DB_PASSWORD"
           secret: "{{ vault_db_password }}"
-          type: env                  # env | json
+          type: env
 
-  templates:                         # map
+  templates:
     job1:
       name: "Run Example"
-      app: "ansible"                 # default if omitted
+      app: "ansible"
       type: "job"
-      repository_name: "Repo Name"   # or repository_id
-      inventory_name: "Inventory Name" # or inventory_id
-      environment_name: "Env Name"   # or environment_id (optional)
-      view_title: "Board Column"     # or view_id (optional)
+      repository_name: "Repo Name"
+      inventory_name: "Inventory Name"
+      environment_name: "Env Name"
+      view_title: "Board Column"
       playbook: "playbooks/site.yml"
-      description: "Runs site"
-      arguments: []                  # list/dict OK; role serializes to JSON string
-      vaults: []                     # optional list of {id, type}
-      tags:                          # the API expects newline-separated string; give list and role joins with '\n'
+      arguments: []
+      tags:
         - web
         - prod
 
-  schedules:                         # map
+  schedules:
     nightly_example:
       name: "Nightly – Run Example"
       cron_format: "0 3 * * *"
-      template_name: "Run Example"   # or template_id
+      template_name: "Run Example"
       active: false
-      arguments: []                  # optional (role serializes when needed)
 
-  integrations:                      # map
+  integrations:
     webhook_hmac:
       name: "Deploy via HMAC"
-      template_name: "Run Example"   # or template_id
-      auth_method: "HMAC"            # None | GitHub Webhooks | Bitbucket Webhooks | Token | HMAC | BasicAuth
-      auth_header: "token"           # only for Token/HMAC; defaults to "token"
-      auth_secret_name: "hmac-secret"  # or auth_secret_id
+      template_name: "Run Example"
+      auth_method: "HMAC"
+      auth_header: "token"
+      auth_secret_name: "hmac-secret"
       task_params:
         diff: false
         dry_run: false
+
+      # OPTIONAL (v2.0.6+)
+      extraction_values:
+        - name: "Extract Environment"
+          key: "X-Env"
+          value_source: "header"
+          variable_type: "environment"
+          variable: "DEPLOY_ENV"
+
+        - name: "Extract Service"
+          key: "X-Service"
+          value_source: "header"
+          variable_type: "environment"
+          variable: "SERVICE_NAME"
 ```
 
-### Notes on fields and conversions
+---
 
-* **Templates**
+## Notes on fields and behavior
 
-  * The `project_template_create` module requires: `name`, `app`, `playbook`, `inventory_id`, `repository_id`. The role resolves `*_name` → IDs for you when possible.
-  * `arguments`: Provide a string **or** list/dict. Lists/dicts are serialized to a JSON string (e.g., `[]`).
-  * `tags`: Provide a **list** in YAML; the role will join it with `'\n'` to match the API’s newline-separated string.
-  * When **updating** templates, the role only sends supported fields (does **not** include `template.id` or `template.project_id` in the payload).
+### Templates
 
-* **Schedules**
+* `*_name` fields are automatically resolved to IDs.
+* `arguments` may be string, list, or dict; lists/dicts are serialized to JSON.
+* `tags` are authored as a list and converted to newline-separated strings.
 
-  * `template_id` is required by the API. The role will resolve `template_name` → `template_id` using existing/created templates.
+### Schedules
 
-* **Integrations**
+* The API requires `template_id`; `template_name` is resolved automatically.
 
-  * `auth_method` uses UI-friendly values; the module converts to API codes.
-  * `auth_header` only applies to **Token**/**HMAC** and defaults to `"token"` when omitted.
-  * `task_params.debug_level` is pinned to `4` by the module; you can set only `diff` and `dry_run`.
+### Integrations
 
-* **Pruning**
+* `auth_method` uses UI-friendly values; the module converts internally.
+* `auth_header` applies only to Token/HMAC and defaults to `"token"`.
+* Only `diff` and `dry_run` are configurable in `task_params`.
 
-  * When `project_deploy_variable_delete: true`, the role removes existing **schedules**, **integrations**, and **templates** not present in `project_deploy_config`.
+### Integration Extraction Values (v2.0.6+)
+
+* Optional and **fully backwards compatible**
+* Created only when `extraction_values` is defined
+* Map incoming request data (headers, payload, query) to task variables
+* Existing integrations without extraction values are unaffected
+
+### Pruning
+
+* When `project_deploy_variable_delete: true`, resources not present in YAML are removed.
 
 ---
 
@@ -216,124 +249,13 @@ project_deploy_config:
     - role: ebdruplab.semaphoreui.project_deploy
 ```
 
-### `vars/project.yml` (minimal but complete)
-
-```yaml
-project_deploy_semaphore_host: "http://localhost"
-project_deploy_semaphore_port: 3000
-project_deploy_semaphore_username: "admin"
-project_deploy_semaphore_password: "changeme"
-
-project_deploy_debug: false
-project_deploy_sensitive_data_no_log: false
-project_deploy_force_project_update: true
-project_deploy_variable_delete: true
-
-project_deploy_config:
-  project:
-    name: "Ebdruplab Example Project"
-    alert: false
-    alert_chat: ""
-    max_parallel_tasks: 0
-    demo: false
-
-  users_access:
-    - username: "ServiceDeskRunner"
-      role: task_runner
-
-  keys:
-    project_ssh:
-      name: "Ebdruplab example ssh key"
-      type: ssh
-      ssh:
-        login: "ansibleuser"
-        passphrase: "{{ vaulted_pk_passphrase }}"
-        private_key: "{{ vaulted_pk_private_key }}"
-    git_user:
-      name: "Ebdruplab Example User"
-      type: login_password
-      login_password:
-        login: "Fake Git User"
-        password: "{{ vaulted_git_password }}"
-
-  repositories:
-    - name: "Repositorie Ebdruplab Demo"
-      git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"
-      git_branch: "main"
-      key_name: "Ebdruplab Example User"
-
-  views:
-    examples:
-      title: "Examples"
-      position: 0
-
-  inventories:
-    inv_repo:
-      name: "A repository Inventory"
-      type: "file"
-      repository_name: "Repositorie Ebdruplab Demo"
-      inventory_file: "inventories/example/example.ini"
-      ssh_key_name: "Ebdruplab example ssh key"
-      become_key_name: "Ebdruplab example ssh key"
-
-  environments:
-    env1:
-      name: "Test Environment"
-      env:
-        KEY: "value"
-      json:
-        foo: "bar"
-      secrets:
-        - name: "DB_PASSWORD"
-          secret: "{{ vaulted_db_password }}"
-          type: env
-        - name: "api_token"
-          secret: "{{ vaulted_api_token }}"
-          type: json
-
-  templates:
-    run_example:
-      name: "Run Example Playbook"
-      app: "ansible"
-      type: "job"
-      repository_name: "Repositorie Ebdruplab Demo"
-      inventory_name: "A repository Inventory"
-      environment_name: "Test Environment"
-      view_title: "Examples"
-      playbook: "playbooks/pb-semaphore-example.yml"
-      description: "Runs the example Ansible playbook"
-      arguments: []
-      tags:
-        - demo
-        - example
-
-  schedules:
-    nightly_example:
-      name: "Nightly – Run Example Playbook"
-      cron_format: "0 3 * * *"
-      template_name: "Run Example Playbook"
-      active: false
-
-  integrations:
-    webhook_hmac:
-      name: "Deploy via HMAC"
-      template_name: "Run Example Playbook"
-      auth_method: "HMAC"
-      auth_header: "token"
-      auth_secret_name: "hmac-secret"
-      task_params:
-        diff: false
-        dry_run: false
-```
-
 ---
 
 ## Tips
 
-* **Names → IDs** are resolved automatically where possible. If you specify both, IDs win.
-* **Arguments/Vaults** can be given as strings or list/dict; lists/dicts are serialized to API-friendly strings.
-* **Template tags** should be authored as a **YAML list**; the role converts to a newline-separated string that the API expects.
-* **Debugging**: set `project_deploy_debug: true` to see helpful interim maps (e.g., desired vs. existing resources).
+* Name-based references are preferred; IDs override names if both are set.
+* Enable `project_deploy_debug: true` to inspect intermediate resolution maps.
+* Extraction values are additive and safe to introduce incrementally.
 
 ---
 
@@ -346,4 +268,5 @@ MIT
 Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
 GitHub: [https://github.com/kris9854](https://github.com/kris9854)
 
-> Want to see this role in action? Check the **`tests/`** folder for a runnable example.
+> See the **`tests/`** directory for a runnable end-to-end example.
+

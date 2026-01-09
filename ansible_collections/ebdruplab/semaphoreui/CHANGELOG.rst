@@ -138,5 +138,10 @@ Version 2.0.5
 -------------
 Fixed bug: https://github.com/Ebdruplab/ansible-collection_ebdruplab/issues/15
 
-
-Initial release; no further info.
+Version 2.0.6
+-------------
+- Add support for defining **integration extraction values** directly in `project_deploy`
+- Map request data (e.g. headers) to **environment variables** for integration tasks
+- **Backwards compatible** with existing integration configurations
+- Extraction values are **optional and additive**
+- Supports resolving integrations, templates, and secrets by **name or ID**
