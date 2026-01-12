@@ -1,0 +1,28 @@
+---
+- name: "Vars | Build vars tree"
+  ansible.builtin.set_fact:
+    _project_backup_vars_tree: "{{ { (project_backup_vars_root_key): _project_backup_export_obj } }}"
+  no_log: "{{ project_backup_sensitive_data_no_log }}"
+  tags:
+    - vars
+    - project_backup
+
+- name: "Vars | Scrub secrets to vault references"
+  ansible.builtin.set_fact:
+    _project_backup_scrubbed_tree: "{{ _project_backup_vars_tree | project_backup_scrub_secrets }}"
+  no_log: "{{ project_backup_sensitive_data_no_log }}"
+  tags:
+    - vars
+    - project_backup
+
+- name: "Vars | Write vars YAML file"
+  ansible.builtin.copy:
+    dest: "{{ project_backup_output_dir }}/{{ project_backup_vars_filename }}"
+    content: "{{ _project_backup_scrubbed_tree | to_nice_yaml(indent=2, width=9999) }}"
+    mode: "0640"
+  no_log: "{{ project_backup_sensitive_data_no_log }}"
+  tags:
+    - vars
+    - output
+    - project_backup
+

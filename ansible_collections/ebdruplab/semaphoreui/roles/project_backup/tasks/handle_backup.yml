@@ -1,0 +1,11 @@
+---
+- name: "Handle | Write raw JSON backup"
+  ansible.builtin.include_tasks:
+    file: write_raw_json.yml
+  when: project_backup_write_raw_json | bool
+
+- name: "Handle | Write vars YAML backup"
+  ansible.builtin.include_tasks:
+    file: write_vars_yaml.yml
+  when: project_backup_write_vars_yaml | bool
+
