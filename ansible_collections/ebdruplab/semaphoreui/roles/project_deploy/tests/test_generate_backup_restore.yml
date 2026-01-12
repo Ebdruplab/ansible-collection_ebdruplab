@@ -12,8 +12,8 @@
     project_restore_root_key: "semaphore_project_backup"
 
   vars_files:
-    # Vaulted secrets referenced by the backup ({{ vault_* }})
-    - "vars/vault.yml"
+    - "vars/example_vault.yml" # not vaulted to showcase A.T.M
+    - "vars/example_vars.yml"
 
   pre_tasks:
     - name: "Login"
