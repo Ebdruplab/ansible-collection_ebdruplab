@@ -3,10 +3,14 @@
 # example vars
 
 # Connection and authentication variables
-project_deploy_semaphore_host: "http://localhost"
-project_deploy_semaphore_port: 3000
-project_deploy_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
-project_deploy_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
+ebdruplab_semaphore_host: "http://localhost"
+ebdruplab_semaphore_port: 3000
+ebdruplab_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
+ebdruplab_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
+#project_deploy_semaphore_host: "http://localhost"
+#project_deploy_semaphore_port: 3000
+#project_deploy_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
+#project_deploy_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
 # If your role supports it, you can use an API token instead of username/password:
 # project_deploy_semaphore_api_token: "KEY"
 
