@@ -145,3 +145,14 @@ Version 2.0.6
 - **Backwards compatible** with existing integration configurations
 - Extraction values are **optional and additive**
 - Supports resolving integrations, templates, and secrets by **name or ID**
+
+Version 2.1.0
+-------------
+- Add new role **`project_backup`** to export Semaphore projects using the built-in backup API
+- Support generating **Ansible vars YAML** from backups for reuse with `project_deploy`
+- Replace secrets in exported vars with **Ansible Vault references** (`vault_*`) instead of plaintext
+- Introduce optional **global Semaphore connection variables** (`ebdruplab_semaphore_*`) shared across collection roles
+- Global variables are **non-breaking** and can be overridden per role
+- Enable full **backup → restore → recreate** workflows when combined with `project_deploy`
+  - Example created in `ebdruplab/semaphoreui/roles/deploy_project/tests`.
+

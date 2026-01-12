@@ -16,6 +16,19 @@ A working example can be found in the repository’s **`tests/`** directory.
 * A reachable Semaphore instance
 
 ---
+## Global connection variables (recommended)
+
+You can define **global** Semaphore connection/auth variables once and reuse them across the collection’s roles (including `project_deploy` and `project_backup`).  
+If any of the `ebdruplab_semaphore_*` variables are set, the role will use them as defaults (role-specific variables still take precedence).
+
+```yaml
+# Global Semaphore connection/auth
+ebdruplab_semaphore_host: "http://localhost"
+ebdruplab_semaphore_port: 3000
+ebdruplab_semaphore_username: "admin"
+ebdruplab_semaphore_password: "changeme"
+# ebdruplab_semaphore_api_token: "KEY"
+```
 
 ## Defaults (quick view)
 

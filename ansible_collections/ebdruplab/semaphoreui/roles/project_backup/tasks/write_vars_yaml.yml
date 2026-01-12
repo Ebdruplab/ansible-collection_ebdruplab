@@ -1,0 +1,11 @@
+---
+- name: "Vars | Write vars YAML (single layout)"
+  ansible.builtin.include_tasks:
+    file: write_vars_single.yml
+  when: project_backup_vars_layout == "single"
+
+- name: "Vars | Write vars YAML (files layout)"
+  ansible.builtin.include_tasks:
+    file: write_vars_files.yml
+  when: project_backup_vars_layout == "files"
+

@@ -2,6 +2,10 @@
 ---
 # tasks file for ebdruplab.semaphoreui.project_deploy
 
+- name: "Resolve globals"
+  ansible.builtin.include_tasks:
+    file: resolve_globals.yml
+
 - name: "Include assert tasks"
   ansible.builtin.include_tasks:
     file: assert.yml

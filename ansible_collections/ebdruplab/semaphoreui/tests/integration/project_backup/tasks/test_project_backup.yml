@@ -47,6 +47,10 @@
           - backup_result.failed is not defined or not backup_result.failed
           - backup_result.backup is defined
 
+    - name: "Debug"
+      ansible.builtin.debug:
+        var: backup_result
+
     - name: 'Delete dummy project'
       ebdruplab.semaphoreui.project_delete:
         host: "{{ semaphore_host }}"

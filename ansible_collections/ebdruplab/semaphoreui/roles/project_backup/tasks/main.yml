@@ -1,0 +1,29 @@
+---
+- name: "Include assert tasks"
+  ansible.builtin.include_tasks:
+    file: assert.yml
+
+- name: "Include Login to Semaphoreui"
+  ansible.builtin.include_tasks:
+    file: login.yml
+  when: project_backup_semaphore_api_token is not defined
+
+- name: "Include project_preflight tasks"
+  ansible.builtin.include_tasks:
+    file: project_preflight.yml
+
+- name: "Proceed with project backup"
+  block:
+    - name: "Include retrieve_backup tasks"
+      ansible.builtin.include_tasks:
+        file: retrieve_backup.yml
+
+    - name: "Include handle_backup tasks"
+      ansible.builtin.include_tasks:
+        file: handle_backup.yml
+  always:
+    - name: "Include Logout to Semaphoreui"
+      ansible.builtin.include_tasks:
+        file: logout.yml
+      when: project_backup_semaphore_api_token is not defined
+

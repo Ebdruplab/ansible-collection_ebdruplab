@@ -1,0 +1,18 @@
+---
+- name: "Resolve | Apply ebdruplab_* globals to project_deploy_* when any global is set (do not override explicit role vars)"
+  ansible.builtin.set_fact:
+    project_deploy_semaphore_host: "{{ project_deploy_semaphore_host | default(ebdruplab_semaphore_host | default('http://localhost')) }}"
+    project_deploy_semaphore_port: "{{ project_deploy_semaphore_port | default(ebdruplab_semaphore_port | default(3000)) }}"
+    project_deploy_semaphore_username: "{{ project_deploy_semaphore_username | default(ebdruplab_semaphore_username | default('')) }}"
+    project_deploy_semaphore_password: "{{ project_deploy_semaphore_password | default(ebdruplab_semaphore_password | default('')) }}"
+    project_deploy_semaphore_api_token: "{{ project_deploy_semaphore_api_token | default(ebdruplab_semaphore_api_token | default(omit)) }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) }}"
+  when:
+    - ebdruplab_semaphore_host is defined
+      or ebdruplab_semaphore_port is defined
+      or ebdruplab_semaphore_username is defined
+      or ebdruplab_semaphore_password is defined
+      or ebdruplab_semaphore_api_token is defined
+  tags:
+    - resolve
+    - auth

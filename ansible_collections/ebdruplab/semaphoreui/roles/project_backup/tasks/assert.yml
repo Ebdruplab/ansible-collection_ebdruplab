@@ -1,0 +1,63 @@
+- name: "Assert | Validate connection variables"
+  ansible.builtin.assert:
+    that:
+      - project_backup_semaphore_host | string | length > 0
+      - project_backup_semaphore_port | int > 0
+      - project_backup_http_timeout | int > 0
+      - project_backup_http_retries | int >= 0
+      - project_backup_http_retry_delay | int >= 0
+    fail_msg: "Invalid connection/http variables."
+  tags:
+    - assert
+    - backup
+
+- name: "Assert | Validate authentication variables"
+  ansible.builtin.assert:
+    that:
+      - (project_backup_semaphore_api_token is defined and (project_backup_semaphore_api_token | string | length > 0))
+        or ((project_backup_semaphore_username | string | length > 0) and (project_backup_semaphore_password | string | length > 0))
+    fail_msg: "You must set either project_backup_semaphore_api_token OR project_backup_semaphore_username + project_backup_semaphore_password."
+  no_log: "{{ project_backup_sensitive_data_no_log }}"
+  tags:
+    - assert
+    - backup
+
+- name: "Assert | Validate project selection variables"
+  ansible.builtin.assert:
+    that:
+      - (project_backup_project_id | int > 0) or (project_backup_project_name | string | length > 0)
+    fail_msg: "You must set either project_backup_project_id (>0) OR project_backup_project_name."
+  tags:
+    - assert
+    - backup
+
+- name: "Assert | Validate output variables"
+  ansible.builtin.assert:
+    that:
+      - project_backup_output_dir | string | length > 0
+      - project_backup_output_prefix | string | length > 0
+      - project_backup_vars_layout in ['single', 'files']
+      - project_backup_vars_root_key | string | length > 0
+      - project_backup_vars_files_dirname | string | length > 0
+    fail_msg: "Invalid output/vars variables."
+  tags:
+    - assert
+    - backup
+
+- name: "Assert | Validate plugin/module FQCNs are configured"
+  ansible.builtin.assert:
+    that:
+      - project_backup_projects_info_module is defined
+      - project_backup_projects_info_module | string | length > 0
+      - project_backup_project_backup_module is defined
+      - project_backup_project_backup_module | string | length > 0
+    fail_msg: >-
+      Missing required module FQCN variables.
+      Define:
+      - project_backup_projects_info_module (list projects)
+      - project_backup_project_backup_module (GET /project/{id}/backup)
+  tags:
+    - assert
+    - backup
+
+

@@ -1,0 +1,68 @@
+---
+- name: "Preflight | Ensure output directory exists"
+  ansible.builtin.file:
+    path: "{{ project_backup_output_dir }}"
+    state: "directory"
+    mode: "0750"
+  tags:
+    - preflight
+    - project_backup
+
+- name: "Preflight | Resolve project id from name"
+  when:
+    - project_backup_project_id | int <= 0
+    - project_backup_project_name | string | length > 0
+  block:
+    - name: "Preflight | List projects"
+      ebdruplab.semaphoreui.projects_info:
+        semaphore_host: "{{ project_backup_semaphore_host }}"
+        semaphore_port: "{{ project_backup_semaphore_port }}"
+        semaphore_api_token: "{{ project_backup_semaphore_api_token }}"
+      register: _project_backup_projects
+      no_log: "{{ project_backup_sensitive_data_no_log }}"
+      tags:
+        - preflight
+        - project_backup
+
+    - name: "Preflight | Normalize projects list"
+      ansible.builtin.set_fact:
+        _project_backup_projects_list: "{{ _project_backup_projects.projects | default([]) }}"
+      tags:
+        - preflight
+        - project_backup
+
+    - name: "Preflight | Set project id from name"
+      ansible.builtin.set_fact:
+        project_backup_project_id: >-
+          {{
+            (
+              _project_backup_projects_list
+              | selectattr('name', 'equalto', project_backup_project_name)
+              | map(attribute='id')
+              | list
+              | first
+            ) | default(0) | int
+          }}
+      tags:
+        - preflight
+        - project_backup
+
+    - name: "Preflight | Fail if project not found"
+      ansible.builtin.fail:
+        msg: "Project not found by name: {{ project_backup_project_name }}"
+      when:
+        - project_backup_project_id | int <= 0
+        - project_backup_fail_if_project_not_found | bool
+      tags:
+        - preflight
+        - project_backup
+
+- name: "Preflight | Assert project id is resolved"
+  ansible.builtin.assert:
+    that:
+      - project_backup_project_id | int > 0
+    fail_msg: "Unable to resolve project_backup_project_id."
+  tags:
+    - preflight
+    - project_backup
+

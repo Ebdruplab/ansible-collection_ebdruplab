@@ -1,0 +1,63 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: "Generate, Restore and Recreate Semaphore Project"
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    # Where backups will be written
+    project_backup_output_dir: "./semaphore_backups"
+
+    # This must match project_backup_vars_root_key
+    project_restore_root_key: "semaphore_project_backup"
+
+  vars_files:
+    # Vaulted secrets referenced by the backup ({{ vault_* }})
+    - "vars/vault.yml"
+
+  pre_tasks:
+    - name: "Login"
+      ebdruplab.semaphoreui.login:
+        host: "{{ project_backup_semaphore_host }}"
+        port: "{{ project_backup_semaphore_port }}"
+        username: "{{ project_backup_semaphore_username }}"
+        password: "{{ project_backup_semaphore_password }}"
+      register: login_result
+      tags:
+        - auth
+        - login
+
+  roles:
+    #
+    # 1) Generate project backup and vars
+    #
+    - role: ebdruplab.semaphoreui.project_backup
+      vars:
+        project_backup_semaphore_api_token: "{{ project_backup_semaphore_api_token | default(omit) }}"
+        project_backup_project_name: "ebdruplab_test_project_backup_integration_test"
+        project_backup_vars_layout: "single"
+        project_backup_vars_root_key: "{{ project_restore_root_key }}"
+        project_backup_write_raw_json: true
+        project_backup_write_vars_yaml: true
+
+    #
+    # 2) Recreate project from generated vars
+    #
+    - role: ebdruplab.semaphoreui.project_deploy
+      vars:
+        project_deploy_semaphore_host: "{{ project_backup_semaphore_host }}"
+        project_deploy_semaphore_port: "{{ project_backup_semaphore_port }}"
+        project_deploy_semaphore_api_token: "{{ project_backup_semaphore_api_token | default(omit) }}"
+        project_deploy: "{{ lookup('file', project_backup_output_dir ~ '/' ~ project_backup_vars_filename) | from_yaml | dict2items | first.value }}"
+
+  post_tasks:
+    - name: "Logout"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ project_backup_semaphore_host }}"
+        port: "{{ project_backup_semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      when: login_result.session_cookie is defined
+      tags:
+        - auth
+        - logout
+
