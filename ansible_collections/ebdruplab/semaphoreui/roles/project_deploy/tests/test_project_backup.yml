@@ -1,0 +1,69 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: "Test | Backup Semaphore project and generate vars locally"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "vars/example_vars.yml"
+
+  vars:
+    _backup_dir: "{{ playbook_dir }}/backup/generated_vars"
+
+    project_backup_output_dir: "{{ _backup_dir }}"
+    project_backup_output_prefix: "semaphore_project"
+    project_backup_write_raw_json: true
+    project_backup_write_vars_yaml: true
+    project_backup_vars_layout: "single"
+    project_backup_vars_root_key: "semaphore_project_backup"
+
+    # Choose ONE of these selectors:
+    project_backup_project_name: "{{ project_deploy_config.project.name }}"
+    # project_backup_project_id: 1
+
+  tasks:
+    - name: "Ensure local backup directory exists"
+      ansible.builtin.file:
+        path: "{{ _backup_dir }}"
+        state: "directory"
+        mode: "0750"
+      tags:
+        - preflight
+
+    - name: "Run project backup role"
+      ansible.builtin.include_role:
+        name: "ebdruplab.semaphoreui.project_backup"
+      tags:
+        - backup
+
+    - name: "Verify | Raw JSON backup file exists"
+      ansible.builtin.stat:
+        path: "{{ project_backup_output_dir }}/{{ project_backup_json_filename }}"
+      register: _backup_json_stat
+      tags:
+        - verify
+
+    - name: "Verify | Vars YAML backup file exists"
+      ansible.builtin.stat:
+        path: "{{ project_backup_output_dir }}/{{ project_backup_vars_filename }}"
+      register: _backup_vars_stat
+      tags:
+        - verify
+
+    - name: "Assert | Backup artifacts created"
+      ansible.builtin.assert:
+        that:
+          - (project_backup_write_raw_json | bool) implies (_backup_json_stat.stat.exists | bool)
+          - (project_backup_write_vars_yaml | bool) implies (_backup_vars_stat.stat.exists | bool)
+        fail_msg: "Backup artifacts missing. Check project_backup role output and paths."
+      tags:
+        - verify
+
+    - name: "Debug | Show output artifact paths"
+      ansible.builtin.debug:
+        msg:
+          raw_json: "{{ project_backup_output_dir }}/{{ project_backup_json_filename }}"
+          vars_yaml: "{{ project_backup_output_dir }}/{{ project_backup_vars_filename }}"
+      tags:
+        - debug
+

@@ -1,0 +1,44 @@
+---
+- name: "Test | Deploy Semaphore project from generated backup vars"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    # Global connection/auth (ebdruplab_semaphore_*) and any vault_* secrets used in the backup
+    - "vars/example_vars.yml"
+
+    # The generated backup vars file (created by test_backup_project.yml)
+    # Update the filename if you used a different prefix/timestamp naming.
+    - "{{ playbook_dir }}/backup/generated_vars/latest.vars.yml"
+
+  tasks:
+    - name: "Resolve | Select backup root tree for project_deploy"
+      ansible.builtin.set_fact:
+        _project_deploy_from_backup: >-
+          {{
+            semaphore_project_backup
+              | default(project_backup | default(omit))
+          }}
+      tags:
+        - preflight
+
+    - name: "Assert | Backup root key exists in loaded vars"
+      ansible.builtin.assert:
+        that:
+          - _project_deploy_from_backup is defined
+          - _project_deploy_from_backup is mapping
+        fail_msg: >-
+          Backup vars not loaded or unexpected structure.
+          Ensure your generated vars file contains the root key 'semaphore_project_backup'
+          (or update project_backup_vars_root_key / this playbook accordingly).
+      tags:
+        - preflight
+
+    - name: "Deploy | Recreate project from backup vars"
+      ansible.builtin.include_role:
+        name: "ebdruplab.semaphoreui.project_deploy"
+      vars:
+        project_deploy_config: "{{ _project_deploy_from_backup }}"
+      tags:
+        - deploy
+
