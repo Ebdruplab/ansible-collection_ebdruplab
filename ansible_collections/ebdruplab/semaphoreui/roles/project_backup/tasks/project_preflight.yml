@@ -14,10 +14,11 @@
     - project_backup_project_name | string | length > 0
   block:
     - name: "Preflight | List projects"
-      ebdruplab.semaphoreui.projects_info:
-        semaphore_host: "{{ project_backup_semaphore_host }}"
-        semaphore_port: "{{ project_backup_semaphore_port }}"
-        semaphore_api_token: "{{ project_backup_semaphore_api_token }}"
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ project_backup_semaphore_host }}"
+        port: "{{ project_backup_semaphore_port }}"
+        api_token: "{{ project_backup_semaphore_api_token | default(omit) }}"
+        session_cookie: "{{ login_result.session_cookie | default(omit) }}"
       register: _project_backup_projects
       no_log: "{{ project_backup_sensitive_data_no_log }}"
       tags:
