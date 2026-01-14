@@ -22,20 +22,41 @@
       }}
     mode: "0640"
   loop:
-    - { key: "meta",               filename: "meta.yml",               default: {} }
-    - { key: "keys",               filename: "keys.yml",               default: [] }
-    - { key: "repositories",       filename: "repositories.yml",       default: [] }
-    - { key: "inventories",        filename: "inventories.yml",        default: [] }
-    - { key: "environments",       filename: "environments.yml",       default: [] }
-    - { key: "templates",          filename: "templates.yml",          default: [] }
-    - { key: "schedules",          filename: "schedules.yml",          default: [] }
-    - { key: "views",              filename: "views.yml",              default: [] }
-    - { key: "integrations",       filename: "integrations.yml",       default: [] }
-    - { key: "integration_aliases",filename: "integration_aliases.yml",default: [] }
-    - { key: "secret_storages",    filename: "secret_storages.yml",    default: [] }
+    - key: "meta"
+      filename: "meta.yml"
+      default: {}
+    - key: "keys"
+      filename: "keys.yml"
+      default: {}
+    - key: "repositories"
+      filename: "repositories.yml"
+      default: []
+    - key: "inventories"
+      filename: "inventories.yml"
+      default: {}
+    - key: "environments"
+      filename: "environments.yml"
+      default: {}
+    - key: "templates"
+      filename: "templates.yml"
+      default: {}
+    - key: "schedules"
+      filename: "schedules.yml"
+      default: {}
+    - key: "views"
+      filename: "views.yml"
+      default: {}
+    - key: "integrations"
+      filename: "integrations.yml"
+      default: {}
+    - key: "integration_aliases"
+      filename: "integration_aliases.yml"
+      default: []
+    - key: "secret_storages"
+      filename: "secret_storages.yml"
+      default: []
   no_log: "{{ project_backup_sensitive_data_no_log }}"
   tags:
     - vars
     - output
     - project_backup
-
