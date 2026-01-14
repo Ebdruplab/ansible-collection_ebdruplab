@@ -1,18 +1,18 @@
-#SPDX-License-Identifier: MIT-0
 ---
-- name: "Example Setup"
+- name: "Test | test_project_deploy.yml"
   hosts: localhost
   gather_facts: false
+
   vars_files:
     - "vars/example_vars.yml"
 
   pre_tasks:
     - name: "Login"
       ebdruplab.semaphoreui.login:
-        host: "{{ project_deploy_semaphore_host }}"
-        port: "{{ project_deploy_semaphore_port }}"
-        username: "{{ project_deploy_semaphore_username }}"
-        password: "{{ project_deploy_semaphore_password }}"
+        host: "{{ ebdruplab_semaphore_host }}"
+        port: "{{ ebdruplab_semaphore_port }}"
+        username: "{{ ebdruplab_semaphore_username }}"
+        password: "{{ ebdruplab_semaphore_password }}"
       register: login_result
       tags:
         - users
@@ -23,8 +23,8 @@
       block:
         - name: "List Users"
           ebdruplab.semaphoreui.user_list:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
           register: _all_users
           tags:
@@ -40,8 +40,8 @@
 
         - name: "Update User When Exists"
           ebdruplab.semaphoreui.user_update:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
             user_id: "{{ users_by_username['ServiceDeskRunner'] }}"
             name: "Service Desk"
@@ -56,8 +56,8 @@
 
         - name: "Set User Password When Exists"
           ebdruplab.semaphoreui.user_password_update:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
             user_id: "{{ users_by_username['ServiceDeskRunner'] }}"
             password: "thisshouldbevaulted"
@@ -70,8 +70,8 @@
 
         - name: "Create User When Missing"
           ebdruplab.semaphoreui.user_create:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
             name: "Service Desk"
             username: "ServiceDeskRunner"
@@ -88,8 +88,8 @@
 
         - name: "Set User Password After Create"
           ebdruplab.semaphoreui.user_password_update:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
             user_id: "{{ created_user.id }}"
             password: "thisshouldbevaulted"
@@ -104,8 +104,8 @@
       always:
         - name: "Logout"
           ebdruplab.semaphoreui.logout:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
             session_cookie: "{{ login_result.session_cookie }}"
           tags:
             - users
@@ -113,4 +113,5 @@
             - logout
 
   roles:
-    - ebdruplab.semaphoreui.project_deploy
+    - role: ebdruplab.semaphoreui.project_deploy
+

@@ -1,4 +1,3 @@
-#SPDX-License-Identifier: MIT-0
 ---
 - name: "Test | Backup Semaphore project and generate vars locally"
   hosts: localhost
@@ -53,8 +52,8 @@
     - name: "Assert | Backup artifacts created"
       ansible.builtin.assert:
         that:
-          - (project_backup_write_raw_json | bool) implies (_backup_json_stat.stat.exists | bool)
-          - (project_backup_write_vars_yaml | bool) implies (_backup_vars_stat.stat.exists | bool)
+          - (not (project_backup_write_raw_json | bool)) or (_backup_json_stat.stat.exists | bool)
+          - (not (project_backup_write_vars_yaml | bool)) or (_backup_vars_stat.stat.exists | bool)
         fail_msg: "Backup artifacts missing. Check project_backup role output and paths."
       tags:
         - verify

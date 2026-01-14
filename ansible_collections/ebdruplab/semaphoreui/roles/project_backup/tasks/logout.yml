@@ -2,10 +2,10 @@
 
 - name: "Log out of Semaphore"
   ebdruplab.semaphoreui.logout:
-    host: "{{ project_deploy_semaphore_host }}"
-    port: "{{ project_deploy_semaphore_port }}"
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
     session_cookie: "{{ login_result.session_cookie }}"
-  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
   tags:
-    - project_deploy
+    - project_backup
     - lgout
