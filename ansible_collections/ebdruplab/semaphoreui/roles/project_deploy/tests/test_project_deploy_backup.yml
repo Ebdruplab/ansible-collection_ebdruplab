@@ -1,24 +1,45 @@
+#SPDX-License-Identifier: MIT-0
 ---
 - name: "Test | Deploy Semaphore project from generated backup vars"
   hosts: localhost
   gather_facts: false
 
+  vars:
+    _backup_dir: "{{ playbook_dir }}/backup/generated_vars"
+
+    # Point to the generated vars file you want to deploy
+    # (replace with the real filename produced by the backup play)
+    project_backup_vars_file: "{{ _backup_dir }}/YOUR_BACKUP_FILENAME.vars.yml"
+
+    project_backup_vars_root_key: "semaphore_project_backup"
+
   vars_files:
-    # Global connection/auth (ebdruplab_semaphore_*) and any vault_* secrets used in the backup
     - "vars/example_vars.yml"
 
-    # The generated backup vars file (created by test_backup_project.yml)
-    # Update the filename if you used a different prefix/timestamp naming.
-    - "{{ playbook_dir }}/backup/generated_vars/latest.vars.yml"
-
   tasks:
+    - name: "Preflight | Ensure backup vars file exists"
+      ansible.builtin.stat:
+        path: "{{ project_backup_vars_file }}"
+      register: _backup_vars_file_stat
+      tags:
+        - preflight
+
+    - name: "Preflight | Fail when backup vars file is missing"
+      ansible.builtin.fail:
+        msg: "Backup vars file not found: {{ project_backup_vars_file }}"
+      when: not _backup_vars_file_stat.stat.exists
+      tags:
+        - preflight
+
+    - name: "Load | Read backup vars file"
+      ansible.builtin.set_fact:
+        _backup_vars_loaded: "{{ lookup('file', project_backup_vars_file) | from_yaml }}"
+      tags:
+        - preflight
+
     - name: "Resolve | Select backup root tree for project_deploy"
       ansible.builtin.set_fact:
-        _project_deploy_from_backup: >-
-          {{
-            semaphore_project_backup
-              | default(project_backup | default(omit))
-          }}
+        _project_deploy_from_backup: "{{ _backup_vars_loaded[project_backup_vars_root_key] | default(omit) }}"
       tags:
         - preflight
 
@@ -29,8 +50,7 @@
           - _project_deploy_from_backup is mapping
         fail_msg: >-
           Backup vars not loaded or unexpected structure.
-          Ensure your generated vars file contains the root key 'semaphore_project_backup'
-          (or update project_backup_vars_root_key / this playbook accordingly).
+          Ensure your generated vars file contains the root key '{{ project_backup_vars_root_key }}'.
       tags:
         - preflight
 
