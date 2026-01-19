@@ -1,0 +1,419 @@
+# scripts/generate_project_deploy_vars.yml
+#SPDX-License-Identifier: MIT-0
+---
+- name: "Generate | project_deploy_config (example-shaped) from Semaphore list modules"
+  hosts: localhost
+  gather_facts: false
+
+  vars_files:
+    - "vars/example_vars.yml"
+
+  vars:
+    ebdruplab_semaphore_host: "http://localhost"
+    ebdruplab_semaphore_port: 3000
+    ebdruplab_semaphore_username: "{{ vault_semaphore_user | default('admin', true) }}"
+    ebdruplab_semaphore_password: "{{ vault_semaphore_password | default('changeme', true) }}"
+
+    semaphore_project_name: "Ebdruplab Example Project"
+    # semaphore_project_id: 0
+
+    output_dir: "{{ playbook_dir }}/.backup/generated_vars"
+    output_filename: "generated.project_deploy.yml"
+
+  tasks:
+    - name: "Ensure output dir exists"
+      ansible.builtin.file:
+        path: "{{ output_dir }}"
+        state: "directory"
+        mode: "0750"
+      tags:
+        - output
+
+    - name: "Semaphore session"
+      block:
+        - name: "Login"
+          ebdruplab.semaphoreui.login:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            username: "{{ ebdruplab_semaphore_username }}"
+            password: "{{ ebdruplab_semaphore_password }}"
+          register: login_result
+          tags:
+            - auth
+            - login
+
+        - name: "Resolve | Project ID"
+          block:
+            - name: "List projects"
+              ebdruplab.semaphoreui.project_list:
+                host: "{{ ebdruplab_semaphore_host }}"
+                port: "{{ ebdruplab_semaphore_port }}"
+                session_cookie: "{{ login_result.session_cookie }}"
+              register: _projects
+              tags:
+                - project
+                - list
+
+            - name: "Select project by name"
+              ansible.builtin.set_fact:
+                semaphore_project_id: >-
+                  {{
+                    (_projects.projects | default([]) | selectattr('name', 'equalto', semaphore_project_name) | list | first).id
+                  }}
+              when:
+                - semaphore_project_id is not defined or (semaphore_project_id | int) == 0
+                - semaphore_project_name | default('') | length > 0
+              tags:
+                - project
+                - resolve
+
+            - name: "Assert | Project id resolved"
+              ansible.builtin.assert:
+                that:
+                  - semaphore_project_id is defined
+                  - (semaphore_project_id | int) > 0
+                fail_msg: "Could not resolve project id. Set semaphore_project_id or a valid semaphore_project_name."
+              tags:
+                - project
+                - resolve
+          tags:
+            - project
+
+        - name: "Get project meta"
+          ebdruplab.semaphoreui.project_get:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _project_meta
+          tags:
+            - project
+            - get
+
+        - name: "List users access"
+          ebdruplab.semaphoreui.project_user_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _users_access
+          tags:
+            - users_access
+            - list
+
+        - name: "List keys"
+          ebdruplab.semaphoreui.project_key_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _keys
+          tags:
+            - keys
+            - list
+
+        - name: "List repositories"
+          ebdruplab.semaphoreui.project_repository_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _repositories
+          tags:
+            - repositories
+            - list
+
+        - name: "List views"
+          ebdruplab.semaphoreui.project_view_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _views
+          tags:
+            - views
+            - list
+
+        - name: "List inventories"
+          ebdruplab.semaphoreui.project_inventory_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _inventories
+          tags:
+            - inventories
+            - list
+
+        - name: "List environments"
+          ebdruplab.semaphoreui.project_environment_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _environments
+          tags:
+            - environments
+            - list
+
+        - name: "List templates"
+          ebdruplab.semaphoreui.project_template_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _templates
+          tags:
+            - templates
+            - list
+
+        - name: "List schedules"
+          ebdruplab.semaphoreui.project_schedule_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _schedules
+          tags:
+            - schedules
+            - list
+
+        - name: "List integrations"
+          ebdruplab.semaphoreui.project_integration_list:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+            project_id: "{{ semaphore_project_id }}"
+          register: _integrations
+          tags:
+            - integrations
+            - list
+
+        - name: "Normalize | Extract list payloads safely"
+          ansible.builtin.set_fact:
+            _users_access_list: "{{ _users_access['users'] | default([]) }}"
+            _keys_list: "{{ _keys['keys'] | default([]) }}"
+            _repos_list: "{{ _repositories['repositories'] | default([]) }}"
+            _views_list: "{{ _views['views'] | default([]) }}"
+            _inventories_list: "{{ _inventories['inventories'] | default([]) }}"
+            _environments_list: "{{ _environments['environments'] | default([]) }}"
+            _templates_list: "{{ _templates['templates'] | default([]) }}"
+            _schedules_list: "{{ _schedules['schedules'] | default([]) }}"
+            _integrations_list: "{{ _integrations['integrations'] | default([]) }}"
+          tags:
+            - normalize
+
+        - name: "Normalize | Build id->name maps"
+          ansible.builtin.set_fact:
+            _key_name_by_id: "{{ dict((_keys_list | map(attribute='id') | list) | zip(_keys_list | map(attribute='name') | list)) }}"
+            _repo_name_by_id: "{{ dict((_repos_list | map(attribute='id') | list) | zip(_repos_list | map(attribute='name') | list)) }}"
+            _inv_name_by_id: "{{ dict((_inventories_list | map(attribute='id') | list) | zip(_inventories_list | map(attribute='name') | list)) }}"
+            _env_name_by_id: "{{ dict((_environments_list | map(attribute='id') | list) | zip(_environments_list | map(attribute='name') | list)) }}"
+            _view_title_by_id: "{{ dict((_views_list | map(attribute='id') | list) | zip(_views_list | map(attribute='title') | list)) }}"
+            _tpl_name_by_id: "{{ dict((_templates_list | map(attribute='id') | list) | zip(_templates_list | map(attribute='name') | list)) }}"
+          tags:
+            - normalize
+
+        - name: "Normalize | Environments env/json fields (strings -> objects)"
+          ansible.builtin.set_fact:
+            _envs_norm: "{{ _envs_norm | default([]) + [ _env_item ] }}"
+          vars:
+            _env_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'env': (
+                        (item.env is string)
+                          | ternary(item.env | from_yaml, (item.env | default({})))
+                      ),
+                      'json': (
+                        (item.json is string)
+                          | ternary(item.json | from_json, (item.json | default({})))
+                      )
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _environments_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          tags:
+            - normalize
+            - environments
+
+        - name: "Normalize | Repositories: add key_name (ssh_key_id -> name)"
+          ansible.builtin.set_fact:
+            _repos_norm: "{{ _repos_norm | default([]) + [ _repo_item ] }}"
+          vars:
+            _repo_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'key_name': (_key_name_by_id[item.ssh_key_id] | default(omit))
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _repos_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          tags:
+            - normalize
+            - repositories
+
+        - name: "Normalize | Inventories: convert *_id references to *_name fields"
+          ansible.builtin.set_fact:
+            _invs_norm: "{{ _invs_norm | default([]) + [ _inv_item ] }}"
+          vars:
+            _inv_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'ssh_key_name': (_key_name_by_id[item.ssh_key_id] | default(omit)),
+                      'become_key_name': (_key_name_by_id[item.become_key_id] | default(omit)),
+                      'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
+                      'inventory_file': (
+                        (item.type | default('')) == 'file'
+                          | ternary(item.inventory, omit)
+                      )
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _inventories_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          tags:
+            - normalize
+            - inventories
+
+        - name: "Normalize | Templates: convert *_id references to *_name fields and parse arguments"
+          ansible.builtin.set_fact:
+            _tpls_norm: "{{ _tpls_norm | default([]) + [ _tpl_item ] }}"
+          vars:
+            _tpl_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'inventory_name': (_inv_name_by_id[item.inventory_id] | default(omit)),
+                      'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
+                      'environment_name': (_env_name_by_id[item.environment_id] | default(omit)),
+                      'view_title': (_view_title_by_id[item.view_id] | default(omit)),
+                      'arguments': (
+                        (item.arguments is string)
+                          | ternary(item.arguments | from_json, (item.arguments | default([])))
+                      )
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _templates_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          tags:
+            - normalize
+            - templates
+
+        - name: "Normalize | Schedules: template_id -> template_name; arguments -> list"
+          ansible.builtin.set_fact:
+            _sched_norm: "{{ _sched_norm | default([]) + [ _sched_item ] }}"
+          vars:
+            _tpl_id: "{{ item.template_id | default(omit) }}"
+            _tpl_name_resolved: >-
+              {{
+                (_tpl_id is not undefined and _tpl_id is not none)
+                  | ternary((_tpl_name_by_id[_tpl_id] | default(omit)), omit)
+              }}
+            _args_raw: "{{ item.arguments | default([]) }}"
+            _args_list: >-
+              {{
+                (_args_raw is string)
+                  | ternary((_args_raw | from_json), _args_raw)
+              }}
+            _sched_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'template_name': (_tpl_name_resolved | default(item.tpl_name | default(omit))),
+                      'arguments': (_args_list | default([]))
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _schedules_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          when: _args_raw is not sequence or (_args_raw is string)
+          tags:
+            - normalize
+            - schedules
+
+        - name: "Normalize | Integrations: template_id/auth_secret_id -> names"
+          ansible.builtin.set_fact:
+            _int_norm: "{{ _int_norm | default([]) + [ _int_item ] }}"
+          vars:
+            _int_item: >-
+              {{
+                item
+                | combine(
+                    {
+                      'template_name': (_tpl_name_by_id[item.template_id] | default(omit)),
+                      'auth_secret_name': (_key_name_by_id[item.auth_secret_id] | default(omit))
+                    },
+                    recursive=True
+                  )
+              }}
+          loop: "{{ _integrations_list }}"
+          loop_control:
+            label: "{{ item.name | default('') }}"
+          tags:
+            - normalize
+            - integrations
+
+        - name: "Build | project_deploy_config (example-shaped)"
+          ansible.builtin.set_fact:
+            project_deploy_config:
+              project:
+                name: "{{ _project_meta.project.name }}"
+                alert: "{{ _project_meta.project.alert | default(false) }}"
+                alert_chat: "{{ _project_meta.project.alert_chat | default('') }}"
+                max_parallel_tasks: "{{ _project_meta.project.max_parallel_tasks | default(0) }}"
+                demo: "{{ _project_meta.project.demo | default(false) }}"
+                type: "{{ _project_meta.project.type | default('') }}"
+
+              users_access: "{{ _users_access_list }}"
+
+              keys: "{{ dict((_keys_list | map(attribute='name') | list) | zip(_keys_list)) }}"
+              repositories: "{{ _repos_norm | default([]) }}"
+              views: "{{ dict((_views_list | map(attribute='title') | list) | zip(_views_list)) }}"
+              inventories: "{{ dict((_invs_norm | default([]) | map(attribute='name') | list) | zip((_invs_norm | default([])))) }}"
+              environments: "{{ dict((_envs_norm | default([]) | map(attribute='name') | list) | zip((_envs_norm | default([])))) }}"
+              templates: "{{ dict((_tpls_norm | default([]) | map(attribute='name') | list) | zip((_tpls_norm | default([])))) }}"
+              schedules: "{{ dict((_sched_norm | default([]) | map(attribute='name') | list) | zip((_sched_norm | default([])))) }}"
+              integrations: "{{ dict((_int_norm | default([]) | map(attribute='name') | list) | zip((_int_norm | default([])))) }}"
+          tags:
+            - build
+
+        - name: "Write YAML vars file"
+          ansible.builtin.copy:
+            dest: "{{ output_dir }}/{{ output_filename }}"
+            content: "{{ {'project_deploy_config': project_deploy_config} | to_nice_yaml(indent=2, width=9999) }}"
+            mode: "0640"
+          tags:
+            - output
+
+      always:
+        - name: "Logout"
+          ebdruplab.semaphoreui.logout:
+            host: "{{ ebdruplab_semaphore_host }}"
+            port: "{{ ebdruplab_semaphore_port }}"
+            session_cookie: "{{ login_result.session_cookie }}"
+          when: login_result.session_cookie is defined
+          tags:
+            - auth
+            - logout
