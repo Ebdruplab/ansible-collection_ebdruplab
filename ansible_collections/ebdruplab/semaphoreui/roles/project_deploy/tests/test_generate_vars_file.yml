@@ -1,7 +1,7 @@
 # scripts/generate_project_deploy_vars.yml
 #SPDX-License-Identifier: MIT-0
 ---
-- name: "Generate | project_deploy_config (example-shaped) from Semaphore list modules"
+- name: "Generate | project_deploy_config (per-project root key) from Semaphore list modules"
   hosts: localhost
   gather_facts: false
 
@@ -203,6 +203,21 @@
           tags:
             - normalize
 
+        - name: "Normalize | Users access -> project_deploy format (username/role)"
+          ansible.builtin.set_fact:
+            _users_access_norm: "{{ _users_access_norm | default([]) + [ _ua_item ] }}"
+          vars:
+            _ua_item:
+              username: "{{ item.username }}"
+              role: "{{ (item.role | default('Owner')) | regex_replace('^owner$', 'Owner') | regex_replace('^Owner$', 'Owner') }}"
+          loop: "{{ _users_access_list | default([]) }}"
+          loop_control:
+            label: "{{ item.username | default('') }}"
+          when: item.username is defined
+          tags:
+            - normalize
+            - users_access
+
         - name: "Normalize | Build id->name maps"
           ansible.builtin.set_fact:
             _key_name_by_id: "{{ dict((_keys_list | map(attribute='id') | list) | zip(_keys_list | map(attribute='name') | list)) }}"
@@ -223,14 +238,8 @@
                 item
                 | combine(
                     {
-                      'env': (
-                        (item.env is string)
-                          | ternary(item.env | from_yaml, (item.env | default({})))
-                      ),
-                      'json': (
-                        (item.json is string)
-                          | ternary(item.json | from_json, (item.json | default({})))
-                      )
+                      'env': ((item.env is string) | ternary(item.env | from_yaml, (item.env | default({})))),
+                      'json': ((item.json is string) | ternary(item.json | from_json, (item.json | default({}))))
                     },
                     recursive=True
                   )
@@ -250,9 +259,7 @@
               {{
                 item
                 | combine(
-                    {
-                      'key_name': (_key_name_by_id[item.ssh_key_id] | default(omit))
-                    },
+                    { 'key_name': (_key_name_by_id[item.ssh_key_id] | default(omit)) },
                     recursive=True
                   )
               }}
@@ -276,7 +283,7 @@
                       'become_key_name': (_key_name_by_id[item.become_key_id] | default(omit)),
                       'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
                       'inventory_file': (
-                        (item.type | default('')) == 'file'
+                        ((item.type | default('')) == 'file')
                           | ternary(item.inventory, omit)
                       )
                     },
@@ -329,11 +336,7 @@
                   | ternary((_tpl_name_by_id[_tpl_id] | default(omit)), omit)
               }}
             _args_raw: "{{ item.arguments | default([]) }}"
-            _args_list: >-
-              {{
-                (_args_raw is string)
-                  | ternary((_args_raw | from_json), _args_raw)
-              }}
+            _args_list: "{{ _args_raw if (_args_raw is not string) else (_args_raw | from_json) }}"
             _sched_item: >-
               {{
                 item
@@ -348,7 +351,6 @@
           loop: "{{ _schedules_list }}"
           loop_control:
             label: "{{ item.name | default('') }}"
-          when: _args_raw is not sequence or (_args_raw is string)
           tags:
             - normalize
             - schedules
@@ -377,16 +379,16 @@
 
         - name: "Build | project_deploy_config (example-shaped)"
           ansible.builtin.set_fact:
-            project_deploy_config:
+            _project_deploy_config_one:
               project:
                 name: "{{ _project_meta.project.name }}"
                 alert: "{{ _project_meta.project.alert | default(false) }}"
                 alert_chat: "{{ _project_meta.project.alert_chat | default('') }}"
-                max_parallel_tasks: "{{ _project_meta.project.max_parallel_tasks | default(0) }}"
+                max_parallel_tasks: "{{ (_project_meta.project.max_parallel_tasks | default(0)) | int }}"
                 demo: "{{ _project_meta.project.demo | default(false) }}"
                 type: "{{ _project_meta.project.type | default('') }}"
 
-              users_access: "{{ _users_access_list }}"
+              users_access: "{{ _users_access_norm | default([]) }}"
 
               keys: "{{ dict((_keys_list | map(attribute='name') | list) | zip(_keys_list)) }}"
               repositories: "{{ _repos_norm | default([]) }}"
@@ -396,6 +398,12 @@
               templates: "{{ dict((_tpls_norm | default([]) | map(attribute='name') | list) | zip((_tpls_norm | default([])))) }}"
               schedules: "{{ dict((_sched_norm | default([]) | map(attribute='name') | list) | zip((_sched_norm | default([])))) }}"
               integrations: "{{ dict((_int_norm | default([]) | map(attribute='name') | list) | zip((_int_norm | default([])))) }}"
+          tags:
+            - build
+
+        - name: "Build | project_deploy_config with project name as key"
+          ansible.builtin.set_fact:
+            project_deploy_config: "{{ { _project_meta.project.name: _project_deploy_config_one } }}"
           tags:
             - build
 
