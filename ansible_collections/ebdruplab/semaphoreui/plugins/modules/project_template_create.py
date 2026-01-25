@@ -303,8 +303,18 @@ def normalize_bool(val):
         return val.lower() in ("true", "yes", "1")
     return False
 
+
 def prune(d, allowed):
     return {k: v for k, v in d.items() if k in allowed}
+
+
+def as_text(x):
+    if x is None:
+        return ""
+    if isinstance(x, (bytes, bytearray)):
+        return x.decode("utf-8", errors="replace")
+    return str(x)
+
 
 def http_post(url, payload, headers, validate):
     return semaphore_post(
@@ -314,6 +324,7 @@ def http_post(url, payload, headers, validate):
         validate_certs=validate,
     )
 
+
 def http_put(url, payload, headers, validate):
     return semaphore_request(
         "PUT",
@@ -322,6 +333,7 @@ def http_put(url, payload, headers, validate):
         headers=headers,
         validate_certs=validate,
     )
+
 
 def main():
     module = AnsibleModule(
@@ -351,14 +363,8 @@ def main():
     headers["Content-Type"] = "application/json"
     headers["Accept"] = "application/json"
 
-    # Capture prompt flags explicitly provided by user
-    user_prompts = {
-        k: normalize_bool(tpl_in[k])
-        for k in PROMPT_KEYS
-        if k in tpl_in
-    }
+    user_prompts = {k: normalize_bool(tpl_in[k]) for k in PROMPT_KEYS if k in tpl_in}
 
-    # Build CREATE payload
     tpl = copy.deepcopy(tpl_in)
     tpl["project_id"] = project_id
     tpl["app"] = tpl.get("app", "ansible")
@@ -383,13 +389,12 @@ def main():
         module.fail_json(
             msg="Template creation failed",
             status=status,
-            response=resp.decode(),
+            response=as_text(resp),
             attempts=attempts,
         )
 
-    created = json.loads(resp.decode())
+    created = json.loads(as_text(resp))
 
-    # Apply prompts using FULL PUT (merge-safe)
     if user_prompts:
         merged = copy.deepcopy(created)
 
@@ -412,7 +417,7 @@ def main():
             module.fail_json(
                 msg="Template created but prompt update failed",
                 status=status2,
-                response=resp2.decode(),
+                response=as_text(resp2),
                 attempts=attempts,
             )
 
@@ -423,6 +428,7 @@ def main():
         template=created,
         attempts=attempts,
     )
+
 
 if __name__ == "__main__":
     main()
