@@ -66,18 +66,18 @@ Version 2.0.1
 Module Added
 ~~~~~~~~~~~~
 
-- **user_password_update.py**  
+- **user_password_update.py**
   Added so we are able to update user's password using Ansible.
 
-- **project_key_update.py**  
+- **project_key_update.py**
   Added so we are able to update keys using Ansible.
 
-- **project_view_update.py**  
+- **project_view_update.py**
   Added a way to update views using Ansible.
 
 Module update
 ~~~~~~~~~~~~~
-- **plugins/modules/project_integration_update.py**  
+- **plugins/modules/project_integration_update.py**
   Fixed the documentation and fixed problems with updating integrations as there where a missing key.
 
 - **project_backup.py**
@@ -145,3 +145,7 @@ Version 2.0.6
 - **Backwards compatible** with existing integration configurations
 - Extraction values are **optional and additive**
 - Supports resolving integrations, templates, and secrets by **name or ID**
+
+Version 2.0.7
+-------------
+- Fix for issue #19
