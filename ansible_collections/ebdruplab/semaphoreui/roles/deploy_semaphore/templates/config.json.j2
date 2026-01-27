@@ -1,0 +1,191 @@
+{%- set cfg = {} -%}
+{%- set dialect = deploy_semaphore_db.dialect -%}
+{%- set cfg = cfg | combine({'dialect': dialect}, recursive=True) -%}
+
+{%- if dialect == 'sqlite' -%}
+{%- set cfg = cfg | combine({'sqlite': {'host': deploy_semaphore_db.sqlite.host}}, recursive=True) -%}
+{%- elif dialect == 'bolt' -%}
+{%- set cfg = cfg | combine({'bolt': {'host': deploy_semaphore_db.bolt.host}}, recursive=True) -%}
+{%- elif dialect == 'mysql' -%}
+{%- set cfg = cfg | combine({'mysql': {
+  'host': deploy_semaphore_db.mysql.host,
+  'name': deploy_semaphore_db.mysql.name,
+  'user': deploy_semaphore_db.mysql.user,
+  'pass': deploy_semaphore_db.mysql.password | default(''),
+  'port': deploy_semaphore_db.mysql.port | default(3306)
+}}, recursive=True) -%}
+{%- elif dialect == 'postgres' -%}
+{%- set cfg = cfg | combine({'postgres': {
+  'host': deploy_semaphore_db.postgres.host,
+  'name': deploy_semaphore_db.postgres.name,
+  'user': deploy_semaphore_db.postgres.user,
+  'pass': deploy_semaphore_db.postgres.password | default(''),
+  'port': deploy_semaphore_db.postgres.port | default(5432)
+}}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_runner.enabled | default(false) -%}
+{%- set cfg = cfg | combine({'use_remote_runner': true}, recursive=True) -%}
+{%- endif -%}
+
+{%- set cfg = cfg | combine({
+  'port': deploy_semaphore_network.port,
+  'interface': deploy_semaphore_network.interface,
+  'tmp_path': deploy_semaphore_paths.tmp_path,
+  'git_client': deploy_semaphore_git_client,
+  'web_host': deploy_semaphore_network.web_host,
+  'schedule.timezone': deploy_semaphore_schedule_timezone,
+  'max_parallel_tasks': deploy_semaphore_max_parallel_tasks,
+  'max_task_duration_sec': deploy_semaphore_max_task_duration_sec,
+  'max_tasks_per_template': deploy_semaphore_max_tasks_per_template,
+  'password_login_disable': deploy_semaphore_auth.password_login_disable,
+  'non_admin_can_create_project': deploy_semaphore_auth.non_admin_can_create_project
+}, recursive=True) -%}
+
+{%- set cfg = cfg | combine({
+  'cookie_hash': deploy_semaphore_secret.cookie_hash,
+  'cookie_encryption': deploy_semaphore_secret.cookie_encryption,
+  'access_key_encryption': deploy_semaphore_secret.access_key_encryption
+}, recursive=True) -%}
+
+{%- if deploy_semaphore_logging.events is defined -%}
+{%- set cfg = cfg | combine({
+  'log.events.enabled': deploy_semaphore_logging.events.enabled,
+  'log.events.format': deploy_semaphore_logging.events.format
+}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_logging.tasks is defined -%}
+{%- set cfg = cfg | combine({
+  'log.tasks.enabled': deploy_semaphore_logging.tasks.enabled,
+  'log.tasks.format': deploy_semaphore_logging.tasks.format
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_tls.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'tls.enabled': true,
+  'tls.cert_file': deploy_semaphore_tls.cert_file,
+  'tls.key_file': deploy_semaphore_tls.key_file,
+  'tls.http_redirect_port': deploy_semaphore_tls.http_redirect_port
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_process.user is defined and deploy_semaphore_process.user != '' -%}
+{%- set cfg = cfg | combine({'process.user': deploy_semaphore_process.user}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_process.uid is defined -%}
+{%- set cfg = cfg | combine({'process.uid': deploy_semaphore_process.uid}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_process.gid is defined -%}
+{%- set cfg = cfg | combine({'process.gid': deploy_semaphore_process.gid}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_process.chroot is defined and deploy_semaphore_process.chroot != '' -%}
+{%- set cfg = cfg | combine({'process.chroot': deploy_semaphore_process.chroot}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.email.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'email_alert': true,
+  'email_sender': deploy_semaphore_alerts.email.sender,
+  'email_host': deploy_semaphore_alerts.email.host,
+  'email_port': deploy_semaphore_alerts.email.port,
+  'email_username': deploy_semaphore_alerts.email.username,
+  'email_password': deploy_semaphore_alerts.email.password,
+  'email_secure': deploy_semaphore_alerts.email.secure
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.telegram.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'telegram_alert': true,
+  'telegram_chat': deploy_semaphore_alerts.telegram.chat,
+  'telegram_token': deploy_semaphore_alerts.telegram.token
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.slack.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'slack_alert': true,
+  'slack_url': deploy_semaphore_alerts.slack.url
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.rocketchat.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'rocketchat_alert': true,
+  'rocketchat_url': deploy_semaphore_alerts.rocketchat.url
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.microsoft_teams.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'microsoft_teams_alert': true,
+  'microsoft_teams_url': deploy_semaphore_alerts.microsoft_teams.url
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.dingtalk.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'dingtalk_alert': true,
+  'dingtalk_url': deploy_semaphore_alerts.dingtalk.url
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_alerts.gotify.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'gotify_alert': true,
+  'gotify_url': deploy_semaphore_alerts.gotify.url,
+  'gotify_token': deploy_semaphore_alerts.gotify.token
+}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_ldap.enabled | default(false) -%}
+{%- set cfg = cfg | combine({
+  'ldap_enable': true,
+  'ldap_binddn': deploy_semaphore_ldap.binddn,
+  'ldap_bindpassword': deploy_semaphore_ldap.bindpassword,
+  'ldap_server': deploy_semaphore_ldap.server,
+  'ldap_searchdn': deploy_semaphore_ldap.searchdn,
+  'ldap_searchfilter': deploy_semaphore_ldap.searchfilter
+}, recursive=True) -%}
+{%- if deploy_semaphore_ldap.needtls is defined -%}
+{%- set cfg = cfg | combine({'ldap_mappings': deploy_semaphore_ldap.needtls}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_ldap.mappings is defined -%}
+{%- if deploy_semaphore_ldap.mappings.dn is defined -%}
+{%- set cfg = cfg | combine({'ldap_mappings.dn': deploy_semaphore_ldap.mappings.dn}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_ldap.mappings.mail is defined -%}
+{%- set cfg = cfg | combine({'ldap_mappings.mail': deploy_semaphore_ldap.mappings.mail}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_ldap.mappings.uid is defined -%}
+{%- set cfg = cfg | combine({'ldap_mappings.uid': deploy_semaphore_ldap.mappings.uid}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_ldap.mappings.cn is defined -%}
+{%- set cfg = cfg | combine({'ldap_mappings.cn': deploy_semaphore_ldap.mappings.cn}, recursive=True) -%}
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_env.apps | length > 0 -%}
+{%- set cfg = cfg | combine({'apps': deploy_semaphore_env.apps}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_env.env_vars | length > 0 -%}
+{%- set cfg = cfg | combine({'env_vars': deploy_semaphore_env.env_vars}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_env.forwarded_env_vars | length > 0 -%}
+{%- set cfg = cfg | combine({'forwarded_env_vars': deploy_semaphore_env.forwarded_env_vars}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_auth_totp.enabled is defined -%}
+{%- set cfg = cfg | combine({'auth.totp.enabled': deploy_semaphore_auth_totp.enabled}, recursive=True) -%}
+{%- endif -%}
+{%- if deploy_semaphore_auth_totp.allow_recovery is defined -%}
+{%- set cfg = cfg | combine({'auth.totp.allow_recovery': deploy_semaphore_auth_totp.allow_recovery}, recursive=True) -%}
+{%- endif -%}
+
+{%- if deploy_semaphore_config_extra is defined and deploy_semaphore_config_extra | length > 0 -%}
+{%- set cfg = cfg | combine(deploy_semaphore_config_extra, recursive=True) -%}
+{%- endif -%}
+
+{{ cfg | to_nice_json }}

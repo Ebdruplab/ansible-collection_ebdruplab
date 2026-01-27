@@ -1,0 +1,22 @@
+#SPDX-License-Identifier: MIT-0
+galaxy_info:
+  author: Kristian Ebdrup <kristian@ebdruplab.dk>
+  description: >
+    Deploy the semaphore project.
+  company: Ebdruplab
+
+  license: MIT
+
+  min_ansible_version: 2.1
+
+  galaxy_tags:
+    - semaphore
+    - ansible
+    - devops
+    - automation
+    - semaphore_deployment
+    - deployment
+
+dependencies: []
+collections:
+  - community.general

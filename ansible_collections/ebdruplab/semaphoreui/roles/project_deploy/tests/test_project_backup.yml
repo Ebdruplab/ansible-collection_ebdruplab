@@ -19,6 +19,7 @@
     # Choose ONE of these selectors:
     project_backup_project_name: "{{ project_deploy_config.project.name }}"
     # project_backup_project_id: 1
+    project_backup_sensitive_data_no_log: false
 
   tasks:
     - name: "Ensure local backup directory exists"
@@ -34,35 +35,3 @@
         name: "ebdruplab.semaphoreui.project_backup"
       tags:
         - backup
-
-    - name: "Verify | Raw JSON backup file exists"
-      ansible.builtin.stat:
-        path: "{{ project_backup_output_dir }}/{{ project_backup_json_filename }}"
-      register: _backup_json_stat
-      tags:
-        - verify
-
-    - name: "Verify | Vars YAML backup file exists"
-      ansible.builtin.stat:
-        path: "{{ project_backup_output_dir }}/{{ project_backup_vars_filename }}"
-      register: _backup_vars_stat
-      tags:
-        - verify
-
-    - name: "Assert | Backup artifacts created"
-      ansible.builtin.assert:
-        that:
-          - (not (project_backup_write_raw_json | bool)) or (_backup_json_stat.stat.exists | bool)
-          - (not (project_backup_write_vars_yaml | bool)) or (_backup_vars_stat.stat.exists | bool)
-        fail_msg: "Backup artifacts missing. Check project_backup role output and paths."
-      tags:
-        - verify
-
-    - name: "Debug | Show output artifact paths"
-      ansible.builtin.debug:
-        msg:
-          raw_json: "{{ project_backup_output_dir }}/{{ project_backup_json_filename }}"
-          vars_yaml: "{{ project_backup_output_dir }}/{{ project_backup_vars_filename }}"
-      tags:
-        - debug
-

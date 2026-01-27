@@ -1,0 +1,217 @@
+---
+- name: "Container deployment block"
+  when: deploy_semaphore_deploy_method == 'container'
+  tags:
+    - deploy_semaphore
+    - container
+  block:
+
+    - name: "Ensure semaphore directories exist"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "root"
+        group: "root"
+        mode: "0755"
+      loop:
+        - "{{ deploy_semaphore_paths.config_dir }}"
+        - "{{ deploy_semaphore_paths.data_dir }}"
+        - "{{ deploy_semaphore_paths.tmp_path }}"
+      tags:
+        - deploy_semaphore
+        - container
+        - setup
+
+    - name: "Render semaphore config.json"
+      ansible.builtin.template:
+        src: "config.json.j2"
+        dest: "{{ deploy_semaphore_paths.config_dir }}/config.json"
+        owner: "root"
+        group: "root"
+        mode: "0640"
+      tags:
+        - deploy_semaphore
+        - container
+        - config
+
+    # ------------------------------- Docker ----------------------------------
+
+    - name: "Pull image (docker)"
+      community.docker.docker_image:
+        name: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        source: pull
+      when: deploy_semaphore_container_engine == 'docker'
+      tags:
+        - deploy_semaphore
+        - container
+        - docker
+
+    - name: "Define docker container (systemd-managed)"
+      community.docker.docker_container:
+        name: "{{ deploy_semaphore_container_name }}"
+        image: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        state: present
+        restart_policy: "no"
+        env: "{{ deploy_semaphore_container_env | default({}) }}"
+        published_ports: "{{ deploy_semaphore_container_ports | default([]) }}"
+        volumes: >-
+          {{
+            (
+              [
+                deploy_semaphore_paths.config_dir ~ ':/etc/semaphore:Z',
+                deploy_semaphore_paths.data_dir ~ ':/var/lib/semaphore:Z'
+              ]
+              + (deploy_semaphore_container_volumes | default([]))
+            ) | unique
+          }}
+        command: ["server", "--config", "/etc/semaphore/config.json"]
+      when:
+        - deploy_semaphore_container_engine == 'docker'
+        - deploy_semaphore_service_manager == 'systemd'
+      tags:
+        - deploy_semaphore
+        - container
+        - docker
+        - systemd
+
+    - name: "Install systemd unit for container (docker)"
+      ansible.builtin.template:
+        src: "container.service.j2"
+        dest: "/etc/systemd/system/{{ deploy_semaphore_service_name }}.service"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      when:
+        - deploy_semaphore_container_engine == 'docker'
+        - deploy_semaphore_service_manager == 'systemd'
+      notify:
+        - "Reaload daemon"
+        - "Enable and start semaphore"
+      tags:
+        - deploy_semaphore
+        - container
+        - docker
+        - systemd
+
+    - name: "Run docker container natively (no systemd)"
+      community.docker.docker_container:
+        name: "{{ deploy_semaphore_container_name }}"
+        image: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        env: "{{ deploy_semaphore_container_env | default({}) }}"
+        published_ports: "{{ deploy_semaphore_container_ports | default([]) }}"
+        volumes: >-
+          {{
+            (
+              [
+                deploy_semaphore_paths.config_dir ~ ':/etc/semaphore:Z',
+                deploy_semaphore_paths.data_dir ~ ':/var/lib/semaphore:Z'
+              ]
+              + (deploy_semaphore_container_volumes | default([]))
+            ) | unique
+          }}
+        command: ["server", "--config", "/etc/semaphore/config.json"]
+      when:
+        - deploy_semaphore_container_engine == 'docker'
+        - deploy_semaphore_service_manager != 'systemd'
+      tags:
+        - deploy_semaphore
+        - container
+        - docker
+        - native
+
+    # ------------------------------- Podman ----------------------------------
+
+    - name: "Pull image (podman)"
+      containers.podman.podman_image:
+        name: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        state: present
+      when: deploy_semaphore_container_engine == 'podman'
+      tags:
+        - deploy_semaphore
+        - container
+        - podman
+
+    - name: "Define podman container (systemd-managed)"
+      containers.podman.podman_container:
+        name: "{{ deploy_semaphore_container_name }}"
+        image: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        state: present
+        restart_policy: "no"
+        env: "{{ deploy_semaphore_container_env | default({}) }}"
+        publish: "{{ deploy_semaphore_container_ports | default([]) }}"
+        volume: >-
+          {{
+            (
+              [
+                deploy_semaphore_paths.config_dir ~ ':/etc/semaphore:Z',
+                deploy_semaphore_paths.data_dir ~ ':/var/lib/semaphore:Z'
+              ]
+              + (deploy_semaphore_container_volumes | default([]))
+            ) | unique
+          }}
+        command: ["server", "--config", "/etc/semaphore/config.json"]
+      when:
+        - deploy_semaphore_container_engine == 'podman'
+        - deploy_semaphore_service_manager == 'systemd'
+      tags:
+        - deploy_semaphore
+        - container
+        - podman
+        - systemd
+
+    - name: "Install systemd unit for container (podman)"
+      ansible.builtin.template:
+        src: "container.service.j2"
+        dest: "/etc/systemd/system/{{ deploy_semaphore_service_name }}.service"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      when:
+        - deploy_semaphore_container_engine == 'podman'
+        - deploy_semaphore_service_manager == 'systemd'
+      notify:
+        - "Reaload daemon"
+        - "Enable and start semaphore"
+      tags:
+        - deploy_semaphore
+        - container
+        - podman
+        - systemd
+
+    - name: "Run podman container natively (no systemd)"
+      containers.podman.podman_container:
+        name: "{{ deploy_semaphore_container_name }}"
+        image: "{{ deploy_semaphore_image }}:{{ deploy_semaphore_image_tag }}"
+        state: started
+        restart_policy: unless-stopped
+        env: "{{ deploy_semaphore_container_env | default({}) }}"
+        publish: "{{ deploy_semaphore_container_ports | default([]) }}"
+        volume: >-
+          {{
+            (
+              [
+                deploy_semaphore_paths.config_dir ~ ':/etc/semaphore:Z',
+                deploy_semaphore_paths.data_dir ~ ':/var/lib/semaphore:Z'
+              ]
+              + (deploy_semaphore_container_volumes | default([]))
+            ) | unique
+          }}
+        command: ["server", "--config", "/etc/semaphore/config.json"]
+      when:
+        - deploy_semaphore_container_engine == 'podman'
+        - deploy_semaphore_service_manager != 'systemd'
+      tags:
+        - deploy_semaphore
+        - container
+        - podman
+        - native
+
+    - name: "Apply systemd handlers (container)"
+      ansible.builtin.meta: flush_handlers
+      when: deploy_semaphore_service_manager == 'systemd'
+      tags:
+        - deploy_semaphore
+        - container
+        - systemd

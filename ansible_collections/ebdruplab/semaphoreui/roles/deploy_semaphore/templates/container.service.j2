@@ -1,0 +1,18 @@
+[Unit]
+Description=Semaphore ({{ deploy_semaphore_container_engine }}) container {{ deploy_semaphore_container_name }}
+{% if deploy_semaphore_container_engine == 'docker' -%}
+Requires=docker.service
+After=docker.service
+{% else -%}
+Wants=network-online.target
+After=network-online.target
+{% endif -%}
+
+[Service]
+Restart=always
+TimeoutStartSec=0
+ExecStart=/usr/bin/{{ deploy_semaphore_container_engine }} start -a {{ deploy_semaphore_container_name }}
+ExecStop=/usr/bin/{{ deploy_semaphore_container_engine }} stop -t 60 {{ deploy_semaphore_container_name }}
+
+[Install]
+WantedBy=multi-user.target

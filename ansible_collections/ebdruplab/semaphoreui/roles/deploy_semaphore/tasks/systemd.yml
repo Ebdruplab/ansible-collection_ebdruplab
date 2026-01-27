@@ -1,0 +1,160 @@
+---
+- name: "Systemd deployment block"
+  when: deploy_semaphore_deploy_method == 'systemd'
+  tags:
+    - deploy_semaphore
+    - systemd
+  block:
+
+    - name: "Ensure semaphore directories exist"
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "root"
+        group: "root"
+        mode: "0755"
+      loop:
+        - "{{ deploy_semaphore_paths.config_dir }}"
+        - "{{ deploy_semaphore_paths.data_dir }}"
+        - "{{ deploy_semaphore_paths.tmp_path }}"
+      tags:
+        - deploy_semaphore
+        - systemd
+        - setup
+
+    - name: "Render semaphore config.json"
+      ansible.builtin.template:
+        src: "config.json.j2"
+        dest: "{{ deploy_semaphore_paths.config_dir }}/config.json"
+        owner: "root"
+        group: "root"
+        mode: "0640"
+      tags:
+        - deploy_semaphore
+        - systemd
+        - config
+
+    # -------------------------- Install: package ------------------------------
+
+    - name: "Install semaphore via package manager"
+      ansible.builtin.package:
+        name: "{{ deploy_semaphore_package_name | default('semaphore') }}"
+        state: present
+      when: deploy_semaphore_install_method == 'package'
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - package
+
+    # --------------------------- Install: GitHub ------------------------------
+
+    - name: "Create temp dir for GitHub artifact"
+      ansible.builtin.file:
+        path: "{{ deploy_semaphore_tmp_dir | default('/tmp/semaphore-install') }}"
+        state: directory
+        mode: "0755"
+      when: deploy_semaphore_install_method == 'github'
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - github
+
+    - name: "Download semaphore release from GitHub"
+      ansible.builtin.get_url:
+        url: >-
+          {{
+            (
+              deploy_semaphore_github_asset_url
+              | default(
+                  'https://github.com/semaphoreui/semaphore/releases/download/v'
+                  ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v',''))
+                  ~ '/'
+                  ~ 'semaphore_'
+                  ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v',''))
+                  ~ '_'
+                  ~ (deploy_semaphore_goos | default('linux'))
+                  ~ '_'
+                  ~ (deploy_semaphore_goarch_map[ansible_architecture] | default('amd64'))
+                  ~ '.tar.gz'
+                )
+            )
+          }}
+        dest: "{{ (deploy_semaphore_tmp_dir | default('/tmp/semaphore-install')) ~ '/' ~ 'semaphore_' ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v','')) ~ '_' ~ (deploy_semaphore_goos | default('linux')) ~ '_' ~ (deploy_semaphore_goarch_map[ansible_architecture] | default('amd64')) ~ '.tar.gz' }}"
+        mode: "0644"
+        checksum: "{{ deploy_semaphore_github_checksum | default(omit) }}"
+      when: deploy_semaphore_install_method == 'github'
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - github
+
+    - name: "Unarchive semaphore release"
+      ansible.builtin.unarchive:
+        src: "{{ (deploy_semaphore_tmp_dir | default('/tmp/semaphore-install')) ~ '/' ~ 'semaphore_' ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v','')) ~ '_' ~ (deploy_semaphore_goos | default('linux')) ~ '_' ~ (deploy_semaphore_goarch_map[ansible_architecture] | default('amd64')) ~ '.tar.gz' }}"
+        dest: "{{ deploy_semaphore_build_dir | default('/usr/local/src/semaphore-' ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v',''))) }}"
+        remote_src: true
+        creates: "{{ deploy_semaphore_build_dir | default('/usr/local/src/semaphore-' ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v',''))) }}"
+      when: deploy_semaphore_install_method == 'github'
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - github
+
+    - name: "Locate extracted semaphore binary"
+      ansible.builtin.find:
+        paths: "{{ deploy_semaphore_build_dir | default('/usr/local/src/semaphore-' ~ ((deploy_semaphore_ver | default(deploy_semaphore_version | default(''))) | regex_replace('^v',''))) }}"
+        patterns: "^semaphore$"
+        use_regex: true
+        file_type: file
+      register: __deploy_semaphore_found_bin
+      when: deploy_semaphore_install_method == 'github'
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - github
+
+    - name: "Install semaphore binary to target path"
+      ansible.builtin.copy:
+        src: "{{ (__deploy_semaphore_found_bin.files | first).path }}"
+        dest: "{{ deploy_semaphore_binary_path }}"
+        owner: "root"
+        group: "root"
+        mode: "0755"
+        remote_src: true
+      when:
+        - deploy_semaphore_install_method == 'github'
+        - (__deploy_semaphore_found_bin.files | length) > 0
+      tags:
+        - deploy_semaphore
+        - systemd
+        - install
+        - github
+
+    # ------------------------------- Service ---------------------------------
+
+    - name: "Install semaphore systemd service (template)"
+      ansible.builtin.template:
+        src: "systemd.service.j2"
+        dest: "/etc/systemd/system/{{ deploy_semaphore_service_name }}.service"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      notify:
+        - "Reaload daemon"
+        - "Enable and start semaphore"
+      tags:
+        - deploy_semaphore
+        - systemd
+        - unit
+
+    - name: "Apply systemd handlers (systemd)"
+      ansible.builtin.meta: flush_handlers
+      tags:
+        - deploy_semaphore
+        - systemd
+        - handlers

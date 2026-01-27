@@ -8,4 +8,3 @@
   ansible.builtin.include_tasks:
     file: write_vars_yaml.yml
   when: project_backup_write_vars_yaml | bool
-

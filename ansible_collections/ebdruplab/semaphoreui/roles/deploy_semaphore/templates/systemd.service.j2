@@ -1,0 +1,19 @@
+[Unit]
+Description=Semaphore Service
+Documentation=https://github.com/semaphoreui/semaphore
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+{% if deploy_semaphore_process.user is defined and (deploy_semaphore_process.user | length) > 0 -%}
+User={{ deploy_semaphore_process.user }}
+{% endif -%}
+WorkingDirectory={{ deploy_semaphore_paths.data_dir }}
+Environment="SEMAPHORE_CONFIG={{ deploy_semaphore_paths.config_dir }}/config.json"
+ExecStart={{ deploy_semaphore_binary_path }} server --config {{ deploy_semaphore_paths.config_dir }}/config.json
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
