@@ -1,0 +1,535 @@
+{
+    "environments": [
+        {
+            "json": "{}",
+            "name": "Empty"
+        },
+        {
+            "env": "{\"KEY\": \"value\"}",
+            "json": "{\"foo\": \"bar\"}",
+            "name": "Test Environment",
+            "password": "mysecret"
+        }
+    ],
+    "integration_aliases": [],
+    "integrations": [
+        {
+            "aliases": [],
+            "auth_header": "token",
+            "auth_method": "token",
+            "auth_secret": "CI Trigger Token",
+            "extract_values": [],
+            "matchers": [],
+            "name": "CI Token Trigger",
+            "searchable": false,
+            "task_params": {
+                "environment": "",
+                "message": "",
+                "params": {}
+            },
+            "template": "Deploy Service"
+        },
+        {
+            "aliases": [],
+            "auth_header": "token",
+            "auth_method": "token",
+            "extract_values": [
+                {
+                    "body_data_type": "json",
+                    "key": "X-Branch",
+                    "name": "Extract Branch",
+                    "value_source": "body",
+                    "variable": "git_branch",
+                    "variable_type": "environment"
+                },
+                {
+                    "body_data_type": "json",
+                    "key": "X-Branch",
+                    "name": "Extract Branch",
+                    "value_source": "header",
+                    "variable": "git_branch",
+                    "variable_type": "environment"
+                },
+                {
+                    "body_data_type": "json",
+                    "key": "X-Branch",
+                    "name": "Extract Branch",
+                    "value_source": "header",
+                    "variable": "git_branch",
+                    "variable_type": "environment"
+                },
+                {
+                    "body_data_type": "json",
+                    "key": "X-Commit",
+                    "name": "Extract Commit",
+                    "value_source": "header",
+                    "variable": "git_commit",
+                    "variable_type": "environment"
+                },
+                {
+                    "body_data_type": "json",
+                    "key": "X-Commit",
+                    "name": "Extract Commit",
+                    "value_source": "header",
+                    "variable": "git_commit",
+                    "variable_type": "environment"
+                },
+                {
+                    "body_data_type": "json",
+                    "key": "X-Commit",
+                    "name": "Extract Commit",
+                    "value_source": "header",
+                    "variable": "git_commit",
+                    "variable_type": "environment"
+                }
+            ],
+            "matchers": [],
+            "name": "CI Token Trigger (Secondary)",
+            "searchable": false,
+            "task_params": {
+                "environment": "",
+                "message": "",
+                "params": {}
+            },
+            "template": "Deploy Service"
+        }
+    ],
+    "inventories": [
+        {
+            "inventory": "localhost ansible_connection=local",
+            "name": "A Local Ini Inventory",
+            "ssh_key": "Ebdruplab example ssh key",
+            "type": "static"
+        },
+        {
+            "inventory": "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n",
+            "name": "A Yaml Inventory",
+            "ssh_key": "Ebdruplab example ssh key",
+            "type": "static-yaml"
+        },
+        {
+            "become_key": "Ebdruplab example ssh key",
+            "inventory": "inventories/example/example.ini",
+            "name": "A repository Inventory",
+            "ssh_key": "Ebdruplab example ssh key",
+            "type": "file"
+        }
+    ],
+    "keys": [
+        {
+            "name": "CI Trigger Token",
+            "owner": "",
+            "type": "login_password"
+        },
+        {
+            "name": "DB_PASSWORD",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - mzw348xzd6",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - 9jl9yw4q3o",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - gxeogxm4ox",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - b0kek3wd46",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - f38trvomvp",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - wtrljkszih",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - z99lns7bds",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - zi9s6wovv9",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - jtoz34yozn",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "DB_PASSWORD - bycvf4awk3",
+            "owner": "environment",
+            "type": "string"
+        },
+        {
+            "name": "Ebdruplab Example User",
+            "owner": "",
+            "type": "login_password"
+        },
+        {
+            "name": "Ebdruplab example ssh key",
+            "owner": "",
+            "type": "ssh"
+        },
+        {
+            "name": "None",
+            "owner": "",
+            "type": "none"
+        },
+        {
+            "name": "Project Vault Password",
+            "owner": "",
+            "type": "login_password"
+        },
+        {
+            "name": "api_token",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 77kpho0zvx",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 2vwbx9lhbi",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 1yureg7nz4",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - teul918kv1",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 6xg5lhdcvz",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 4rkmb1qyba",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - xlp765udn3",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - rypop5zk13",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - 7artewytaw",
+            "owner": "variable",
+            "type": "string"
+        },
+        {
+            "name": "api_token - y8lh2v28bl",
+            "owner": "variable",
+            "type": "string"
+        }
+    ],
+    "meta": {
+        "alert": false,
+        "alert_chat": "",
+        "max_parallel_tasks": 0,
+        "name": "Ebdruplab Example Project",
+        "type": ""
+    },
+    "repositories": [
+        {
+            "git_branch": "main",
+            "git_url": "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git",
+            "name": "Repositorie Ebdruplab Demo",
+            "ssh_key": "Ebdruplab Example User"
+        }
+    ],
+    "schedules": [
+        {
+            "active": true,
+            "cron_format": "0 3 * * *",
+            "name": "Nightly Deploy",
+            "task_params": {
+                "environment": "",
+                "message": "",
+                "params": {}
+            },
+            "template": "Deploy Service"
+        },
+        {
+            "active": false,
+            "cron_format": "0 * * * *",
+            "name": "Hourly Build",
+            "task_params": {
+                "environment": "",
+                "message": "",
+                "params": {}
+            },
+            "template": "Build Artifact"
+        }
+    ],
+    "secret_storages": [],
+    "templates": [
+        {
+            "allow_override_args_in_task": false,
+            "allow_override_branch_in_task": false,
+            "allow_parallel_tasks": false,
+            "app": "ansible",
+            "arguments": "[]",
+            "autorun": false,
+            "cron": "0 * * * *",
+            "description": "Builds the application artifact",
+            "environment": "Test Environment",
+            "inventory": "A repository Inventory",
+            "name": "Build Artifact",
+            "playbook": "playbooks/build.yml",
+            "repository": "Repositorie Ebdruplab Demo",
+            "start_version": "1.0.0.0",
+            "suppress_success_alerts": false,
+            "survey_vars": [],
+            "task_params": {
+                "allow_debug": false,
+                "allow_override_inventory": false,
+                "allow_override_limit": false,
+                "allow_override_skip_tags": false,
+                "allow_override_tags": false,
+                "limit": [],
+                "skip_tags": [],
+                "tags": []
+            },
+            "type": "build",
+            "vaults": [
+                {
+                    "type": "password"
+                },
+                {
+                    "name": "exist",
+                    "script": "extension-client",
+                    "type": "script"
+                }
+            ],
+            "view": "ExamplePos_1"
+        },
+        {
+            "allow_override_args_in_task": false,
+            "allow_override_branch_in_task": false,
+            "allow_parallel_tasks": false,
+            "app": "ansible",
+            "arguments": "[]",
+            "autorun": false,
+            "cron": "0 3 * * *",
+            "description": "Deploys the service",
+            "environment": "Test Environment",
+            "git_branch": "release",
+            "inventory": "A repository Inventory",
+            "name": "Deploy Service",
+            "playbook": "playbooks/deploy.yml",
+            "repository": "Repositorie Ebdruplab Demo",
+            "suppress_success_alerts": false,
+            "survey_vars": [
+                {
+                    "default_value": "",
+                    "description": "",
+                    "name": "target_env",
+                    "required": true,
+                    "title": "Target environment",
+                    "type": "enum",
+                    "values": [
+                        {
+                            "name": "dev",
+                            "value": "dev"
+                        },
+                        {
+                            "name": "prod",
+                            "value": "prod"
+                        }
+                    ]
+                }
+            ],
+            "task_params": {
+                "allow_debug": true,
+                "allow_override_inventory": false,
+                "allow_override_limit": false,
+                "allow_override_skip_tags": false,
+                "allow_override_tags": false,
+                "limit": [],
+                "skip_tags": [],
+                "tags": []
+            },
+            "type": "deploy",
+            "vaults": [
+                {
+                    "type": "password"
+                }
+            ],
+            "view": "ExamplePos_1"
+        },
+        {
+            "allow_override_args_in_task": true,
+            "allow_override_branch_in_task": true,
+            "allow_parallel_tasks": false,
+            "app": "ansible",
+            "arguments": "[]",
+            "autorun": false,
+            "description": "Runs the example Ansible playbook",
+            "environment": "Test Environment",
+            "git_branch": "main",
+            "inventory": "A repository Inventory",
+            "name": "Ebdruplab Example Playbook",
+            "playbook": "playbooks/pb-semaphore-example.yml",
+            "repository": "Repositorie Ebdruplab Demo",
+            "suppress_success_alerts": false,
+            "survey_vars": [
+                {
+                    "default_value": "1.0.0",
+                    "description": "",
+                    "name": "release_version",
+                    "required": true,
+                    "title": "Release version",
+                    "type": "string",
+                    "values": []
+                },
+                {
+                    "default_value": "localhost",
+                    "description": "The target",
+                    "name": "targets",
+                    "required": true,
+                    "title": "What is our target?",
+                    "type": "string",
+                    "values": []
+                }
+            ],
+            "task_params": {
+                "allow_debug": true,
+                "allow_override_inventory": true,
+                "allow_override_limit": true,
+                "allow_override_skip_tags": true,
+                "allow_override_tags": true,
+                "limit": [],
+                "skip_tags": [],
+                "tags": []
+            },
+            "type": "",
+            "vaults": [],
+            "view": "ExamplePos_1"
+        },
+        {
+            "allow_override_args_in_task": true,
+            "allow_override_branch_in_task": true,
+            "allow_parallel_tasks": false,
+            "app": "ansible",
+            "arguments": "[]",
+            "autorun": false,
+            "description": "Runs the example Ansible playbook",
+            "environment": "Test Environment",
+            "git_branch": "main",
+            "inventory": "A repository Inventory",
+            "name": "Example Playbook",
+            "playbook": "playbooks/pb-semaphore-example.yml",
+            "repository": "Repositorie Ebdruplab Demo",
+            "suppress_success_alerts": false,
+            "survey_vars": [
+                {
+                    "default_value": "1.0.0",
+                    "description": "",
+                    "name": "release_version",
+                    "required": true,
+                    "title": "Release version",
+                    "type": "string",
+                    "values": []
+                },
+                {
+                    "default_value": "5",
+                    "description": "",
+                    "name": "batch_size",
+                    "required": false,
+                    "title": "Batch size",
+                    "type": "int",
+                    "values": []
+                },
+                {
+                    "default_value": "",
+                    "description": "",
+                    "name": "api_key",
+                    "required": false,
+                    "title": "API key",
+                    "type": "secret",
+                    "values": []
+                },
+                {
+                    "default_value": "",
+                    "description": "",
+                    "name": "env",
+                    "required": true,
+                    "title": "Environment",
+                    "type": "enum",
+                    "values": [
+                        {
+                            "name": "staging",
+                            "value": "stg"
+                        },
+                        {
+                            "name": "production",
+                            "value": "prod"
+                        }
+                    ]
+                }
+            ],
+            "task_params": {
+                "allow_debug": true,
+                "allow_override_inventory": true,
+                "allow_override_limit": true,
+                "allow_override_skip_tags": true,
+                "allow_override_tags": true,
+                "limit": [],
+                "skip_tags": [],
+                "tags": []
+            },
+            "type": "",
+            "vaults": [
+                {
+                    "type": "password"
+                },
+                {
+                    "name": "exist",
+                    "script": "extension-client",
+                    "type": "script"
+                }
+            ],
+            "view": "ExamplePos_1"
+        }
+    ],
+    "views": [
+        {
+            "position": 0,
+            "title": "Examples"
+        },
+        {
+            "position": 1,
+            "title": "ExamplePos_1"
+        }
+    ]
+}

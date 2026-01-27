@@ -1,0 +1,385 @@
+project_deploy_config:
+  Ebdruplab Example Project:
+    environments:
+      Empty:
+        env: null
+        id: 33
+        json: {}
+        name: Empty
+        password: null
+        project_id: 30
+      Test Environment:
+        env:
+          KEY: value
+        id: 34
+        json:
+          foo: bar
+        name: Test Environment
+        password: mysecret
+        project_id: 30
+    integrations:
+      CI Token Trigger:
+        auth_header: token
+        auth_method: token
+        auth_secret_id: 69
+        auth_secret_name: CI Trigger Token
+        id: 3
+        name: CI Token Trigger
+        project_id: 30
+        searchable: false
+        template_id: 18
+        template_name: Deploy Service
+      CI Token Trigger (Secondary):
+        auth_header: token
+        auth_method: token
+        auth_secret_id: null
+        id: 4
+        name: CI Token Trigger (Secondary)
+        project_id: 30
+        searchable: false
+        template_id: 18
+        template_name: Deploy Service
+    inventories:
+      A Local Ini Inventory:
+        become_key_id: null
+        id: 21
+        inventory: localhost ansible_connection=local
+        name: A Local Ini Inventory
+        project_id: 30
+        repository_id: null
+        ssh_key_id: 66
+        ssh_key_name: Ebdruplab example ssh key
+        template_id: null
+        type: static
+      A Yaml Inventory:
+        become_key_id: null
+        id: 20
+        inventory: "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n"
+        name: A Yaml Inventory
+        project_id: 30
+        repository_id: null
+        ssh_key_id: 66
+        ssh_key_name: Ebdruplab example ssh key
+        template_id: null
+        type: static-yaml
+      A repository Inventory:
+        become_key_id: 66
+        become_key_name: Ebdruplab example ssh key
+        id: 22
+        inventory: inventories/example/example.ini
+        inventory_file: inventories/example/example.ini
+        name: A repository Inventory
+        project_id: 30
+        repository_id: 11
+        repository_name: Repositorie Ebdruplab Demo
+        ssh_key_id: 66
+        ssh_key_name: Ebdruplab example ssh key
+        template_id: null
+        type: file
+    keys:
+      CI Trigger Token:
+        id: 69
+        login_password:
+          login: ''
+          password: ''
+        name: CI Trigger Token
+        project_id: 30
+        ssh:
+          login: ''
+          passphrase: ''
+          private_key: ''
+        string: ''
+        type: login_password
+      Ebdruplab Example User:
+        id: 67
+        login_password:
+          login: ''
+          password: ''
+        name: Ebdruplab Example User
+        project_id: 30
+        ssh:
+          login: ''
+          passphrase: ''
+          private_key: ''
+        string: ''
+        type: login_password
+      Ebdruplab example ssh key:
+        id: 66
+        login_password:
+          login: ''
+          password: ''
+        name: Ebdruplab example ssh key
+        project_id: 30
+        ssh:
+          login: ''
+          passphrase: ''
+          private_key: ''
+        string: ''
+        type: ssh
+      None:
+        empty: true
+        id: 65
+        login_password:
+          login: ''
+          password: ''
+        name: None
+        project_id: 30
+        ssh:
+          login: ''
+          passphrase: ''
+          private_key: ''
+        string: ''
+        type: none
+      Project Vault Password:
+        id: 68
+        login_password:
+          login: ''
+          password: ''
+        name: Project Vault Password
+        project_id: 30
+        ssh:
+          login: ''
+          passphrase: ''
+          private_key: ''
+        string: ''
+        type: login_password
+    project:
+      alert: false
+      alert_chat: ''
+      demo: false
+      max_parallel_tasks: '0'
+      name: Ebdruplab Example Project
+      type: ''
+    repositories:
+    - git_branch: main
+      git_url: https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git
+      id: 11
+      key_name: Ebdruplab Example User
+      name: Repositorie Ebdruplab Demo
+      project_id: 30
+      ssh_key_id: 67
+    schedules:
+      Hourly Build:
+        active: false
+        arguments: []
+        cron_format: 0 * * * *
+        id: 5
+        name: Hourly Build
+        project_id: 30
+        repository_id: null
+        task_params: {}
+        template_id: 19
+        tpl_name: Build Artifact
+      Nightly Deploy:
+        active: true
+        arguments: []
+        cron_format: 0 3 * * *
+        id: 4
+        name: Nightly Deploy
+        project_id: 30
+        repository_id: null
+        task_params: {}
+        template_id: 18
+        tpl_name: Deploy Service
+    templates:
+      Build Artifact:
+        app: ansible
+        arguments: []
+        description: Builds the application artifact
+        environment_id: 34
+        environment_name: Test Environment
+        id: 19
+        inventory_id: 22
+        inventory_name: A repository Inventory
+        name: Build Artifact
+        playbook: playbooks/build.yml
+        project_id: 30
+        repository_id: 11
+        repository_name: Repositorie Ebdruplab Demo
+        start_version: 1.0.0.0
+        task_params:
+          allow_debug: false
+          allow_override_inventory: false
+          allow_override_limit: false
+          allow_override_skip_tags: false
+          allow_override_tags: false
+          limit: []
+          skip_tags: []
+          tags: []
+        tasks: 0
+        type: build
+        vaults:
+        - id: 53
+          project_id: 30
+          template_id: 19
+          type: password
+        - id: 54
+          name: exist
+          project_id: 30
+          script: extension-client
+          template_id: 19
+          type: script
+        view_id: 9
+        view_title: ExamplePos_1
+      Deploy Service:
+        app: ansible
+        arguments: []
+        description: Deploys the service
+        environment_id: 34
+        environment_name: Test Environment
+        git_branch: release
+        id: 18
+        inventory_id: 22
+        inventory_name: A repository Inventory
+        name: Deploy Service
+        playbook: playbooks/deploy.yml
+        project_id: 30
+        repository_id: 11
+        repository_name: Repositorie Ebdruplab Demo
+        survey_vars:
+        - name: target_env
+          required: true
+          title: Target environment
+          type: enum
+          values:
+          - name: dev
+            value: dev
+          - name: prod
+            value: prod
+        task_params:
+          allow_debug: true
+          allow_override_inventory: false
+          allow_override_limit: false
+          allow_override_skip_tags: false
+          allow_override_tags: false
+          limit: []
+          skip_tags: []
+          tags: []
+        tasks: 0
+        type: deploy
+        vaults:
+        - id: 52
+          project_id: 30
+          template_id: 18
+          type: password
+        view_id: 9
+        view_title: ExamplePos_1
+      Ebdruplab Example Playbook:
+        allow_override_args_in_task: true
+        allow_override_branch_in_task: true
+        app: ansible
+        arguments: []
+        description: Runs the example Ansible playbook
+        environment_id: 34
+        environment_name: Test Environment
+        git_branch: main
+        id: 16
+        inventory_id: 22
+        inventory_name: A repository Inventory
+        name: Ebdruplab Example Playbook
+        playbook: playbooks/pb-semaphore-example.yml
+        project_id: 30
+        repository_id: 11
+        repository_name: Repositorie Ebdruplab Demo
+        survey_vars:
+        - default_value: 1.0.0
+          name: release_version
+          required: true
+          title: Release version
+          type: string
+        - default_value: localhost
+          description: The target
+          name: targets
+          required: true
+          title: What is our target?
+          type: string
+        task_params:
+          allow_debug: true
+          allow_override_inventory: true
+          allow_override_limit: true
+          allow_override_skip_tags: true
+          allow_override_tags: true
+          limit: []
+          skip_tags: []
+          tags: []
+        tasks: 0
+        view_id: 9
+        view_title: ExamplePos_1
+      Example Playbook:
+        allow_override_args_in_task: true
+        allow_override_branch_in_task: true
+        app: ansible
+        arguments: []
+        description: Runs the example Ansible playbook
+        environment_id: 34
+        environment_name: Test Environment
+        git_branch: main
+        id: 17
+        inventory_id: 22
+        inventory_name: A repository Inventory
+        name: Example Playbook
+        playbook: playbooks/pb-semaphore-example.yml
+        project_id: 30
+        repository_id: 11
+        repository_name: Repositorie Ebdruplab Demo
+        survey_vars:
+        - default_value: 1.0.0
+          name: release_version
+          required: true
+          title: Release version
+          type: string
+        - default_value: '5'
+          name: batch_size
+          title: Batch size
+          type: int
+        - name: api_key
+          title: API key
+          type: secret
+        - name: env
+          required: true
+          title: Environment
+          type: enum
+          values:
+          - name: staging
+            value: stg
+          - name: production
+            value: prod
+        task_params:
+          allow_debug: true
+          allow_override_inventory: true
+          allow_override_limit: true
+          allow_override_skip_tags: true
+          allow_override_tags: true
+          limit: []
+          skip_tags: []
+          tags: []
+        tasks: 0
+        vaults:
+        - id: 50
+          project_id: 30
+          template_id: 17
+          type: password
+        - id: 51
+          name: exist
+          project_id: 30
+          script: extension-client
+          template_id: 17
+          type: script
+        view_id: 9
+        view_title: ExamplePos_1
+    users_access:
+    - role: Owner
+      username: admin
+    - role: Owner
+      username: ServiceDeskRunner
+    views:
+      ExamplePos_1:
+        id: 9
+        position: 1
+        project_id: 30
+        title: ExamplePos_1
+      Examples:
+        id: 8
+        position: 0
+        project_id: 30
+        title: Examples

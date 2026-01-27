@@ -1,0 +1,202 @@
+---
+- name: "Validate deploy method"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_deploy_method in ['container', 'systemd']
+    fail_msg: "deploy_semaphore_deploy_method must be 'container' or 'systemd'."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate container engine and image when container"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_container_engine in ['docker', 'podman']
+      - deploy_semaphore_image is string
+      - (deploy_semaphore_image | length) > 0
+      - deploy_semaphore_image_tag is string
+      - (deploy_semaphore_image_tag | length) > 0
+    fail_msg: "Container engine must be docker|podman and image/tag must be non-empty."
+    quiet: true
+  when: deploy_semaphore_deploy_method == 'container'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate systemd install method when systemd"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_install_method in ['package', 'github']
+    fail_msg: "deploy_semaphore_install_method must be 'package' or 'github' when using systemd."
+    quiet: true
+  when: deploy_semaphore_deploy_method == 'systemd'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate paths"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_paths.config_dir is string
+      - (deploy_semaphore_paths.config_dir | length) > 0
+      - deploy_semaphore_paths.data_dir is string
+      - (deploy_semaphore_paths.data_dir | length) > 0
+      - deploy_semaphore_paths.tmp_path is string
+      - (deploy_semaphore_paths.tmp_path | length) > 0
+    fail_msg: "config_dir, data_dir and tmp_path must be set."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate network"
+  ansible.builtin.assert:
+    that:
+      - (deploy_semaphore_network.port | int) >= 1
+      - (deploy_semaphore_network.port | int) <= 65535
+      - deploy_semaphore_network.interface is string
+    fail_msg: "Network port must be 1..65535 and interface must be a string."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate database dialect"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_db.dialect in ['sqlite', 'bolt', 'mysql', 'postgres']
+    fail_msg: "Unsupported database dialect."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate sqlite settings"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_db.sqlite.host is string
+      - (deploy_semaphore_db.sqlite.host | length) > 0
+    fail_msg: "sqlite.host must be set."
+    quiet: true
+  when: deploy_semaphore_db.dialect == 'sqlite'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate bolt settings"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_db.bolt.host is string
+      - (deploy_semaphore_db.bolt.host | length) > 0
+    fail_msg: "bolt.host must be set."
+    quiet: true
+  when: deploy_semaphore_db.dialect == 'bolt'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate mysql settings"
+  ansible.builtin.assert:
+    that:
+      - (deploy_semaphore_db.mysql.host | length) > 0
+      - (deploy_semaphore_db.mysql.name | length) > 0
+      - (deploy_semaphore_db.mysql.user | length) > 0
+      - (deploy_semaphore_db.mysql.port | int) > 0
+    fail_msg: "mysql requires host, name, user and a valid port."
+    quiet: true
+  when: deploy_semaphore_db.dialect == 'mysql'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate postgres settings"
+  ansible.builtin.assert:
+    that:
+      - (deploy_semaphore_db.postgres.host | length) > 0
+      - (deploy_semaphore_db.postgres.name | length) > 0
+      - (deploy_semaphore_db.postgres.user | length) > 0
+      - (deploy_semaphore_db.postgres.port | int) > 0
+    fail_msg: "postgres requires host, name, user and a valid port."
+    quiet: true
+  when: deploy_semaphore_db.dialect == 'postgres'
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate secrets"
+  ansible.builtin.assert:
+    that:
+      - (deploy_semaphore_secret.cookie_hash           | length) > 0
+      - (deploy_semaphore_secret.cookie_encryption     | length) > 0
+      - (deploy_semaphore_secret.access_key_encryption | length) > 0
+    fail_msg: "cookie_hash, cookie_encryption and access_key_encryption must be set."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate TLS settings"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_tls.enabled in [true, false]
+      - (not (deploy_semaphore_tls.enabled | bool)) or ((deploy_semaphore_tls.cert_file | length) > 0)
+      - (not (deploy_semaphore_tls.enabled | bool)) or ((deploy_semaphore_tls.key_file  | length) > 0)
+      - (deploy_semaphore_tls.http_redirect_port | int) >= 0
+      - (deploy_semaphore_tls.http_redirect_port | int) <= 65535
+    fail_msg: "TLS enabled requires cert_file and key_file; http_redirect_port must be 0..65535."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate admin user (if enabled)"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_admin_user.enabled in [true, false]
+      - (not deploy_semaphore_admin_user.enabled) or ((deploy_semaphore_admin_user.login    | length) > 0)
+      - (not deploy_semaphore_admin_user.enabled) or ((deploy_semaphore_admin_user.password | length) > 0)
+      - (not deploy_semaphore_admin_user.enabled) or ((deploy_semaphore_admin_user.name     | length) > 0)
+      - (not deploy_semaphore_admin_user.enabled) or ((deploy_semaphore_admin_user.email    | length) > 0)
+    fail_msg: "Admin user requires login, password, name and email when enabled."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor
+
+- name: "Validate boolean flags are booleans"
+  ansible.builtin.assert:
+    that:
+      - deploy_semaphore_runner.enabled in [true, false]
+      - deploy_semaphore_auth.password_login_disable in [true, false]
+      - deploy_semaphore_auth.non_admin_can_create_project in [true, false]
+      - deploy_semaphore_auth_totp.enabled in [true, false]
+      - deploy_semaphore_auth_totp.allow_recovery in [true, false]
+      - deploy_semaphore_logging.events.enabled in [true, false]
+      - deploy_semaphore_logging.tasks.enabled in [true, false]
+      - deploy_semaphore_alerts.email.enabled in [true, false]
+      - deploy_semaphore_alerts.telegram.enabled in [true, false]
+      - deploy_semaphore_alerts.slack.enabled in [true, false]
+      - deploy_semaphore_alerts.rocketchat.enabled in [true, false]
+      - deploy_semaphore_alerts.microsoft_teams.enabled in [true, false]
+      - deploy_semaphore_alerts.dingtalk.enabled in [true, false]
+      - deploy_semaphore_alerts.gotify.enabled in [true, false]
+    fail_msg: "All feature flags must be true/false."
+    quiet: true
+  tags:
+    - deploy_semaphore
+    - assert
+    - minor

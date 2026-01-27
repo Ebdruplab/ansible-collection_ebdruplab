@@ -1,0 +1,143 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for ebdruplab.semaphoreui.deploy_semaphore
+deploy_semaphore_deploy_method: "container"  # container | systemd
+deploy_semaphore_container_engine: "docker"  # docker | podman
+deploy_semaphore_image: "semaphoreui/semaphore"
+deploy_semaphore_image_tag: "latest"
+deploy_semaphore_container_name: "semaphore"
+deploy_semaphore_container_ports:
+  - "3000:3000"
+deploy_semaphore_container_env: {}
+deploy_semaphore_container_volumes: []
+
+deploy_semaphore_install_method: "package"   # package | github
+deploy_semaphore_version: ""
+deploy_semaphore_binary_path: "/usr/local/bin/semaphore"
+
+deploy_semaphore_paths:
+  config_dir: "/etc/semaphore"
+  data_dir: "/var/lib/semaphore"
+  tmp_path: "/var/tmp/semaphore"
+
+deploy_semaphore_network:
+  port: 3000
+  interface: "0.0.0.0"
+  web_host: ""
+
+deploy_semaphore_git_client: "cmd_git"
+deploy_semaphore_schedule_timezone: "UTC"
+deploy_semaphore_max_task_duration_sec: 3600
+deploy_semaphore_max_parallel_tasks: 0
+deploy_semaphore_max_tasks_per_template: 0
+
+deploy_semaphore_runner:
+  enabled: false  # when false, key is omitted from config
+
+deploy_semaphore_auth:
+  password_login_disable: false
+  non_admin_can_create_project: false
+
+deploy_semaphore_auth_totp:
+  enabled: false
+  allow_recovery: true
+
+deploy_semaphore_secret:
+  cookie_hash: "ITbvFoprffxLk+xnDZBG3C+NR2rnEAJ1HPHM8QlSDCQ="
+  cookie_encryption: "OdwKXa+LoE+0EiLUWiqiBPhS4/WBFHV3byk89muMW6U="
+  access_key_encryption: "tqjtkeiZHCHfjyzBtbiIiQIhNcWYg7gOlIyXTKoq2kM="
+
+deploy_semaphore_logging:
+  events:
+    enabled: true
+    format: "json"
+  tasks:
+    enabled: true
+    format: "json"
+
+deploy_semaphore_tls:
+  enabled: false
+  cert_file: ""
+  key_file: ""
+  http_redirect_port: 80
+
+deploy_semaphore_process: {}  # { user: "", uid: 0, gid: 0, chroot: "" }
+
+deploy_semaphore_alerts:
+  email:
+    enabled: false
+    sender: ""
+    host: ""
+    port: 587
+    username: ""
+    password: ""
+    secure: false
+  telegram:
+    enabled: false
+    chat: ""
+    token: ""
+  slack:
+    enabled: false
+    url: ""
+  rocketchat:
+    enabled: false
+    url: ""
+  microsoft_teams:
+    enabled: false
+    url: ""
+  dingtalk:
+    enabled: false
+    url: ""
+  gotify:
+    enabled: false
+    url: ""
+    token: ""
+
+deploy_semaphore_env:
+  apps: []
+  env_vars: {}
+  forwarded_env_vars: []
+
+deploy_semaphore_db:
+  dialect: "sqlite"  # sqlite | bolt | mysql | postgres
+  sqlite:
+    host: "{{ deploy_semaphore_paths.data_dir }}/database.sqlite"
+  bolt:
+    host: "{{ deploy_semaphore_paths.data_dir }}/database.boltdb"
+  mysql:
+    host: "localhost"
+    name: "semaphore"
+    user: "root"
+    password: ""
+    port: 3306
+  postgres:
+    host: "localhost"
+    name: "semaphore"
+    user: "root"
+    password: ""
+    port: 5432
+
+deploy_semaphore_admin_user:
+  enabled: true
+  login: "admin"
+  password: "changeme"
+  name: "Admin"
+  email: "admin@localhost"
+
+deploy_semaphore_config_extra: {}
+
+
+deploy_semaphore_install_method: 'github'
+deploy_semaphore_service_manager: 'systemd'
+
+deploy_semaphore_service_name: "semaphore"
+deploy_semaphore__binary_path: '/usr/local/bin/semaphore'
+
+deploy_semaphore_ver: ''
+deploy_semaphore_goarch_map:
+  x86_64: amd64
+  aarch64: arm64
+  armv7l: armv7
+  ppc64le: ppc64le
+  s390x: s390x
+deploy_semaphore_goos: "linux"

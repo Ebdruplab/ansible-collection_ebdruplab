@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for ebdruplab.semaphoreui.deploy_semaphore
+
+- name: "Include assert tasks"
+  ansible.builtin.include_tasks:
+    file: assert.yml

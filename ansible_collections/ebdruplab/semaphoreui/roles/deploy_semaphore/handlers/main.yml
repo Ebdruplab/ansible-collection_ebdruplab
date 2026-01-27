@@ -1,0 +1,21 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for ebdruplab.semaphoreui.deploy_semaphore
+
+- name: "Reaload daemon"
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags:
+    - deploy_semaphore
+    - systemd
+    - handlers
+
+- name: "Enable and start semaphore"
+  ansible.builtin.systemd:
+    name: "{{ deploy_semaphore_container_name }}.service"
+    enabled: true
+    state: started
+  tags:
+    - deploy_semaphore
+    - systemd
+    - handlers
