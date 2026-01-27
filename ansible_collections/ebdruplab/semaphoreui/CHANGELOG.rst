@@ -154,3 +154,5 @@ Version 2.1.0
 -------------
 - Add new role **`project_backup`** to export Semaphore projects using the built-in backup API
 - Support generating **Ansible vars YAML** from backups for reuse with `project_deploy`
+
+
