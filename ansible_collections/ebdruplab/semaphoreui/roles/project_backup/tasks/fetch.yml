@@ -1,0 +1,111 @@
+# roles/project_backup/tasks/fetch.yml
+---
+- name: "Get project meta"
+  ebdruplab.semaphoreui.project_get:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _project_meta
+  tags:
+    - project
+    - get
+
+- name: "List users access"
+  ebdruplab.semaphoreui.project_user_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _users_access
+  tags:
+    - users_access
+    - list
+
+- name: "List keys"
+  ebdruplab.semaphoreui.project_key_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _keys
+  tags:
+    - keys
+    - list
+
+- name: "List repositories"
+  ebdruplab.semaphoreui.project_repository_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _repositories
+  tags:
+    - repositories
+    - list
+
+- name: "List views"
+  ebdruplab.semaphoreui.project_view_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _views
+  tags:
+    - views
+    - list
+
+- name: "List inventories"
+  ebdruplab.semaphoreui.project_inventory_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _inventories
+  tags:
+    - inventories
+    - list
+
+- name: "List environments"
+  ebdruplab.semaphoreui.project_environment_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _environments
+  tags:
+    - environments
+    - list
+
+- name: "List templates"
+  ebdruplab.semaphoreui.project_template_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _templates
+  tags:
+    - templates
+    - list
+
+- name: "List schedules"
+  ebdruplab.semaphoreui.project_schedule_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _schedules
+  tags:
+    - schedules
+    - list
+
+- name: "List integrations"
+  ebdruplab.semaphoreui.project_integration_list:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: "{{ project_backup_project_id }}"
+  register: _integrations
+  tags:
+    - integrations
+    - list

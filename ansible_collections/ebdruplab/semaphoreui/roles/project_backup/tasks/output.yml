@@ -1,0 +1,9 @@
+# roles/project_backup/tasks/output.yml
+---
+- name: "Ensure output dir exists"
+  ansible.builtin.file:
+    path: "{{ project_backup_output_dir }}"
+    state: "directory"
+    mode: "0750"
+  tags:
+    - output

@@ -1,3 +1,4 @@
+# roles/project_backup/tasks/resolve_globals.yml
 ---
 - name: "Resolve | Apply ebdruplab_* globals to project_backup_* when any global is set (do not override explicit role vars)"
   ansible.builtin.set_fact:
