@@ -1,5 +1,5 @@
+# roles/project_backup/tasks/login.yml
 ---
-
 - name: "Log in to Semaphore"
   ebdruplab.semaphoreui.login:
     host: "{{ project_backup_semaphore_host }}"

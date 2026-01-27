@@ -3,7 +3,7 @@ galaxy_info:
   role_name: "project_backup"
   namespace: "ebdruplab"
   author: "Kristian Ebdrup"
-  description: "Backup Semaphore UI project via API backup endpoint and optionally convert to Ansible vars YAML."
+  description: "Backup Semaphore UI project via writen semaphoreui modules, to be used with project_deploy role"
   license: "MIT"
   min_ansible_version: "2.10"
   platforms:

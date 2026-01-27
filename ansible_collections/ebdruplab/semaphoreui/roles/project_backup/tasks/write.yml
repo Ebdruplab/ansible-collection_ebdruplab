@@ -1,0 +1,9 @@
+# roles/project_backup/tasks/write.yml
+---
+- name: "Write YAML vars file"
+  ansible.builtin.copy:
+    dest: "{{ project_backup_output_dir }}/{{ project_backup_output_filename }}"
+    content: "{{ { (project_backup_root_key | default('project_deploy_config')): project_backup_project_deploy_config } | to_nice_yaml(indent=2, width=9999) }}"
+    mode: "0640"
+  tags:
+    - output

@@ -1,0 +1,47 @@
+# roles/project_backup/tasks/resolve_project.yml
+---
+- name: "Resolve | Project ID"
+  block:
+    - name: "List projects"
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ project_backup_semaphore_host }}"
+        port: "{{ project_backup_semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      register: _projects
+      tags:
+        - project
+        - list
+
+    - name: "Resolve | Prefer name when set; else keep provided id"
+      ansible.builtin.set_fact:
+        project_backup_project_id: >-
+          {{
+            (
+              (project_backup_project_name | default('') | length) > 0
+            )
+            | ternary(
+                (_projects.projects | default([])
+                  | selectattr('name', 'equalto', project_backup_project_name)
+                  | list
+                  | first
+                ).id,
+                project_backup_project_id
+              )
+          }}
+      tags:
+        - project
+        - resolve
+
+    - name: "Assert | Project id resolved"
+      ansible.builtin.assert:
+        that:
+          - project_backup_project_id is not none
+          - (project_backup_project_id | int) > 0
+        fail_msg: >-
+          Could not resolve project id.
+          Provide a valid project_backup_project_name or set project_backup_project_id (>0).
+      tags:
+        - project
+        - resolve
+  tags:
+    - project

@@ -1,0 +1,31 @@
+# roles/project_backup/tasks/build.yml
+---
+- name: "Build | project_deploy_config (example-shaped)"
+  ansible.builtin.set_fact:
+    _project_deploy_config_one:
+      project:
+        name: "{{ _project_meta.project.name }}"
+        alert: "{{ _project_meta.project.alert | default(false) }}"
+        alert_chat: "{{ _project_meta.project.alert_chat | default('') }}"
+        max_parallel_tasks: "{{ (_project_meta.project.max_parallel_tasks | default(0)) | int }}"
+        demo: "{{ _project_meta.project.demo | default(false) }}"
+        type: "{{ _project_meta.project.type | default('') }}"
+
+      users_access: "{{ _users_access_norm | default([]) }}"
+
+      keys: "{{ dict((_keys_list | map(attribute='name') | list) | zip(_keys_list)) }}"
+      repositories: "{{ _repos_norm | default([]) }}"
+      views: "{{ dict((_views_list | map(attribute='title') | list) | zip(_views_list)) }}"
+      inventories: "{{ dict((_invs_norm | default([]) | map(attribute='name') | list) | zip((_invs_norm | default([])))) }}"
+      environments: "{{ dict((_envs_norm | default([]) | map(attribute='name') | list) | zip((_envs_norm | default([])))) }}"
+      templates: "{{ dict((_tpls_norm | default([]) | map(attribute='name') | list) | zip((_tpls_norm | default([])))) }}"
+      schedules: "{{ dict((_sched_norm | default([]) | map(attribute='name') | list) | zip((_sched_norm | default([])))) }}"
+      integrations: "{{ dict((_int_norm | default([]) | map(attribute='name') | list) | zip((_int_norm | default([])))) }}"
+  tags:
+    - build
+
+- name: "Build | project_deploy_config with project name as key"
+  ansible.builtin.set_fact:
+    project_backup_project_deploy_config: "{{ { _project_meta.project.name: _project_deploy_config_one } }}"
+  tags:
+    - build

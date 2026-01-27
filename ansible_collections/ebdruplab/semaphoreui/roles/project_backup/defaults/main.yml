@@ -14,64 +14,16 @@ project_backup_semaphore_username: "admin"
 project_backup_semaphore_password: "changeme"
 # project_backup_semaphore_api_token: "KEY"
 
-#############################################
-# Target project (choose one)
-project_backup_project_id: 0
+# Target project selector (prefer id; name used if id unset/0)
 project_backup_project_name: ""
+project_backup_project_id: 0
 
 # Output
-project_backup_output_dir: "./semaphore_backups"
-project_backup_output_prefix: "semaphore_project"
-project_backup_timestamp: "{{ lookup('pipe', 'date -u +%Y%m%dT%H%M%SZ') }}"
+project_backup_output_dir: "{{ playbook_dir }}/.backup/generated_vars"
+project_backup_output_filename: "generated.project_deploy.yml"
 
-# What to generate
-project_backup_write_raw_json: true
-project_backup_write_vars_yaml: true
-
-# Filenames
-project_backup_json_filename: "{{ project_backup_output_prefix }}_{{ project_backup_project_id | default('0') }}_{{ project_backup_timestamp }}.json"
-project_backup_vars_filename: "{{ project_backup_output_prefix }}_{{ project_backup_project_id | default('0') }}_{{ project_backup_timestamp }}.vars.yml"
-
-# Vars YAML shape
-# - "single": one YAML file containing a single variable tree under project_backup_vars_root_key
-# - "files": write multiple YAML files under project_backup_output_dir/vars (projects.yml, keys.yml, etc.)
-project_backup_vars_layout: "single"
-project_backup_vars_root_key: "semaphore_project_backup"
-
-# When vars_layout == "files"
-project_backup_vars_files_dirname: "vars"
-
-# HTTP tuning (used by login/logout modules if applicable)
-project_backup_http_timeout: 60
-project_backup_http_retries: 3
-project_backup_http_retry_delay: 2
+# Root key in written vars file
+project_backup_root_key: "project_deploy_config"
 
 # Safety
-project_backup_fail_if_project_not_found: true
-
-#############################################
-# Vars export: secret scrubbing -> Vault references
-# NOTE: The role does NOT read Vault; it only replaces secret values with {{ vault_* }} references.
-project_backup_scrub_secrets: true
-project_backup_vault_var_prefix: "vault"
-
-# Keys treated as secrets (exact match)
-project_backup_secret_keys_exact:
-  - password
-  - token
-  - api_key
-  - secret
-  - private_key
-  - ssh_key
-  - passphrase
-
-# Keys treated as secrets (regex match against key name)
-project_backup_secret_keys_regex:
-  - "(?i)password"
-  - "(?i)token"
-  - "(?i)secret"
-  - "(?i)api[_-]?key"
-  - "(?i)private[_-]?key"
-  - "(?i)ssh[_-]?key"
-  - "(?i)passphrase"
-
+project_backup_sensitive_data_no_log: true

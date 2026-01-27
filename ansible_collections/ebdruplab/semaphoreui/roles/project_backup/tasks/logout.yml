@@ -1,5 +1,5 @@
+# roles/project_backup/tasks/logout.yml
 ---
-
 - name: "Log out of Semaphore"
   ebdruplab.semaphoreui.logout:
     host: "{{ project_backup_semaphore_host }}"
