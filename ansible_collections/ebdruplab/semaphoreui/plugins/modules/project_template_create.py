@@ -29,7 +29,8 @@ options:
     required: true
     description:
       - Hostname or IP of the Semaphore server, including scheme.
-      - Example: C(http://localhost) or C(https://semaphore.example.com).
+      - 'Example: C(http://localhost) or C(https://semaphore.example.com).'
+
 
   port:
     type: int
