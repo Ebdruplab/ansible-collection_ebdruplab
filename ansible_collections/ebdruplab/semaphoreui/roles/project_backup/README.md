@@ -1,38 +1,37 @@
-ebdruplab.semaphoreui.project_backup
-=========
-Back up a Semaphore UI project using the built-in Semaphore backup API and optionally export the result as **Ansible-friendly vars YAML**.  
-The generated vars can be safely committed to Git and reused with the `project_deploy` role to recreate the project.
+# Ansible Role: `ebdruplab.semaphoreui.project_backup`
 
-Sensitive values (passwords, tokens, keys) are **never exported in plaintext**. They are replaced with Ansible Vault variable references (`{{ vault_* }}`).
+Generate a **`project_deploy_config`** structure from an existing Semaphore UI project and write it as **Ansible vars YAML**.
+The generated file can be committed to Git and later consumed directly by the
+`ebdruplab.semaphoreui.project_deploy` role to recreate the project.
 
-Requirements
-------------
+This role **reads live project state** from Semaphore (projects, keys, repos, inventories, templates, schedules, integrations, etc.) and converts it into the declarative format expected by `project_deploy`.
 
-- Ansible 2.10+
-- A reachable Semaphore UI instance
-- Collection: `ebdruplab.semaphoreui`
-- Valid authentication:
-  - API token **or**
-  - Username/password (login/logout handled by the role)
+## Requirements
 
-Role Variables
---------------
-## Global connection variables (recommended)
+* Ansible **2.10+**
+* A reachable Semaphore UI instance
+* Ansible collection: `ebdruplab.semaphoreui`
+* Valid authentication:
 
-You can define **global** Semaphore connection/auth variables once and reuse them across the collection’s roles (including `project_deploy` and `project_backup`).  
-If any of the `ebdruplab_semaphore_*` variables are set, the role will use them as defaults (role-specific variables still take precedence).
+  * Username/password **or**
+  * API token
+
+## Role Variables
+
+### General
 
 ```yaml
-# Global Semaphore connection/auth
-ebdruplab_semaphore_host: "http://localhost"
-ebdruplab_semaphore_port: 3000
-ebdruplab_semaphore_username: "admin"
-ebdruplab_semaphore_password: "changeme"
-# ebdruplab_semaphore_api_token: "KEY"
+project_backup_debug: false
+project_backup_sensitive_data_no_log: true
 ```
 
+* `project_backup_debug`
+  Enable additional debug output.
 
-### Connection and authentication variables if global is not used
+* `project_backup_sensitive_data_no_log`
+  Prevents sensitive values from appearing in Ansible logs.
+
+### Connection and authentication
 
 ```yaml
 project_backup_semaphore_host: "http://localhost"
@@ -40,54 +39,78 @@ project_backup_semaphore_port: 3000
 project_backup_semaphore_username: "admin"
 project_backup_semaphore_password: "changeme"
 # project_backup_semaphore_api_token: "KEY"
-````
+```
 
-### Target project (choose one)
+Authentication is handled internally by the role using `login.yml` and `logout.yml`.
+
+### Target project selection
+
+You must select **exactly one project**.
+
+Project **name is preferred**.
+If a name is provided, it is always used even if an ID is set.
 
 ```yaml
-project_backup_project_id: 0
 project_backup_project_name: ""
+project_backup_project_id: 0
 ```
+
+Resolution logic:
+
+1. If `project_backup_project_name` is set → resolve project ID by name
+2. Otherwise → use `project_backup_project_id`
+3. Fail if neither resolves to a valid project
 
 ### Output
 
 ```yaml
-project_backup_output_dir: "./semaphore_backups"
-project_backup_output_prefix: "semaphore_project"
-project_backup_write_raw_json: true
-project_backup_write_vars_yaml: true
+project_backup_output_dir: "{{ playbook_dir }}/.backup/generated_vars"
+project_backup_output_filename: "generated.project_deploy.yml"
 ```
 
-### Vars export
+The role writes a single YAML file containing the generated configuration.
+
+### Vars structure
 
 ```yaml
-project_backup_vars_layout: "single"   # single | files
-project_backup_vars_root_key: "semaphore_project_backup"
-project_backup_vars_files_dirname: "vars"
+project_backup_root_key: "project_deploy_config"
 ```
 
-### Secret handling
+The output file will look like:
 
 ```yaml
-project_backup_scrub_secrets: true
-project_backup_vault_var_prefix: "vault"
+project_deploy_config:
+  My Project:
+    project:
+      name: My Project
+      ...
+    inventories: {}
+    templates: {}
+    schedules: {}
 ```
 
-Secrets are replaced with Vault references such as:
+This format is **directly consumable** by `project_deploy`.
 
-```yaml
-password: "{{ vault_repository_myrepo_password }}"
-```
+## What the role does
 
-The role **does not read from Ansible Vault**. Users must define these variables themselves.
+1. Resolves global or role-specific Semaphore connection variables
+2. Logs in to Semaphore
+3. Resolves the target project
+4. Collects:
 
-## Dependencies
-
-None.
-
-This role is designed to integrate with:
-
-* `ebdruplab.semaphoreui.project_deploy` (for restore/recreation)
+   * Project metadata
+   * Users access
+   * Keys
+   * Repositories
+   * Views
+   * Inventories
+   * Environments
+   * Templates
+   * Schedules
+   * Integrations
+5. Normalizes all resources into `project_deploy`-compatible form
+6. Writes a single vars YAML file
+7. Logs out of Semaphore
 
 ## Example Playbook
 
@@ -98,27 +121,37 @@ This role is designed to integrate with:
     - role: ebdruplab.semaphoreui.project_backup
       vars:
         project_backup_semaphore_host: "https://semaphore.example.com"
-        project_backup_semaphore_api_token: "{{ lookup('env','SEMAPHORE_TOKEN') }}"
+        project_backup_semaphore_api_token: "{{ lookup('env', 'SEMAPHORE_TOKEN') }}"
         project_backup_project_name: "My Project"
-        project_backup_vars_layout: "single"
 ```
 
-Using the backup with `project_deploy`:
+## Using the output with `project_deploy`
 
 ```yaml
 vars_files:
-  - semaphore_backups/semaphore_project_12_20260112T120000Z.vars.yml
-  - group_vars/all/vault.yml
+  - .backup/generated_vars/generated.project_deploy.yml
 ```
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  roles:
+    - role: ebdruplab.semaphoreui.project_deploy
+```
+
+## Dependencies
+
+None.
+
+Designed to work together with:
+
+* `ebdruplab.semaphoreui.project_deploy`
 
 ## License
 
-BSD
+MIT-0
 
 ## Author Information
 
-Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
+**Kristian Ebdrup**
 GitHub: [https://github.com/kris9854](https://github.com/kris9854)
-
-> See the **`ebdruplab/roles/project_deploy/tests/project_generate_restore_and_recreate.yml`** directory for a runnable end-to-end example.
-

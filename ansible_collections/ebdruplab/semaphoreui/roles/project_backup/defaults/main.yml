@@ -25,5 +25,3 @@ project_backup_output_filename: "generated.project_deploy.yml"
 # Root key in written vars file
 project_backup_root_key: "project_deploy_config"
 
-# Safety
-project_backup_sensitive_data_no_log: true
