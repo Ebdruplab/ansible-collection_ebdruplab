@@ -30,3 +30,6 @@ build_ignore:
   - 'test/*'
   - '.gitignore'
   - '*.zip'
+  - '__pycache__'
+  - '**/__pycache__'
+  - '*.pyc'

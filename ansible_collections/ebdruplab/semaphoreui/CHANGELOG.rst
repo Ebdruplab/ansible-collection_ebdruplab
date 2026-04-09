@@ -4,6 +4,19 @@ Changelog
 Version 3.0.0
 -------------
 
+Bug fixes
+~~~~~~~~~
+
+- **roles/project_deploy**
+  - Fixed integration extraction value handling so ``project_deploy`` is idempotent when ``extraction_values`` are declared.
+  - The role now lists existing extraction values, updates matching entries by name when fields drift, and only creates missing entries instead of appending duplicates on every run.
+
+- **roles/project_deploy/tests**
+  - Fixed snapshot normalization used by the integration test helpers.
+  - Replaced ambiguous dot-notation access for ``keys`` with bracket access in test helpers and assertions, avoiding Jinja collisions with the dictionary ``keys()`` method.
+  - Normalized captured project metadata so assertions remain stable even when the Semaphore project detail endpoint omits fields such as ``alert`` or ``max_parallel_tasks``.
+
+
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
