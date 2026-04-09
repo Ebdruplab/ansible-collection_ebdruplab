@@ -13,81 +13,91 @@ module: project_integration_extraction_value_create
 short_description: Create an extracted value for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Adds an extracted value rule to a specific integration in a Semaphore project.
+  - Create a new extraction rule for a Semaphore project integration.
+  - Extraction rules map data from an incoming integration request to a Semaphore task variable.
+  - This module is intended for creating missing rules. If you need to modify an existing rule,
+    use M(ebdruplab.semaphoreui.project_integration_extraction_value_update).
 
 options:
   host:
     description:
-      - Base URL of the Semaphore server (e.g. C(http://localhost)).
+      - Base URL of the Semaphore server, including the scheme.
+      - "Example: C(http://localhost)."
     type: str
     required: true
   port:
     description:
-      - Port where the Semaphore API is exposed (e.g. C(3000)).
+      - TCP port where the Semaphore API is exposed.
     type: int
     required: true
   project_id:
     description:
-      - ID of the project that owns the integration.
+      - Numeric ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
     description:
-      - ID of the integration to attach the extracted value to.
+      - Numeric ID of the integration that should receive the new extraction rule.
     type: int
     required: true
   value:
     description:
-      - Definition of the extracted value to create.
+      - Definition of the extracted value rule to create.
     type: dict
     required: true
     suboptions:
       id:
         description:
-          - Optional client-supplied ID; usually omitted.
+          - Optional client-supplied ID.
+          - Normally omitted and left to the Semaphore API.
         type: int
       name:
         description:
-          - Human-readable name of the extraction rule.
+          - Human-readable display name for the extraction rule.
         type: str
         required: true
       value_source:
         description:
-          - Where to read the value from in the incoming request.
+          - Where to read the value from in the incoming integration request.
         type: str
         choices: [body, headers, query]
         default: body
       body_data_type:
         description:
-          - Data type of the request body when C(value_source=body).
+          - Format of the request body when O(value.value_source=body).
+          - Ignored by Semaphore for non-body sources.
         type: str
         choices: [json, text]
         default: json
       key:
         description:
-          - Key or path to extract (e.g. C(payload.user.id), header/query key).
+          - Key, header name, query parameter, or JSON path to read from the incoming request.
+          - "Example: C(payload.user.id) or C(X-Branch)."
         type: str
         required: true
       variable:
         description:
-          - Variable name to store the extracted value under.
+          - Destination variable name to store the extracted value under.
         type: str
         required: true
       variable_type:
         description:
-          - Target variable bucket.
+          - Destination variable bucket in Semaphore.
+          - The value is passed through to the API as provided by the module input.
         type: str
         choices: [environment, extra]
         default: environment
   session_cookie:
     description:
-      - Session cookie for authentication. Use this or C(api_token).
+      - Session cookie used for authentication.
+      - Use this or O(api_token).
     type: str
     required: false
     no_log: true
   api_token:
     description:
-      - Bearer API token for authentication. Use this or C(session_cookie).
+      - Bearer API token used for authentication.
+      - Use this or O(session_cookie).
     type: str
     required: false
     no_log: true
@@ -99,6 +109,50 @@ options:
 
 author:
   - "Kristian Ebdrup (@kris9854)"
+"""
+
+EXAMPLES = r"""
+- name: Create a header extraction rule
+  ebdruplab.semaphoreui.project_integration_extraction_value_create:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
+    project_id: 1
+    integration_id: 11
+    value:
+      name: "Extract Branch"
+      value_source: "headers"
+      key: "X-Branch"
+      variable: "git_branch"
+      variable_type: "environment"
+
+- name: Create a body extraction rule
+  ebdruplab.semaphoreui.project_integration_extraction_value_create:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    project_id: 1
+    integration_id: 11
+    value:
+      name: "Extract User ID"
+      value_source: "body"
+      body_data_type: "json"
+      key: "payload.user.id"
+      variable: "USER_ID"
+      variable_type: "environment"
+"""
+
+RETURN = r"""
+extracted_value:
+  description:
+    - Extracted value object returned by the Semaphore API.
+  type: dict
+  returned: success
+status:
+  description:
+    - HTTP status code returned by the API.
+  type: int
+  returned: always
 """
 
 def main():

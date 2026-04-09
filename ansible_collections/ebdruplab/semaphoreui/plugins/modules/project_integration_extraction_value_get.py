@@ -10,41 +10,46 @@ import json
 DOCUMENTATION = r"""
 ---
 module: project_integration_extraction_value_get
-short_description: List extracted values for a Semaphore integration
+short_description: Get extraction values for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Retrieves all Integration Extracted Values for a given integration in a Semaphore project.
+  - Return the extraction rules for a specific integration in a Semaphore project.
+  - This module overlaps with M(ebdruplab.semaphoreui.project_integration_extraction_value_list)
+    and exists as a compatibility-style getter.
 
 options:
   host:
     description:
-      - Base URL of the Semaphore server (e.g. C(http://localhost)).
+      - Base URL of the Semaphore server, including the scheme.
+      - "Example: C(http://localhost)."
     type: str
     required: true
   port:
     description:
-      - Port where the Semaphore API is available (e.g. C(3000)).
+      - TCP port where the Semaphore API is available.
     type: int
     required: true
   project_id:
     description:
-      - ID of the project that owns the integration.
+      - Numeric ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
     description:
-      - ID of the integration whose extracted values should be listed.
+      - Numeric ID of the integration whose extraction rules should be returned.
     type: int
     required: true
   session_cookie:
     description:
-      - Session cookie for authentication. Use this or C(api_token).
+      - Session cookie used for authentication.
+      - Use this or O(api_token).
     type: str
     required: false
     no_log: true
   api_token:
     description:
-      - Bearer token for authentication. Use this or C(session_cookie).
+      - Bearer API token used for authentication.
+      - Use this or O(session_cookie).
     type: str
     required: false
     no_log: true
@@ -59,7 +64,7 @@ author:
 """
 
 EXAMPLES = r"""
-- name: List extracted values for an integration (session)
+- name: Get extraction values for an integration (session)
   ebdruplab.semaphoreui.project_integration_extraction_value_get:
     host: http://localhost
     port: 3000
@@ -76,12 +81,12 @@ EXAMPLES = r"""
 RETURN = r"""
 values:
   description:
-    - List of Integration Extracted Values.
+    - List of extraction value objects returned by the Semaphore API.
   type: list
   returned: success
 status:
   description:
-    - HTTP status code (C(200) on success).
+    - HTTP status code returned by the API.
   type: int
   returned: always
 """

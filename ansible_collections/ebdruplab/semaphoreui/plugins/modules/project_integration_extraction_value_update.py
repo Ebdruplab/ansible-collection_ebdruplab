@@ -13,73 +13,79 @@ module: project_integration_extraction_value_update
 short_description: Update an extracted value for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Updates a specific extracted value rule on a project integration in Semaphore.
+  - Update a specific extraction rule on a Semaphore project integration.
+  - Use this module when the extraction rule already exists and you want to change one or more fields.
 
 options:
   host:
     description:
-      - Base URL of the Semaphore server, including scheme (e.g. C(http://localhost)).
+      - Base URL of the Semaphore server, including the scheme.
+      - "Example: C(http://localhost)."
     type: str
     required: true
   port:
     description:
-      - Port where the Semaphore API is exposed.
+      - TCP port where the Semaphore API is exposed.
     type: int
     required: true
   project_id:
     description:
-      - ID of the project that owns the integration.
+      - Numeric ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
     description:
-      - ID of the integration that contains the extracted value rule.
+      - Numeric ID of the integration that contains the extraction rule.
     type: int
     required: true
   extractvalue_id:
     description:
-      - ID of the extracted value to update.
+      - Numeric ID of the extraction rule to update.
     type: int
     required: true
   value:
     description:
-      - Fields to update on the extracted value. Provide one or more.
+      - Fields to update on the extraction rule.
+      - Any supplied keys are sent directly to the Semaphore API.
     type: dict
     required: true
     suboptions:
       name:
         description:
-          - Human-readable name for the extracted value rule.
+          - Human-readable display name for the extraction rule.
         type: str
       value_source:
         description:
-          - Location of the value to extract (for example C(body), C(headers), or C(query)).
+          - Request source to read from.
+          - Example values include C(body), C(headers), or C(query).
         type: str
       body_data_type:
         description:
-          - Data type when reading from the request body (for example C(json) or C(text)).
+          - Request body format when O(value.value_source=body).
         type: str
       key:
         description:
-          - Path or key selector used to find the value (e.g. C(payload.user.id)).
+          - Key, header name, query parameter, or JSON path used to locate the value.
         type: str
       variable:
         description:
-          - Variable name to store the extracted value as (e.g. C(USER_ID)).
+          - Destination variable name in Semaphore.
         type: str
       variable_type:
         description:
-          - Target bucket for the variable (for example C(environment) or C(json)).
+          - Destination variable bucket in Semaphore.
         type: str
   session_cookie:
     description:
-      - Session cookie for authentication. Use this or C(api_token).
+      - Session cookie used for authentication.
+      - Use this or O(api_token).
     type: str
     required: false
     no_log: true
   api_token:
     description:
-      - Bearer token for authentication. Use this or C(session_cookie).
+      - Bearer API token used for authentication.
+      - Use this or O(session_cookie).
     type: str
     required: false
     no_log: true
@@ -114,12 +120,13 @@ EXAMPLES = r"""
 RETURN = r"""
 extracted_value:
   description:
-    - Server response (if any) or the update payload when the API returns C(204 No Content).
+    - Updated extraction value object returned by the API.
+    - When the API returns C(204 No Content), this contains the payload sent by the module.
   type: dict
   returned: success
 status:
   description:
-    - HTTP status code (C(204) expected on success).
+    - HTTP status code returned by the API.
   type: int
   returned: always
 """

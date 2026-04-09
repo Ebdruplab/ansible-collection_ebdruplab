@@ -13,38 +13,42 @@ module: project_integration_extraction_value_list
 short_description: List extracted values for a Semaphore integration
 version_added: "2.0.0"
 description:
-  - Retrieves all extracted value rules linked to a specific integration in a Semaphore project.
+  - Return all extraction rules linked to a specific integration in a Semaphore project.
+  - This is a read-only helper module.
 
 options:
   host:
     description:
-      - Base URL of the Semaphore server (e.g. C(http://localhost)).
+      - Base URL of the Semaphore server, including the scheme.
+      - "Example: C(http://localhost)."
     type: str
     required: true
   port:
     description:
-      - Port where the Semaphore API is exposed (e.g. C(3000)).
+      - TCP port where the Semaphore API is exposed.
     type: int
     required: true
   project_id:
     description:
-      - ID of the project that owns the integration.
+      - Numeric ID of the project that owns the integration.
     type: int
     required: true
   integration_id:
     description:
-      - ID of the integration whose extracted values should be listed.
+      - Numeric ID of the integration whose extraction rules should be listed.
     type: int
     required: true
   session_cookie:
     description:
-      - Session cookie for authentication. Use this or C(api_token).
+      - Session cookie used for authentication.
+      - Use this or O(api_token).
     type: str
     required: false
     no_log: true
   api_token:
     description:
-      - Bearer token for authentication. Use this or C(session_cookie).
+      - Bearer API token used for authentication.
+      - Use this or O(session_cookie).
     type: str
     required: false
     no_log: true
@@ -85,12 +89,12 @@ EXAMPLES = r"""
 RETURN = r"""
 extracted_values:
   description:
-    - List of extracted value objects.
+    - List of extraction value objects returned by the Semaphore API.
   type: list
   returned: success
 status:
   description:
-    - HTTP status code (C(200) on success).
+    - HTTP status code returned by the API.
   type: int
   returned: always
 """

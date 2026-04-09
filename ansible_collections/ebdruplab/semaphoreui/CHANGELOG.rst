@@ -63,6 +63,12 @@ Changes
   - ``project_schedule_list``
   - ``project_user_list``
 
+- Improved module documentation for the integration extraction value modules to make generated docs clearer and easier to follow:
+  - ``project_integration_extraction_value_create``
+  - ``project_integration_extraction_value_get``
+  - ``project_integration_extraction_value_list``
+  - ``project_integration_extraction_value_update``
+
 Version 2.0.3
 -------------
 
