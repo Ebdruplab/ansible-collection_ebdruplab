@@ -3,3 +3,5 @@
 *.zip
 *.ansible*
 *.ansible/*.lock
+__pycache__/
+*.pyc
