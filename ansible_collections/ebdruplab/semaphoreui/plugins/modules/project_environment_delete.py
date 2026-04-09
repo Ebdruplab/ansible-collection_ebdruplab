@@ -4,7 +4,11 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import (
+    semaphore_delete,
+    semaphore_get_json,
+    get_auth_headers,
+)
 
 DOCUMENTATION = r"""
 ---
@@ -100,7 +104,7 @@ def main():
             validate_certs=dict(type='bool', default=True)
         ),
         required_one_of=[['session_cookie', 'api_token']],
-        supports_check_mode=False
+        supports_check_mode=True
     )
 
     host = module.params["host"].rstrip("/")
@@ -118,6 +122,28 @@ def main():
     headers["Content-Type"] = "application/json"
 
     try:
+        current_environment, response_body, response_status, _ = semaphore_get_json(
+            url,
+            headers=headers,
+            validate_certs=validate_certs,
+        )
+        if response_status == 404:
+            module.exit_json(changed=False, deleted=False, status=response_status)
+        if response_status != 200 or not isinstance(current_environment, dict):
+            module.fail_json(
+                msg=f"Failed to fetch current environment state: HTTP {response_status}",
+                status=response_status,
+                response=response_body,
+            )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                check_mode=True,
+                before=current_environment,
+                after=None,
+            )
+
         _, status, _ = semaphore_delete(url, headers=headers, validate_certs=validate_certs)
 
         if status != 204:
@@ -131,4 +157,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

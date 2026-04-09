@@ -240,10 +240,143 @@
     - integrations
     - facts
 
+- name: "List existing extraction values for integrations with extraction configuration"
+  ebdruplab.semaphoreui.project_integration_extraction_value_list:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ integrations_by_name_after[item.name] | int }}"
+  when:
+    - item.name is defined
+    - item.name in (integrations_by_name_after | default({}))
+    - (item.extraction_values | default([])) | length > 0
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  register: _integration_extraction_value_lists
+  tags:
+    - project_deploy
+    - integrations
+    - extractions
+    - list
+
+- name: "Build extraction value map by integration name"
+  ansible.builtin.set_fact:
+    integration_extraction_values_by_integration_name: >-
+      {{
+        (integration_extraction_values_by_integration_name | default({}))
+        | combine({
+            item.item.name: (item.extracted_values | default([]))
+          })
+      }}
+  loop: "{{ _integration_extraction_value_lists.results | default([]) }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  tags:
+    - project_deploy
+    - integrations
+    - extractions
+    - facts
+
+- name: "Update Integration Extraction Values when they already exist by name"
+  ebdruplab.semaphoreui.project_integration_extraction_value_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ integrations_by_name_after[item.0.name] | int }}"
+    extractvalue_id: >-
+      {{
+        (
+          (
+            integration_extraction_values_by_integration_name[item.0.name] | default([])
+          )
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).id | int
+      }}
+    value:
+      name: "{{ item.1.name }}"
+      key: "{{ item.1.key | default(item.1.value) }}"
+      value_source: "{{ item.1.value_source }}"
+      body_data_type: "{{ item.1.body_data_type | default('json') }}"
+      variable_type: "{{ item.1.variable_type }}"
+      variable: "{{ item.1.variable }}"
+  when:
+    - item.0.name is defined
+    - item.0.name in (integrations_by_name_after | default({}))
+    - (item.0.extraction_values | default([])) | length > 0
+    - (item.1.key is defined) or (item.1.value is defined)
+    - >
+      (
+        integration_extraction_values_by_integration_name[item.0.name] | default([])
+        | selectattr('name', 'equalto', item.1.name)
+        | list
+        | length
+      ) > 0
+    - >
+      (
+        (
+          integration_extraction_values_by_integration_name[item.0.name] | default([])
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).key | default('')
+      ) != (item.1.key | default(item.1.value))
+      or
+      (
+        (
+          integration_extraction_values_by_integration_name[item.0.name] | default([])
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).value_source | default('')
+      ) != (item.1.value_source | string)
+      or
+      (
+        (
+          integration_extraction_values_by_integration_name[item.0.name] | default([])
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).body_data_type | default('json')
+      ) != (item.1.body_data_type | default('json'))
+      or
+      (
+        (
+          integration_extraction_values_by_integration_name[item.0.name] | default([])
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).variable | default('')
+      ) != (item.1.variable | string)
+      or
+      (
+        (
+          integration_extraction_values_by_integration_name[item.0.name] | default([])
+          | selectattr('name', 'equalto', item.1.name)
+          | list
+          | first
+        ).variable_type | default('')
+      ) != (item.1.variable_type | string)
+  loop: "{{ _desired_integrations | subelements('extraction_values', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }} :: {{ item.1.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - integrations
+    - extractions
+    - update
+
 # IMPORTANT: project_integration_extraction_value_create expects a DICT argument named "value"
 # (not a scalar, and not "extraction_value"). The dict should match the API shape.
 # Backwards compatible: allow "key" or "value" in vars; map to API "key".
-- name: "Create Integration Extraction Values (additive; supports key/value; no impact if not configured)"
+- name: "Create Integration Extraction Values when missing by name"
   ebdruplab.semaphoreui.project_integration_extraction_value_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
@@ -262,6 +395,13 @@
     - item.0.name in (integrations_by_name_after | default({}))
     - (item.0.extraction_values | default([])) | length > 0
     - (item.1.key is defined) or (item.1.value is defined)
+    - >
+      (
+        integration_extraction_values_by_integration_name[item.0.name] | default([])
+        | selectattr('name', 'equalto', item.1.name)
+        | list
+        | length
+      ) == 0
   loop: "{{ _desired_integrations | subelements('extraction_values', skip_missing=True) }}"
   loop_control:
     label: "{{ item.0.name }} :: {{ item.1.name }}"
@@ -285,4 +425,3 @@
     - project_deploy
     - integrations
     - facts
-

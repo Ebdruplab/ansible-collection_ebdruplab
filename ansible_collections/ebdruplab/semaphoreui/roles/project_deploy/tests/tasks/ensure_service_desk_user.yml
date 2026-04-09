@@ -1,0 +1,88 @@
+---
+- name: "Login for user reconciliation"
+  ebdruplab.semaphoreui.login:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    username: "{{ project_deploy_semaphore_username }}"
+    password: "{{ project_deploy_semaphore_password }}"
+  register: project_deploy_test_user_login_result
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+
+- name: "Ensure Service Desk test user exists"
+  block:
+    - name: "List existing Semaphore users"
+      ebdruplab.semaphoreui.user_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+      register: project_deploy_test_all_users
+
+    - name: "Build user lookup by username"
+      ansible.builtin.set_fact:
+        project_deploy_test_users_by_username: >-
+          {{
+            dict(
+              (project_deploy_test_all_users.users | default([]) | map(attribute='username') | list)
+              | zip(project_deploy_test_all_users.users | default([]) | map(attribute='id') | list)
+            )
+          }}
+
+    - name: "Update Service Desk test user when it already exists"
+      ebdruplab.semaphoreui.user_update:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+        user_id: "{{ project_deploy_test_users_by_username[project_deploy_test_service_desk_username] }}"
+        name: "{{ project_deploy_test_service_desk_name }}"
+        username: "{{ project_deploy_test_service_desk_username }}"
+        email: "{{ project_deploy_test_service_desk_email }}"
+        admin: true
+        alert: true
+      when: project_deploy_test_service_desk_username in (project_deploy_test_users_by_username | default({}))
+
+    - name: "Set Service Desk test user password when it already exists"
+      ebdruplab.semaphoreui.user_password_update:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+        user_id: "{{ project_deploy_test_users_by_username[project_deploy_test_service_desk_username] }}"
+        password: "{{ project_deploy_test_service_desk_password }}"
+      when: project_deploy_test_service_desk_username in (project_deploy_test_users_by_username | default({}))
+      no_log: true
+
+    - name: "Create Service Desk test user when missing"
+      ebdruplab.semaphoreui.user_create:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+        name: "{{ project_deploy_test_service_desk_name }}"
+        username: "{{ project_deploy_test_service_desk_username }}"
+        email: "{{ project_deploy_test_service_desk_email }}"
+        password: "{{ project_deploy_test_service_desk_password }}"
+        admin: true
+        alert: true
+      when: project_deploy_test_service_desk_username not in (project_deploy_test_users_by_username | default({}))
+      register: project_deploy_test_created_user
+      no_log: true
+
+    - name: "Set Service Desk test user password after creation"
+      ebdruplab.semaphoreui.user_password_update:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+        user_id: "{{ project_deploy_test_created_user.id }}"
+        password: "{{ project_deploy_test_service_desk_password }}"
+      when:
+        - project_deploy_test_created_user is defined
+        - project_deploy_test_created_user.id is defined
+      no_log: true
+  always:
+    - name: "Logout after user reconciliation"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_user_login_result.session_cookie }}"
+      when:
+        - project_deploy_test_user_login_result is defined
+        - project_deploy_test_user_login_result.session_cookie is defined
+      no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"

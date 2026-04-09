@@ -1,0 +1,187 @@
+---
+- name: "Login to capture project snapshot"
+  ebdruplab.semaphoreui.login:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    username: "{{ project_deploy_semaphore_username }}"
+    password: "{{ project_deploy_semaphore_password }}"
+  register: project_deploy_test_snapshot_login_result
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+
+- name: "Capture current Semaphore state for the managed project"
+  block:
+    - name: "List all projects"
+      ebdruplab.semaphoreui.project_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+      register: project_deploy_test_projects
+
+    - name: "Find the managed project by name"
+      ansible.builtin.set_fact:
+        project_deploy_test_matching_projects: >-
+          {{
+            project_deploy_test_projects.projects | default([])
+            | selectattr('name', 'equalto', project_deploy_config.project.name)
+            | list
+          }}
+
+    - name: "Assert that exactly one managed project exists"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_test_matching_projects | length == 1
+
+    - name: "Remember the managed project identity"
+      ansible.builtin.set_fact:
+        project_deploy_test_current_project: "{{ project_deploy_test_matching_projects | first }}"
+        project_deploy_test_current_project_id: "{{ (project_deploy_test_matching_projects | first).id | int }}"
+
+    - name: "Get managed project details"
+      ebdruplab.semaphoreui.project_get:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_project_details
+
+    - name: "List managed project users"
+      ebdruplab.semaphoreui.project_user_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_project_users
+
+    - name: "List managed project keys"
+      ebdruplab.semaphoreui.project_key_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_keys
+
+    - name: "List managed project repositories"
+      ebdruplab.semaphoreui.project_repository_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+        sort: name
+        order: asc
+      register: project_deploy_test_repositories
+
+    - name: "List managed project views"
+      ebdruplab.semaphoreui.project_view_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_views
+
+    - name: "List managed project inventories"
+      ebdruplab.semaphoreui.project_inventory_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_inventories
+
+    - name: "List managed project environments"
+      ebdruplab.semaphoreui.project_environment_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+        sort: name
+        order: asc
+      register: project_deploy_test_environments
+
+    - name: "List managed project templates"
+      ebdruplab.semaphoreui.project_template_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+        sort: name
+        order: asc
+      register: project_deploy_test_templates
+
+    - name: "List managed project schedules"
+      ebdruplab.semaphoreui.project_schedule_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+        sort: name
+        order: asc
+      register: project_deploy_test_schedules
+
+    - name: "List managed project integrations"
+      ebdruplab.semaphoreui.project_integration_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+      register: project_deploy_test_integrations
+
+    - name: "Initialize extraction value snapshot map"
+      ansible.builtin.set_fact:
+        project_deploy_test_integration_extraction_values: {}
+
+    - name: "List extraction values for each managed integration"
+      ebdruplab.semaphoreui.project_integration_extraction_value_list:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+        project_id: "{{ project_deploy_test_current_project_id }}"
+        integration_id: "{{ item.id }}"
+      loop: "{{ project_deploy_test_integrations.integrations | default([]) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: project_deploy_test_extraction_value_results
+      when: (project_deploy_test_integrations.integrations | default([])) | length > 0
+
+    - name: "Store extraction values grouped by integration name"
+      ansible.builtin.set_fact:
+        project_deploy_test_integration_extraction_values: >-
+          {{
+            project_deploy_test_integration_extraction_values | combine({
+              item.item.name: (
+                item.extracted_values | default([])
+                | sort(attribute='name')
+              )
+            })
+          }}
+      loop: "{{ project_deploy_test_extraction_value_results.results | default([]) }}"
+      loop_control:
+        label: "{{ item.item.name }}"
+
+    - name: "Store normalized project snapshot"
+      ansible.builtin.set_fact:
+        "{{ project_deploy_test_snapshot_var }}":
+          project_id: "{{ project_deploy_test_current_project_id }}"
+          project: >-
+            {{
+              project_deploy_config.project
+              | combine(project_deploy_test_project_details.project | default({}), recursive=True)
+            }}
+          users: "{{ project_deploy_test_project_users.users | default([]) | sort(attribute='username') }}"
+          keys: "{{ project_deploy_test_keys['keys'] | default([]) | sort(attribute='name') }}"
+          repositories: "{{ project_deploy_test_repositories.repositories | default([]) | sort(attribute='name') }}"
+          views: "{{ project_deploy_test_views.views | default([]) | sort(attribute='position') }}"
+          inventories: "{{ project_deploy_test_inventories.inventories | default([]) | sort(attribute='name') }}"
+          environments: "{{ project_deploy_test_environments.environments | default([]) | sort(attribute='name') }}"
+          templates: "{{ project_deploy_test_templates.templates | default([]) | sort(attribute='name') }}"
+          schedules: "{{ project_deploy_test_schedules.schedules | default([]) | sort(attribute='name') }}"
+          integrations: "{{ project_deploy_test_integrations.integrations | default([]) | sort(attribute='name') }}"
+          integration_extraction_values: "{{ project_deploy_test_integration_extraction_values }}"
+  always:
+    - name: "Logout after capturing project snapshot"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ project_deploy_semaphore_host }}"
+        port: "{{ project_deploy_semaphore_port }}"
+        session_cookie: "{{ project_deploy_test_snapshot_login_result.session_cookie }}"
+      when:
+        - project_deploy_test_snapshot_login_result is defined
+        - project_deploy_test_snapshot_login_result.session_cookie is defined
+      no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"

@@ -4,7 +4,11 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import (
+    semaphore_delete,
+    semaphore_get_json,
+    get_auth_headers,
+)
 
 DOCUMENTATION = r'''
 ---
@@ -103,6 +107,28 @@ def main():
             session_cookie=module.params.get("session_cookie"),
             api_token=module.params.get("api_token")
         )
+        current_inventory, response_body, response_status, _ = semaphore_get_json(
+            url,
+            headers=headers,
+            validate_certs=module.params["validate_certs"],
+        )
+        if response_status == 404:
+            module.exit_json(changed=False, deleted=False, status=response_status)
+        if response_status != 200 or not isinstance(current_inventory, dict):
+            module.fail_json(
+                msg=f"Failed to fetch current inventory state: HTTP {response_status}",
+                status=response_status,
+                response=response_body,
+            )
+
+        if module.check_mode:
+            module.exit_json(
+                changed=True,
+                check_mode=True,
+                before=current_inventory,
+                after=None,
+            )
+
 
         _, status, _ = semaphore_delete(
             url,
@@ -120,4 +146,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

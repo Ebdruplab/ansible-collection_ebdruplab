@@ -4,7 +4,7 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_request, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_request, get_auth_headers, exit_check_mode
 import json
 
 DOCUMENTATION = r'''
@@ -96,6 +96,8 @@ def main():
 
     try:
         body = json.dumps(backup_data).encode("utf-8")
+        if module.check_mode:
+            exit_check_mode(module)
 
         response_body, status, _ = semaphore_request(
             "POST", url, body=body, headers=headers, validate_certs=validate_certs

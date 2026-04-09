@@ -96,7 +96,7 @@ def main():
             validate_certs=dict(type="bool", default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
     host = module.params["host"].rstrip("/")

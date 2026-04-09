@@ -4,7 +4,12 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
+from ..module_utils.semaphore_api import (
+    semaphore_put,
+    semaphore_get_json,
+    get_auth_headers,
+    sanitize_check_mode_value,
+)
 import json
 
 DOCUMENTATION = r"""
@@ -208,7 +213,7 @@ def main():
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[['session_cookie', 'api_token']],
-        supports_check_mode=False
+        supports_check_mode=True
     )
 
     host = module.params["host"].rstrip("/")
@@ -253,6 +258,43 @@ def main():
 
     try:
         body = json.dumps(env_update).encode("utf-8")
+        current_environment, response_body, get_status, _ = semaphore_get_json(
+            url,
+            headers=headers,
+            validate_certs=validate_certs,
+        )
+        if get_status != 200 or not isinstance(current_environment, dict):
+            module.fail_json(
+                msg=f"Failed to fetch current environment state: HTTP {get_status}",
+                status=get_status,
+                response=response_body,
+            )
+
+        before = {
+            key: current_environment.get(key)
+            for key in env_update.keys()
+        }
+        after = {
+            key: env_update.get(key)
+            for key in env_update.keys()
+        }
+        changed = before != after
+
+        if module.check_mode:
+            module.exit_json(
+                changed=changed,
+                check_mode=True,
+                before=sanitize_check_mode_value(before),
+                after=sanitize_check_mode_value(after),
+            )
+
+        if not changed:
+            module.exit_json(
+                changed=False,
+                environment=sanitize_check_mode_value(current_environment),
+                status=200,
+            )
+
         response_body, status, _ = semaphore_put(
             url,
             body=body,

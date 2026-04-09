@@ -1,116 +1,314 @@
 #SPDX-License-Identifier: MIT-0
 ---
-- name: "Example Setup"
+- name: "Project Deploy Integration Test"
   hosts: localhost
   gather_facts: false
   vars_files:
     - "vars/example_vars.yml"
+  vars:
+    project_deploy_test_service_desk_name: "Service Desk"
+    project_deploy_test_service_desk_username: "ServiceDeskRunner"
+    project_deploy_test_service_desk_email: "sd@example.com"
+    project_deploy_test_service_desk_password: "thisshouldbevaulted"
+    project_deploy_test_check_mode_view_title: "Check Mode Preview View"
+    project_deploy_test_expected_usernames: >-
+      {{
+        project_deploy_config.users_access | default([])
+        | map(attribute='username')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_key_names: >-
+      {{
+        project_deploy_config['keys'] | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_repository_names: >-
+      {{
+        project_deploy_config.repositories | default([])
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_view_titles: >-
+      {{
+        project_deploy_config.views | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='title')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_inventory_names: >-
+      {{
+        project_deploy_config.inventories | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_environment_names: >-
+      {{
+        project_deploy_config.environments | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_template_names: >-
+      {{
+        project_deploy_config.templates | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_schedule_names: >-
+      {{
+        project_deploy_config.schedules | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
+    project_deploy_test_expected_integration_names: >-
+      {{
+        project_deploy_config.integrations | default({})
+        | dict2items
+        | map(attribute='value')
+        | map(attribute='name')
+        | list
+        | sort
+      }}
 
   pre_tasks:
-    - name: "Login"
-      ebdruplab.semaphoreui.login:
-        host: "{{ project_deploy_semaphore_host }}"
-        port: "{{ project_deploy_semaphore_port }}"
-        username: "{{ project_deploy_semaphore_username }}"
-        password: "{{ project_deploy_semaphore_password }}"
-      register: login_result
-      tags:
-        - users
-        - auth
-        - login
+    - name: "Ensure prerequisite users exist"
+      ansible.builtin.include_tasks:
+        file: tasks/ensure_service_desk_user.yml
 
-    - name: "Reconcile Service Desk User"
+  tasks:
+    - name: "Apply project_deploy role"
+      ansible.builtin.include_role:
+        name: ebdruplab.semaphoreui.project_deploy
+
+    - name: "Capture baseline project snapshot"
+      ansible.builtin.include_tasks:
+        file: tasks/capture_project_snapshot.yml
+      vars:
+        project_deploy_test_snapshot_var: "project_deploy_snapshot_after_apply"
+
+    - name: "Initialize expected integration extraction value map"
+      ansible.builtin.set_fact:
+        project_deploy_test_expected_extraction_values_by_integration: {}
+
+    - name: "Record expected extraction value names by integration"
+      ansible.builtin.set_fact:
+        project_deploy_test_expected_extraction_values_by_integration: >-
+          {{
+            project_deploy_test_expected_extraction_values_by_integration | combine({
+              item.name: (
+                item.extraction_values | default([])
+                | map(attribute='name')
+                | list
+                | sort
+              )
+            })
+          }}
+      loop: >-
+        {{
+          project_deploy_config.integrations | default({})
+          | dict2items
+          | map(attribute='value')
+          | list
+        }}
+      when: (item.extraction_values | default([])) | length > 0
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "Assert project metadata matches the requested configuration"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_snapshot_after_apply.project_id | int > 0
+          - project_deploy_snapshot_after_apply.project.name == project_deploy_config.project.name
+          - (project_deploy_snapshot_after_apply.project.alert | bool) == (project_deploy_config.project.alert | bool)
+          - project_deploy_snapshot_after_apply.project.alert_chat == project_deploy_config.project.alert_chat
+          - (project_deploy_snapshot_after_apply.project.max_parallel_tasks | int) == (project_deploy_config.project.max_parallel_tasks | int)
+          - (project_deploy_snapshot_after_apply.project.demo | bool) == (project_deploy_config.project.demo | bool)
+
+    - name: "Assert all expected resource names exist after deployment"
+      ansible.builtin.assert:
+        that:
+          - (project_deploy_test_expected_usernames | difference(project_deploy_snapshot_after_apply.users | map(attribute='username') | list | sort)) | length == 0
+          - (project_deploy_test_expected_key_names | difference(project_deploy_snapshot_after_apply['keys'] | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_repository_names | difference(project_deploy_snapshot_after_apply.repositories | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_view_titles | difference(project_deploy_snapshot_after_apply.views | map(attribute='title') | list | sort)) | length == 0
+          - (project_deploy_test_expected_inventory_names | difference(project_deploy_snapshot_after_apply.inventories | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_environment_names | difference(project_deploy_snapshot_after_apply.environments | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_template_names | difference(project_deploy_snapshot_after_apply.templates | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_schedule_names | difference(project_deploy_snapshot_after_apply.schedules | map(attribute='name') | list | sort)) | length == 0
+          - (project_deploy_test_expected_integration_names | difference(project_deploy_snapshot_after_apply.integrations | map(attribute='name') | list | sort)) | length == 0
+
+    - name: "Assert extraction values exist for integrations that declare them"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              item.value
+              | difference(
+                  project_deploy_snapshot_after_apply.integration_extraction_values[item.key]
+                  | default([])
+                  | map(attribute='name')
+                  | list
+                  | sort
+                )
+            ) | length == 0
+      loop: "{{ project_deploy_test_expected_extraction_values_by_integration | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: "Run the role a second time to verify idempotence"
+      ansible.builtin.include_role:
+        name: ebdruplab.semaphoreui.project_deploy
+
+    - name: "Capture snapshot after second role run"
+      ansible.builtin.include_tasks:
+        file: tasks/capture_project_snapshot.yml
+      vars:
+        project_deploy_test_snapshot_var: "project_deploy_snapshot_after_idempotent_run"
+
+    - name: "Assert second role run does not change persisted Semaphore state"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_snapshot_after_idempotent_run == project_deploy_snapshot_after_apply
+
+    - name: "Exercise update, delete and create modules in check mode"
       block:
-        - name: "List Users"
-          ebdruplab.semaphoreui.user_list:
+        - name: "Login for direct check mode module validation"
+          ebdruplab.semaphoreui.login:
             host: "{{ project_deploy_semaphore_host }}"
             port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-          register: _all_users
-          tags:
-            - users
-            - list
+            username: "{{ project_deploy_semaphore_username }}"
+            password: "{{ project_deploy_semaphore_password }}"
+          register: project_deploy_test_check_mode_login_result
+          no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
 
-        - name: "Build Username Map"
-          ansible.builtin.set_fact:
-            users_by_username: "{{ dict((_all_users.users | default([])) | map(attribute='username') | zip((_all_users.users | default([])) | map(attribute='id'))) }}"
-          tags:
-            - users
-            - facts
-
-        - name: "Update User When Exists"
-          ebdruplab.semaphoreui.user_update:
+        - name: "Preview a project update"
+          ebdruplab.semaphoreui.project_update:
             host: "{{ project_deploy_semaphore_host }}"
             port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-            user_id: "{{ users_by_username['ServiceDeskRunner'] }}"
-            name: "Service Desk"
-            username: "ServiceDeskRunner"
-            email: "sd@example.com"
-            admin: true
-            alert: true
-          when: "'ServiceDeskRunner' in (users_by_username | default({}))"
-          tags:
-            - users
-            - update
+            session_cookie: "{{ project_deploy_test_check_mode_login_result.session_cookie }}"
+            project_id: "{{ project_deploy_snapshot_after_apply.project_id }}"
+            project:
+              name: "{{ project_deploy_snapshot_after_apply.project.name }}"
+              alert: "{{ not (project_deploy_snapshot_after_apply.project.alert | bool) }}"
+              alert_chat: "{{ project_deploy_snapshot_after_apply.project.alert_chat }}"
+              max_parallel_tasks: "{{ project_deploy_snapshot_after_apply.project.max_parallel_tasks }}"
+              demo: "{{ project_deploy_snapshot_after_apply.project.demo }}"
+          check_mode: true
+          register: project_deploy_test_project_update_check
 
-        - name: "Set User Password When Exists"
-          ebdruplab.semaphoreui.user_password_update:
+        - name: "Preview deletion of an existing view"
+          ebdruplab.semaphoreui.project_view_delete:
             host: "{{ project_deploy_semaphore_host }}"
             port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-            user_id: "{{ users_by_username['ServiceDeskRunner'] }}"
-            password: "thisshouldbevaulted"
-          when: "'ServiceDeskRunner' in (users_by_username | default({}))"
-          no_log: true
-          tags:
-            - users
-            - update
-            - password
+            session_cookie: "{{ project_deploy_test_check_mode_login_result.session_cookie }}"
+            project_id: "{{ project_deploy_snapshot_after_apply.project_id }}"
+            view_id: "{{ (project_deploy_snapshot_after_apply.views | first).id }}"
+          check_mode: true
+          register: project_deploy_test_view_delete_check
 
-        - name: "Create User When Missing"
-          ebdruplab.semaphoreui.user_create:
+        - name: "Preview creation of a new view"
+          ebdruplab.semaphoreui.project_view_create:
             host: "{{ project_deploy_semaphore_host }}"
             port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-            name: "Service Desk"
-            username: "ServiceDeskRunner"
-            email: "sd@example.com"
-            password: "thisshouldbevaulted"
-            admin: true
-            alert: true
-          when: "'ServiceDeskRunner' not in (users_by_username | default({}))"
-          register: created_user
-          no_log: true
-          tags:
-            - users
-            - create
-
-        - name: "Set User Password After Create"
-          ebdruplab.semaphoreui.user_password_update:
-            host: "{{ project_deploy_semaphore_host }}"
-            port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-            user_id: "{{ created_user.id }}"
-            password: "thisshouldbevaulted"
-          when:
-            - created_user is defined
-            - created_user.id is defined
-          no_log: true
-          tags:
-            - users
-            - create
-            - password
+            session_cookie: "{{ project_deploy_test_check_mode_login_result.session_cookie }}"
+            project_id: "{{ project_deploy_snapshot_after_apply.project_id }}"
+            title: "{{ project_deploy_test_check_mode_view_title }}"
+            position: 999
+          check_mode: true
+          register: project_deploy_test_view_create_check
       always:
-        - name: "Logout"
+        - name: "Logout after direct check mode module validation"
           ebdruplab.semaphoreui.logout:
             host: "{{ project_deploy_semaphore_host }}"
             port: "{{ project_deploy_semaphore_port }}"
-            session_cookie: "{{ login_result.session_cookie }}"
-          tags:
-            - users
-            - auth
-            - logout
+            session_cookie: "{{ project_deploy_test_check_mode_login_result.session_cookie }}"
+          when:
+            - project_deploy_test_check_mode_login_result is defined
+            - project_deploy_test_check_mode_login_result.session_cookie is defined
+          no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
 
-  roles:
-    - ebdruplab.semaphoreui.project_deploy
+    - name: "Assert direct check mode module previews returned planning data"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_test_project_update_check.changed | bool
+          - project_deploy_test_project_update_check.check_mode | default(false) | bool
+          - (project_deploy_test_project_update_check.before.alert | bool) != (project_deploy_test_project_update_check.after.alert | bool)
+          - project_deploy_test_view_delete_check.changed | bool
+          - project_deploy_test_view_delete_check.check_mode | default(false) | bool
+          - project_deploy_test_view_delete_check.before.id == ((project_deploy_snapshot_after_apply.views | first).id)
+          - project_deploy_test_view_delete_check.after is none
+          - project_deploy_test_view_create_check.changed | bool
+          - project_deploy_test_view_create_check.check_mode | default(false) | bool
+          - project_deploy_test_view_create_check.skipped_execution | default(false) | bool
+          - project_deploy_test_view_create_check.planned.title == project_deploy_test_check_mode_view_title
+
+    - name: "Capture snapshot after direct check mode previews"
+      ansible.builtin.include_tasks:
+        file: tasks/capture_project_snapshot.yml
+      vars:
+        project_deploy_test_snapshot_var: "project_deploy_snapshot_after_direct_check_mode"
+
+    - name: "Assert direct check mode previews did not mutate Semaphore state"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_snapshot_after_direct_check_mode == project_deploy_snapshot_after_apply
+          - project_deploy_test_check_mode_view_title not in (project_deploy_snapshot_after_direct_check_mode.views | map(attribute='title') | list)
+
+    - name: "Build a drifted config for optional role-level check mode"
+      ansible.builtin.set_fact:
+        project_deploy_test_check_mode_config: >-
+          {{
+            project_deploy_config | combine(
+              {
+                'project': project_deploy_config.project | combine(
+                  {
+                    'alert': not (project_deploy_config.project.alert | bool)
+                  }
+                )
+              },
+              recursive=True
+            )
+          }}
+      when: project_deploy_semaphore_api_token is defined
+
+    - name: "Run the role in check mode when an API token is available"
+      block:
+        - name: "Include project_deploy role in check mode"
+          ansible.builtin.include_role:
+            name: ebdruplab.semaphoreui.project_deploy
+          vars:
+            project_deploy_config: "{{ project_deploy_test_check_mode_config }}"
+      check_mode: true
+      when: project_deploy_semaphore_api_token is defined
+
+    - name: "Capture snapshot after optional role-level check mode"
+      ansible.builtin.include_tasks:
+        file: tasks/capture_project_snapshot.yml
+      vars:
+        project_deploy_test_snapshot_var: "project_deploy_snapshot_after_role_check_mode"
+      when: project_deploy_semaphore_api_token is defined
+
+    - name: "Assert optional role-level check mode does not mutate state"
+      ansible.builtin.assert:
+        that:
+          - project_deploy_snapshot_after_role_check_mode == project_deploy_snapshot_after_apply
+      when: project_deploy_semaphore_api_token is defined
