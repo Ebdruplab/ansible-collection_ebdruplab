@@ -4,7 +4,7 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_put, get_auth_headers, exit_check_mode
 import json
 
 DOCUMENTATION = r'''
@@ -237,7 +237,7 @@ def main():
         payload["login_password"] = p["login_password"]
 
     if module.check_mode:
-        module.exit_json(changed=True, status=204, project_id=project_id, key_id=key_id)
+        exit_check_mode(module, planned=payload)
 
     try:
         body = json.dumps(payload).encode("utf-8")

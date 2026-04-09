@@ -68,6 +68,13 @@ project_deploy_config:
         login: "token"
         password: "{{ vault_ci_trigger_token | default('Token1234', true) }}"
 
+    ci_trigger_token_secondary:
+      name: "CI Trigger Token Secondary"
+      type: login_password
+      login_password:
+        login: "token"
+        password: "{{ vault_ci_trigger_token_secondary | default('Token5678', true) }}"
+
   repositories:
     - name: "Repositorie Ebdruplab Demo"
       git_url: "https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git"

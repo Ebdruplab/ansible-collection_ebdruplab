@@ -4,7 +4,7 @@
 # MIT License
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_put, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_put, get_auth_headers, exit_check_mode
 import json
 
 DOCUMENTATION = r'''
@@ -127,6 +127,9 @@ def main():
 
     try:
         body = json.dumps(payload).encode("utf-8")
+        if module.check_mode:
+            exit_check_mode(module)
+
         _, status, _ = semaphore_put(
             url=url,
             body=body,

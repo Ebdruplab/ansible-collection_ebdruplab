@@ -4,7 +4,7 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers, exit_check_mode
 
 DOCUMENTATION = r'''
 ---
@@ -84,7 +84,7 @@ def main():
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
     host = module.params["host"].rstrip("/")
@@ -101,6 +101,9 @@ def main():
     )
 
     try:
+        if module.check_mode:
+            exit_check_mode(module)
+
         _, status, _ = semaphore_delete(
             url=url,
             headers=headers,

@@ -11,7 +11,7 @@ A working example can be found in the repository’s **`tests/`** directory.
 
 ## Requirements
 
-* Ansible 2.10+
+* Ansible 2.16.0+
 * Collection: `ebdruplab.semaphoreui` (this role lives inside it)
 * A reachable Semaphore instance
 
@@ -269,4 +269,3 @@ Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
 GitHub: [https://github.com/kris9854](https://github.com/kris9854)
 
 > See the **`tests/`** directory for a runnable end-to-end example.
-

@@ -4,7 +4,7 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_post
+from ..module_utils.semaphore_api import semaphore_post, exit_check_mode
 import json
 
 DOCUMENTATION = r"""
@@ -77,7 +77,7 @@ def main():
             password=dict(type='str', required=True, no_log=True),
             validate_certs=dict(type='bool', default=True),
         ),
-        supports_check_mode=False
+        supports_check_mode=True
     )
 
     host = module.params["host"].rstrip("/")
@@ -93,6 +93,9 @@ def main():
     }
 
     try:
+        if module.check_mode:
+            exit_check_mode(module)
+
         _, status, cookie = semaphore_post(url, body=payload, validate_certs=validate_certs)
         if status != 204:
             module.fail_json(msg=f"Login failed, status: {status}")

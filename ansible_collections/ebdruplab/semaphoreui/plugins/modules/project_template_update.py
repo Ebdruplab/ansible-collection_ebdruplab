@@ -4,7 +4,11 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_request, get_auth_headers
+from ..module_utils.semaphore_api import (
+    semaphore_request,
+    get_auth_headers,
+    sanitize_check_mode_value,
+)
 import json
 import copy
 
@@ -779,7 +783,7 @@ def main():
             allow_job_arguments=dict(type='bool', default=True),
         ),
         required_one_of=[['session_cookie', 'api_token']],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
     p = module.params
@@ -960,6 +964,26 @@ def main():
             merged.pop("arguments", None)
 
     merged = _prune_none(merged)
+    before = {key: existing.get(key) for key in merged.keys()}
+    after = {key: merged.get(key) for key in merged.keys()}
+    changed = before != after
+
+    if module.check_mode:
+        module.exit_json(
+            changed=changed,
+            check_mode=True,
+            before=sanitize_check_mode_value(before),
+            after=sanitize_check_mode_value(after),
+            attempts=attempts,
+        )
+
+    if not changed:
+        module.exit_json(
+            changed=False,
+            template=sanitize_check_mode_value(existing),
+            status=200,
+            attempts=attempts,
+        )
 
     # 5) PUT (with fallback strategy if the server rejects some fields)
     def do_put(payload, op):

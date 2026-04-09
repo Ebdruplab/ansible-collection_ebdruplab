@@ -20,7 +20,7 @@ This Ansible collection provides modules for automating the management of [Semap
 
 ## Requirements
 
-- Ansible 2.10+
+- Ansible 2.16.0+
 - tested on semaphore UI version 2.14
 
 ---
@@ -233,4 +233,3 @@ And then load them into your playbook:
 vars_files:
   - vault.yml
 ```
-

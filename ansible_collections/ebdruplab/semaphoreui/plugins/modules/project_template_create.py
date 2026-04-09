@@ -6,6 +6,7 @@ from ..module_utils.semaphore_api import (
     semaphore_post,
     semaphore_request,
     get_auth_headers,
+    exit_check_mode,
 )
 import json
 import copy
@@ -466,7 +467,7 @@ def main():
             validate_certs=dict(type="bool", default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
-        supports_check_mode=False,
+        supports_check_mode=True,
     )
 
     p = module.params
@@ -503,6 +504,9 @@ def main():
 
     base_url = f"{host}:{port}/api/project/{project_id}/templates"
     attempts = []
+
+    if module.check_mode:
+        exit_check_mode(module, planned=create_payload)
 
     resp, status, _ = http_post(base_url, create_payload, headers, p["validate_certs"])
     attempts.append({"op": "create", "status": status, "request": create_payload})

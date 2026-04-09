@@ -4,7 +4,7 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers
+from ..module_utils.semaphore_api import semaphore_delete, get_auth_headers, exit_check_mode
 
 DOCUMENTATION = r"""
 ---
@@ -84,6 +84,9 @@ def main():
     headers = get_auth_headers(module.params['session_cookie'], module.params['api_token'])
 
     try:
+        if module.check_mode:
+            exit_check_mode(module)
+
         _, status, _ = semaphore_delete(url, headers=headers, validate_certs=module.params["validate_certs"])
         if status != 204:
             module.fail_json(msg=f"Failed to delete token: HTTP {status}")

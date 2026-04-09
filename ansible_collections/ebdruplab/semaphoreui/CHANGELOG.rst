@@ -1,6 +1,55 @@
 Changelog
 =========
 
+Version 3.0.0
+-------------
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+- **Check mode behavior is now safe and non-mutating for write modules.**
+  - Mutating modules no longer call ``POST``, ``PUT``, or ``DELETE`` when Ansible is run with ``--check``.
+  - This is a behavioral change for users who previously relied on the old, incorrect behavior where some modules still modified Semaphore state during check mode.
+
+- **Update modules now use predictive check mode where possible.**
+  - The following modules read current state first, normalize managed fields, and in check mode return ``changed=True/False`` together with ``before`` and ``after`` data without calling the API:
+    - ``project_update``
+    - ``project_repository_update``
+    - ``project_inventory_update``
+    - ``project_environment_update``
+    - ``project_template_update``
+    - ``project_view_update``
+  - Outside check mode these modules may now fail earlier if the preliminary ``GET`` used to fetch current state fails.
+
+- **Delete modules now probe existence before delete.**
+  - The following modules first check whether the target resource exists:
+    - ``project_delete``
+    - ``project_repository_delete``
+    - ``project_inventory_delete``
+    - ``project_environment_delete``
+    - ``project_template_delete``
+    - ``project_view_delete``
+    - ``project_schedule_delete``
+  - If the object is already absent they now return ``changed=False``.
+  - In check mode they return ``changed=True`` with ``before`` data and do not send the delete request.
+  - Outside check mode this can surface permission or lookup failures earlier because a ``GET`` now happens before the delete.
+
+Changes
+~~~~~~~
+
+- Added shared helper support in ``plugins/module_utils/semaphore_api.py`` for:
+  - non-throwing HTTP status handling
+  - JSON probing helpers for predictive check mode
+  - redaction of sensitive values in check-mode output
+
+- Marked read-only modules that were incorrectly non-check-safe as check-mode-safe:
+  - ``apps_list``
+  - ``project_integration_get``
+  - ``project_integration_list``
+  - ``project_integration_extraction_value_list``
+  - ``project_schedule_list``
+  - ``project_user_list``
+
 Version 2.0.3
 -------------
 
