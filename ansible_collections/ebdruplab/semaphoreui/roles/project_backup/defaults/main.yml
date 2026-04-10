@@ -1,0 +1,28 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for ebdruplab.semaphoreui.project_backup
+
+project_backup_debug: false
+
+# No log sensitive data
+project_backup_sensitive_data_no_log: true
+
+## Connection and authentication variables
+project_backup_semaphore_host: "http://localhost"
+project_backup_semaphore_port: 3000
+project_backup_semaphore_username: "admin"
+project_backup_semaphore_password: "changeme"
+# project_backup_semaphore_api_token: "KEY"
+
+# Target project selector (prefer id; name used if id unset/0)
+project_backup_project_name: ""
+project_backup_project_id: 0
+
+# Output
+project_backup_output_dir: "{{ playbook_dir }}/.backup/generated_vars"
+project_backup_output_filename: "generated.project_deploy.yml"
+
+# Root key in written vars file
+project_backup_root_key: "project_deploy_config"
+project_backup_vault_variables_root_key: "project_backup_vault_variables"
+project_backup_vault_variable_prefix: "ansible_vault"

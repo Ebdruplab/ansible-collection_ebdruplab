@@ -1,0 +1,115 @@
+---
+- name: "Normalize | Keys: append normalized key item"
+  ansible.builtin.set_fact:
+    _keys_norm: "{{ (_keys_norm | default([])) + [ _key_norm ] }}"
+    project_backup_generated_vault_variables: >-
+      {{
+        (
+          (project_backup_generated_vault_variables | default([]))
+          + _key_vault_vars
+        ) | unique
+      }}
+  vars:
+    _key_name_token: >-
+      {{
+        (
+          item.name
+          | default('KEY')
+          | regex_replace('[^A-Za-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+          | upper
+        )
+      }}
+    _login_password_var: "{{ project_backup_vault_variable_prefix }}_{{ _key_name_token }}_PASSWORD"
+    _ssh_passphrase_var: "{{ project_backup_vault_variable_prefix }}_{{ _key_name_token }}_PASSPHRASE"
+    _ssh_private_key_var: "{{ project_backup_vault_variable_prefix }}_{{ _key_name_token }}_PRIVATE_KEY"
+    _key_base: >-
+      {{
+        item
+        | dict2items
+        | rejectattr('key', 'equalto', 'IgnorePlain')
+        | rejectattr('key', 'equalto', 'string')
+        | rejectattr('key', 'equalto', 'ssh')
+        | rejectattr('key', 'equalto', 'login_password')
+        | list
+        | items2dict
+      }}
+    _key_vault_vars: >-
+      {{
+        (
+          [ _login_password_var ]
+          if ((item.type | default('')) == 'login_password')
+          else []
+        )
+        + (
+          [ _ssh_private_key_var ]
+          if ((item.type | default('')) == 'ssh')
+          else []
+        )
+        + (
+          [ _ssh_passphrase_var ]
+          if (
+            (item.type | default('')) == 'ssh'
+            and (
+              (
+                (item.ssh | default({})).get('passphrase')
+                | default('', true)
+                | string
+                | length
+              ) > 0
+            )
+          )
+          else []
+        )
+      }}
+    _key_norm: >-
+      {{
+        _key_base
+        | combine(
+            (
+              ((item.type | default('')) == 'login_password')
+              | ternary(
+                  {
+                    'login_password': {
+                      'login': ((item.login_password | default({})).get('login', '')),
+                      'password': '{{ ' ~ _login_password_var ~ ' }}'
+                    }
+                  },
+                  {}
+                )
+            ),
+            recursive=True
+          )
+        | combine(
+            (
+              ((item.type | default('')) == 'ssh')
+              | ternary(
+                  {
+                    'ssh': {
+                      'login': ((item.ssh | default({})).get('login', '')),
+                      'private_key': '{{ ' ~ _ssh_private_key_var ~ ' }}'
+                    }
+                      | combine(
+                          (
+                            (
+                              (
+                                (item.ssh | default({})).get('passphrase')
+                                | default('', true)
+                                | string
+                                | length
+                              ) > 0
+                            )
+                            | ternary(
+                                { 'passphrase': '{{ ' ~ _ssh_passphrase_var ~ ' }}' },
+                                {}
+                              )
+                          ),
+                          recursive=True
+                        )
+                  },
+                  {}
+                )
+            ),
+            recursive=True
+          )
+      }}
