@@ -1,0 +1,162 @@
+---
+- name: "Normalize | Environments: initialize secret accumulators"
+  ansible.builtin.set_fact:
+    _project_backup_environment_secrets_by_key: {}
+    _project_backup_environment_vault_variables: []
+
+- name: "Normalize | Environments: normalize secret entries"
+  ansible.builtin.set_fact:
+    _project_backup_environment_secrets_by_key: >-
+      {{
+        (_project_backup_environment_secrets_by_key | default({}))
+        | combine({
+            _environment_secret_composite_key: _environment_secret_norm
+          })
+      }}
+    _project_backup_environment_vault_variables: >-
+      {{
+        (
+          (_project_backup_environment_vault_variables | default([]))
+          + _environment_secret_vars
+        ) | unique
+      }}
+  vars:
+    _environment_secrets_list: >-
+      {{
+        (
+          env_item.secrets
+          if (
+            env_item.secrets is defined
+            and env_item.secrets is sequence
+            and env_item.secrets is not string
+            and env_item.secrets is not mapping
+          )
+          else []
+        )
+      }}
+    _environment_name_token: >-
+      {{
+        (
+          env_item.name
+          | default('ENVIRONMENT')
+          | regex_replace('[^A-Za-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+          | upper
+        )
+      }}
+    _environment_secret_name_token: >-
+      {{
+        (
+          env_secret.name
+          | default('SECRET')
+          | regex_replace('[^A-Za-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+          | upper
+        )
+      }}
+    _environment_secret_var: >-
+      {{
+        project_backup_vault_variable_prefix
+        ~ '_'
+        ~ _environment_name_token
+        ~ '_'
+        ~ _environment_secret_name_token
+        ~ '_SECRET'
+      }}
+    _environment_secret_type: "{{ ((env_secret.type | default('env')) == 'var') | ternary('json', (env_secret.type | default('env'))) }}"
+    _environment_secret_composite_key: "{{ _environment_secret_type }}::{{ env_secret.name | default('SECRET') }}"
+    _environment_secret_vars: "{{ [ _environment_secret_var ] }}"
+    _environment_secret_norm: >-
+      {{
+        {
+          'name': env_secret.name,
+          'secret': '{{ ' ~ _environment_secret_var ~ ' }}',
+          'type': _environment_secret_type
+        }
+      }}
+  loop: "{{ _environment_secrets_list }}"
+  loop_control:
+    loop_var: env_secret
+    label: "{{ env_secret.name | default('') }}"
+
+- name: "Normalize | Environments: append normalized environment item"
+  ansible.builtin.set_fact:
+    _envs_norm: "{{ (_envs_norm | default([])) + [ _environment_norm ] }}"
+    project_backup_generated_vault_variables: >-
+      {{
+        (
+          (project_backup_generated_vault_variables | default([]))
+          + _environment_password_vars
+          + (_project_backup_environment_vault_variables | default([]))
+        ) | unique
+      }}
+  vars:
+    _environment_name_token: >-
+      {{
+        (
+          env_item.name
+          | default('ENVIRONMENT')
+          | regex_replace('[^A-Za-z0-9]+', '_')
+          | regex_replace('^_+|_+$', '')
+          | upper
+        )
+      }}
+    _environment_password_var: "{{ project_backup_vault_variable_prefix }}_{{ _environment_name_token }}_PASSWORD"
+    _environment_password_vars: >-
+      {{
+        [ _environment_password_var ]
+        if (
+          env_item.password is defined
+          and env_item.password is not none
+          and ((env_item.password | default('', true) | string | length) > 0)
+        )
+        else []
+      }}
+    _environment_norm: >-
+      {{
+        (
+          env_item
+          | dict2items
+          | rejectattr('key', 'equalto', 'password')
+          | rejectattr('key', 'equalto', 'env')
+          | rejectattr('key', 'equalto', 'json')
+          | rejectattr('key', 'equalto', 'secrets')
+          | list
+          | items2dict
+        )
+        | combine(
+            {
+              'env': (
+                (env_item.env is string)
+                | ternary(env_item.env | from_yaml, (env_item.env | default({})))
+              ),
+              'json': (
+                (env_item.json is string)
+                | ternary(env_item.json | from_json, (env_item.json | default({})))
+              ),
+              'secrets': (
+                _project_backup_environment_secrets_by_key
+                | default({})
+                | dict2items
+                | map(attribute='value')
+                | sort(attribute='name')
+                | list
+              )
+            },
+            recursive=True
+          )
+        | combine(
+            (
+              (
+                env_item.password is defined
+                and env_item.password is not none
+                and ((env_item.password | default('', true) | string | length) > 0)
+              )
+              | ternary(
+                  { 'password': '{{ ' ~ _environment_password_var ~ ' }}' },
+                  {}
+                )
+            ),
+            recursive=True
+          )
+      }}

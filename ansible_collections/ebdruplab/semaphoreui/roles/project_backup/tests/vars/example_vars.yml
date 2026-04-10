@@ -1,0 +1,13 @@
+#SPDX-License-Identifier: MIT-0
+---
+project_backup_semaphore_host: "{{ project_deploy_semaphore_host }}"
+project_backup_semaphore_port: "{{ project_deploy_semaphore_port }}"
+project_backup_semaphore_username: "{{ project_deploy_semaphore_username }}"
+project_backup_semaphore_password: "{{ project_deploy_semaphore_password }}"
+project_backup_project_name: "{{ project_deploy_config.project.name }}"
+project_backup_output_dir: "{{ playbook_dir }}/generated"
+project_backup_output_filename: "generated.project_deploy.yml"
+project_backup_sensitive_data_no_log: false
+project_backup_root_key: "project_deploy_config"
+project_backup_vault_variables_root_key: "project_backup_vault_variables"
+project_backup_vault_variable_prefix: "ansible_vault"

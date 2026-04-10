@@ -1,0 +1,162 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: "Project Backup Integration Test"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - "../../project_deploy/tests/vars/example_vars.yml"
+    - "vars/example_vars.yml"
+  vars:
+    project_deploy_test_service_desk_name: "Service Desk"
+    project_deploy_test_service_desk_username: "ServiceDeskRunner"
+    project_deploy_test_service_desk_email: "sd@example.com"
+    project_deploy_test_service_desk_password: "thisshouldbevaulted"
+    project_backup_test_generated_file: "{{ project_backup_output_dir }}/{{ project_backup_output_filename }}"
+    project_backup_test_expected_vault_variables:
+      - "ansible_vault_CI_TRIGGER_TOKEN_PASSWORD"
+      - "ansible_vault_CI_TRIGGER_TOKEN_SECONDARY_PASSWORD"
+      - "ansible_vault_EBDRUPLAB_EXAMPLE_SSH_KEY_PRIVATE_KEY"
+      - "ansible_vault_EBDRUPLAB_EXAMPLE_USER_PASSWORD"
+      - "ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD"
+      - "ansible_vault_TEST_ENVIRONMENT_API_TOKEN_SECRET"
+      - "ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET"
+      - "ansible_vault_TEST_ENVIRONMENT_PASSWORD"
+    project_backup_test_placeholder_example_user_password: "{{ '{{ ansible_vault_EBDRUPLAB_EXAMPLE_USER_PASSWORD }}' }}"
+    project_backup_test_placeholder_project_vault_password: "{{ '{{ ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD }}' }}"
+    project_backup_test_placeholder_ci_trigger_token_password: "{{ '{{ ansible_vault_CI_TRIGGER_TOKEN_PASSWORD }}' }}"
+    project_backup_test_placeholder_ci_trigger_token_secondary_password: "{{ '{{ ansible_vault_CI_TRIGGER_TOKEN_SECONDARY_PASSWORD }}' }}"
+    project_backup_test_placeholder_example_ssh_private_key: "{{ '{{ ansible_vault_EBDRUPLAB_EXAMPLE_SSH_KEY_PRIVATE_KEY }}' }}"
+    project_backup_test_placeholder_environment_password: "{{ '{{ ansible_vault_TEST_ENVIRONMENT_PASSWORD }}' }}"
+    project_backup_test_placeholder_environment_db_password_secret: "{{ '{{ ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET }}' }}"
+    project_backup_test_placeholder_environment_api_token_secret: "{{ '{{ ansible_vault_TEST_ENVIRONMENT_API_TOKEN_SECRET }}' }}"
+
+  pre_tasks:
+    - name: "Ensure prerequisite users exist"
+      ansible.builtin.include_tasks:
+        file: "{{ playbook_dir }}/../../project_deploy/tests/tasks/ensure_service_desk_user.yml"
+
+  tasks:
+    - name: "Apply project_deploy role to create the source project"
+      ansible.builtin.include_role:
+        name: ebdruplab.semaphoreui.project_deploy
+
+    - name: "Run project_backup role"
+      ansible.builtin.include_role:
+        name: ebdruplab.semaphoreui.project_backup
+
+    - name: "Read generated backup file"
+      ansible.builtin.slurp:
+        src: "{{ project_backup_test_generated_file }}"
+      register: project_backup_test_generated_file_raw
+
+    - name: "Parse generated backup file"
+      ansible.builtin.set_fact:
+        project_backup_test_generated_file_text: "{{ project_backup_test_generated_file_raw.content | b64decode }}"
+        project_backup_test_generated_vars: "{{ project_backup_test_generated_file_raw.content | b64decode | from_yaml }}"
+
+    - name: "Assert generated backup file has the expected top-level structure"
+      ansible.builtin.assert:
+        that:
+          - project_backup_test_generated_vars is mapping
+          - "'project_deploy_config' in project_backup_test_generated_vars"
+          - "'project_backup_vault_variables' in project_backup_test_generated_vars"
+          - project_backup_test_generated_vars.project_deploy_config.project.name == project_deploy_config.project.name
+          - project_backup_test_generated_vars.project_deploy_config[project_deploy_config.project.name] is not defined
+
+    - name: "Assert generated vault variable list matches expectations"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              project_backup_test_expected_vault_variables
+              | difference(project_backup_test_generated_vars.project_backup_vault_variables | default([]))
+            ) | length == 0
+          - >-
+            (
+              project_backup_test_generated_vars.project_backup_vault_variables | default([])
+              | difference(project_backup_test_expected_vault_variables)
+            ) | length == 0
+
+    - name: "Assert key placeholders are generated for secret-bearing keys"
+      ansible.builtin.assert:
+        that:
+          - >-
+            project_backup_test_generated_vars.project_deploy_config['keys']['Ebdruplab Example User'].login_password.password
+            == project_backup_test_placeholder_example_user_password
+          - >-
+            project_backup_test_generated_vars.project_deploy_config['keys']['Project Vault Password'].login_password.password
+            == project_backup_test_placeholder_project_vault_password
+          - >-
+            project_backup_test_generated_vars.project_deploy_config['keys']['CI Trigger Token'].login_password.password
+            == project_backup_test_placeholder_ci_trigger_token_password
+          - >-
+            project_backup_test_generated_vars.project_deploy_config['keys']['CI Trigger Token Secondary'].login_password.password
+            == project_backup_test_placeholder_ci_trigger_token_secondary_password
+          - >-
+            project_backup_test_generated_vars.project_deploy_config['keys']['Ebdruplab example ssh key'].ssh.private_key
+            == project_backup_test_placeholder_example_ssh_private_key
+
+    - name: "Assert environment placeholders and normalized secrets are generated"
+      ansible.builtin.assert:
+        that:
+          - >-
+            project_backup_test_generated_vars.project_deploy_config.environments['Test Environment'].password
+            == project_backup_test_placeholder_environment_password
+          - >-
+            project_backup_test_generated_vars.project_deploy_config.environments['Test Environment'].secrets
+            | selectattr('name', 'equalto', 'DB_PASSWORD')
+            | map(attribute='secret')
+            | first
+            == project_backup_test_placeholder_environment_db_password_secret
+          - >-
+            project_backup_test_generated_vars.project_deploy_config.environments['Test Environment'].secrets
+            | selectattr('name', 'equalto', 'api_token')
+            | map(attribute='secret')
+            | first
+            == project_backup_test_placeholder_environment_api_token_secret
+          - >-
+            project_backup_test_generated_vars.project_deploy_config.environments['Test Environment'].secrets
+            | selectattr('name', 'equalto', 'api_token')
+            | map(attribute='type')
+            | first
+            == 'json'
+          - "'password' not in project_backup_test_generated_vars.project_deploy_config.environments['Empty']"
+
+    - name: "Assert extraction values are included once per configured name"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              project_backup_test_generated_vars.project_deploy_config.integrations['CI Token Trigger (Secondary)'].extraction_values
+              | map(attribute='name')
+              | list
+              | sort
+            ) == ['Extract Branch', 'Extract Commit']
+
+    - name: "Assert plaintext secrets are not present in the generated file"
+      ansible.builtin.assert:
+        that:
+          - "'vaultencryptedsecretpassword' not in project_backup_test_generated_file_text"
+          - "'ssh-rsa vaultencryptedsecretkey' not in project_backup_test_generated_file_text"
+          - "'TopSecret900' not in project_backup_test_generated_file_text"
+          - "'Token1234' not in project_backup_test_generated_file_text"
+          - "'Token5678' not in project_backup_test_generated_file_text"
+          - "'mysecret' not in project_backup_test_generated_file_text"
+          - "'changeme' not in project_backup_test_generated_file_text"
+
+    - name: "Run project_backup role a second time"
+      ansible.builtin.include_role:
+        name: ebdruplab.semaphoreui.project_backup
+
+    - name: "Read generated backup file after the second run"
+      ansible.builtin.slurp:
+        src: "{{ project_backup_test_generated_file }}"
+      register: project_backup_test_generated_file_second_raw
+
+    - name: "Assert the generated file is stable across repeated runs"
+      ansible.builtin.assert:
+        that:
+          - >-
+            (
+              project_backup_test_generated_file_second_raw.content | b64decode | from_yaml
+            ) == project_backup_test_generated_vars

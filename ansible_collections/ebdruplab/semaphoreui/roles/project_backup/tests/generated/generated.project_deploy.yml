@@ -1,0 +1,351 @@
+project_backup_vault_variables:
+- ansible_vault_CI_TRIGGER_TOKEN_PASSWORD
+- ansible_vault_CI_TRIGGER_TOKEN_SECONDARY_PASSWORD
+- ansible_vault_EBDRUPLAB_EXAMPLE_SSH_KEY_PRIVATE_KEY
+- ansible_vault_EBDRUPLAB_EXAMPLE_USER_PASSWORD
+- ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD
+- ansible_vault_TEST_ENVIRONMENT_API_TOKEN_SECRET
+- ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET
+- ansible_vault_TEST_ENVIRONMENT_PASSWORD
+project_deploy_config:
+  environments:
+    Empty:
+      env: null
+      id: 1
+      json: {}
+      name: Empty
+      project_id: 1
+      secrets: []
+    Test Environment:
+      env:
+        KEY: value
+      id: 2
+      json:
+        foo: bar
+      name: Test Environment
+      password: '{{ ansible_vault_TEST_ENVIRONMENT_PASSWORD }}'
+      project_id: 1
+      secrets:
+      - name: api_token
+        secret: '{{ ansible_vault_TEST_ENVIRONMENT_API_TOKEN_SECRET }}'
+        type: json
+      - name: DB_PASSWORD
+        secret: '{{ ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET }}'
+        type: env
+  integrations:
+    CI Token Trigger:
+      auth_header: ''
+      auth_method: token
+      auth_secret_id: 5
+      auth_secret_name: CI Trigger Token
+      extraction_values: []
+      id: 1
+      name: CI Token Trigger
+      project_id: 1
+      searchable: false
+      task_params:
+        debug_level: 4
+        diff: false
+        dry_run: false
+        environment: null
+        params: null
+      template_id: 3
+      template_name: Deploy Service
+    CI Token Trigger (Secondary):
+      auth_header: ''
+      auth_method: token
+      auth_secret_id: 6
+      auth_secret_name: CI Trigger Token Secondary
+      extraction_values:
+      - body_data_type: json
+        id: 1
+        integration_id: 2
+        key: X-Branch
+        name: Extract Branch
+        value_source: header
+        variable: git_branch
+      - body_data_type: json
+        id: 2
+        integration_id: 2
+        key: X-Commit
+        name: Extract Commit
+        value_source: header
+        variable: git_commit
+      id: 2
+      name: CI Token Trigger (Secondary)
+      project_id: 1
+      searchable: false
+      task_params:
+        debug_level: 4
+        diff: false
+        dry_run: false
+        environment: null
+        params: null
+      template_id: 3
+      template_name: Deploy Service
+  inventories:
+    A Local Ini Inventory:
+      become_key_id: null
+      id: 2
+      inventory: localhost ansible_connection=local
+      name: A Local Ini Inventory
+      project_id: 1
+      repository_id: null
+      ssh_key_id: 2
+      ssh_key_name: Ebdruplab example ssh key
+      template_id: null
+      type: static
+    A Yaml Inventory:
+      become_key_id: null
+      id: 1
+      inventory: "all:\n  hosts:\n    localhost:\n      ansible_connection: local\n"
+      name: A Yaml Inventory
+      project_id: 1
+      repository_id: null
+      ssh_key_id: 2
+      ssh_key_name: Ebdruplab example ssh key
+      template_id: null
+      type: static-yaml
+    A repository Inventory:
+      become_key_id: 2
+      become_key_name: Ebdruplab example ssh key
+      id: 3
+      inventory: inventories/example/example.ini
+      inventory_file: inventories/example/example.ini
+      name: A repository Inventory
+      project_id: 1
+      repository_id: 1
+      repository_name: Repositorie Ebdruplab Demo
+      ssh_key_id: 2
+      ssh_key_name: Ebdruplab example ssh key
+      template_id: null
+      type: file
+  keys:
+    CI Trigger Token:
+      id: 5
+      login_password:
+        login: ''
+        password: '{{ ansible_vault_CI_TRIGGER_TOKEN_PASSWORD }}'
+      name: CI Trigger Token
+      override_secret: false
+      project_id: 1
+      type: login_password
+    CI Trigger Token Secondary:
+      id: 6
+      login_password:
+        login: ''
+        password: '{{ ansible_vault_CI_TRIGGER_TOKEN_SECONDARY_PASSWORD }}'
+      name: CI Trigger Token Secondary
+      override_secret: false
+      project_id: 1
+      type: login_password
+    Ebdruplab Example User:
+      id: 3
+      login_password:
+        login: ''
+        password: '{{ ansible_vault_EBDRUPLAB_EXAMPLE_USER_PASSWORD }}'
+      name: Ebdruplab Example User
+      override_secret: false
+      project_id: 1
+      type: login_password
+    Ebdruplab example ssh key:
+      id: 2
+      name: Ebdruplab example ssh key
+      override_secret: false
+      project_id: 1
+      ssh:
+        login: ''
+        private_key: '{{ ansible_vault_EBDRUPLAB_EXAMPLE_SSH_KEY_PRIVATE_KEY }}'
+      type: ssh
+    None:
+      id: 1
+      name: None
+      override_secret: false
+      project_id: 1
+      type: none
+    Project Vault Password:
+      id: 4
+      login_password:
+        login: ''
+        password: '{{ ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD }}'
+      name: Project Vault Password
+      override_secret: false
+      project_id: 1
+      type: login_password
+  project:
+    alert: false
+    alert_chat: ''
+    demo: false
+    max_parallel_tasks: '0'
+    name: Ebdruplab Example Project
+    type: ''
+  repositories:
+  - git_branch: main
+    git_url: https://github.com/Ebdruplab/ansible-semaphore_ebdruplab_examples.git
+    id: 1
+    key_name: Ebdruplab Example User
+    name: Repositorie Ebdruplab Demo
+    project_id: 1
+    ssh_key_id: 3
+  schedules:
+    Hourly Build:
+      active: false
+      arguments: []
+      cron_format: 0 * * * *
+      id: 2
+      name: Hourly Build
+      project_id: 1
+      repository_id: null
+      template_id: 4
+      tpl_name: Build Artifact
+    Nightly Deploy:
+      active: true
+      arguments: []
+      cron_format: 0 3 * * *
+      id: 1
+      name: Nightly Deploy
+      project_id: 1
+      repository_id: null
+      template_id: 3
+      tpl_name: Deploy Service
+  templates:
+    Build Artifact:
+      allow_override_args_in_task: false
+      app: ansible
+      arguments: []
+      autorun: false
+      build_template_id: null
+      description: Builds the application artifact
+      environment_id: 2
+      environment_name: Test Environment
+      git_branch: null
+      id: 4
+      inventory_id: 3
+      inventory_name: A repository Inventory
+      last_task: null
+      name: Build Artifact
+      playbook: playbooks/build.yml
+      project_id: 1
+      repository_id: 1
+      repository_name: Repositorie Ebdruplab Demo
+      runner_tag: null
+      start_version: null
+      suppress_success_alerts: false
+      survey_vars: null
+      task_params: {}
+      tasks: 0
+      type: build
+      vaults: null
+      view_id: 2
+      view_title: ExamplePos_1
+    Deploy Service:
+      allow_override_args_in_task: false
+      app: ansible
+      arguments: []
+      autorun: false
+      build_template_id: null
+      description: Deploys the service
+      environment_id: 2
+      environment_name: Test Environment
+      git_branch: release
+      id: 3
+      inventory_id: 3
+      inventory_name: A repository Inventory
+      last_task: null
+      name: Deploy Service
+      playbook: playbooks/deploy.yml
+      project_id: 1
+      repository_id: 1
+      repository_name: Repositorie Ebdruplab Demo
+      runner_tag: null
+      start_version: null
+      suppress_success_alerts: false
+      survey_vars: null
+      task_params: {}
+      tasks: 0
+      type: deploy
+      vaults: null
+      view_id: 2
+      view_title: ExamplePos_1
+    Ebdruplab Example Playbook:
+      allow_override_args_in_task: false
+      app: ansible
+      arguments: []
+      autorun: false
+      build_template_id: null
+      description: Runs the example Ansible playbook
+      environment_id: 2
+      environment_name: Test Environment
+      git_branch: main
+      id: 1
+      inventory_id: 3
+      inventory_name: A repository Inventory
+      last_task: null
+      name: Ebdruplab Example Playbook
+      playbook: playbooks/pb-semaphore-example.yml
+      project_id: 1
+      repository_id: 1
+      repository_name: Repositorie Ebdruplab Demo
+      runner_tag: null
+      start_version: null
+      suppress_success_alerts: false
+      survey_vars: null
+      task_params:
+        allow_override_inventory: true
+        allow_override_limit: true
+        allow_override_skip_tags: true
+        allow_override_tags: true
+      tasks: 0
+      type: ''
+      vaults: null
+      view_id: 2
+      view_title: ExamplePos_1
+    Example Playbook:
+      allow_override_args_in_task: false
+      app: ansible
+      arguments: []
+      autorun: false
+      build_template_id: null
+      description: Runs the example Ansible playbook
+      environment_id: 2
+      environment_name: Test Environment
+      git_branch: main
+      id: 2
+      inventory_id: 3
+      inventory_name: A repository Inventory
+      last_task: null
+      name: Example Playbook
+      playbook: playbooks/pb-semaphore-example.yml
+      project_id: 1
+      repository_id: 1
+      repository_name: Repositorie Ebdruplab Demo
+      runner_tag: null
+      start_version: null
+      suppress_success_alerts: false
+      survey_vars: null
+      task_params:
+        allow_override_inventory: false
+        allow_override_limit: false
+        allow_override_skip_tags: false
+        allow_override_tags: false
+      tasks: 0
+      type: ''
+      vaults: null
+      view_id: 2
+      view_title: ExamplePos_1
+  users_access:
+  - role: Owner
+    username: admin
+  - role: Owner
+    username: ServiceDeskRunner
+  views:
+    ExamplePos_1:
+      id: 2
+      position: 1
+      project_id: 1
+      title: ExamplePos_1
+    Examples:
+      id: 1
+      position: 0
+      project_id: 1
+      title: Examples

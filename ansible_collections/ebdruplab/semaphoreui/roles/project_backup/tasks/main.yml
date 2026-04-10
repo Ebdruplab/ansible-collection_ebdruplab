@@ -1,0 +1,224 @@
+---
+- name: "Resolve | Apply ebdruplab_* globals to project_backup_* when any global is set"
+  ansible.builtin.set_fact:
+    project_backup_semaphore_host: "{{ project_backup_semaphore_host | default(ebdruplab_semaphore_host | default('http://localhost')) }}"
+    project_backup_semaphore_port: "{{ project_backup_semaphore_port | default(ebdruplab_semaphore_port | default(3000)) }}"
+    project_backup_semaphore_username: "{{ project_backup_semaphore_username | default(ebdruplab_semaphore_username | default('')) }}"
+    project_backup_semaphore_password: "{{ project_backup_semaphore_password | default(ebdruplab_semaphore_password | default('')) }}"
+    project_backup_semaphore_api_token: "{{ project_backup_semaphore_api_token | default(ebdruplab_semaphore_api_token | default(omit)) }}"
+  no_log: "{{ project_backup_sensitive_data_no_log | default(true) }}"
+  when:
+    - ebdruplab_semaphore_host is defined
+      or ebdruplab_semaphore_port is defined
+      or ebdruplab_semaphore_username is defined
+      or ebdruplab_semaphore_password is defined
+      or ebdruplab_semaphore_api_token is defined
+  tags:
+    - resolve
+    - auth
+
+- name: "Assert | Required connection variables present"
+  ansible.builtin.assert:
+    that:
+      - (project_backup_semaphore_host | default('') | length) > 0
+      - project_backup_semaphore_port is defined
+      - (project_backup_semaphore_port | int) > 0
+    fail_msg: >-
+      Missing connection config. Ensure project_backup_semaphore_host and
+      project_backup_semaphore_port are set.
+  tags:
+    - preflight
+    - assert
+
+- name: "Assert | Auth variables present (username/password or api token)"
+  ansible.builtin.assert:
+    that:
+      - (project_backup_semaphore_api_token is defined and project_backup_semaphore_api_token is not none)
+        or (
+          (project_backup_semaphore_username | default('') | length) > 0
+          and (project_backup_semaphore_password | default('') | length) > 0
+        )
+    fail_msg: >-
+      Missing auth config. Provide project_backup_semaphore_api_token OR both
+      project_backup_semaphore_username and project_backup_semaphore_password.
+  tags:
+    - preflight
+    - assert
+
+- name: "Assert | Project selector provided"
+  ansible.builtin.assert:
+    that:
+      - (project_backup_project_name | default('') | length) > 0
+        or (project_backup_project_id is not none and (project_backup_project_id | int) > 0)
+    fail_msg: "Set project_backup_project_name (preferred) or project_backup_project_id (>0)."
+  tags:
+    - preflight
+    - assert
+
+- name: "Assert | Output configuration valid"
+  ansible.builtin.assert:
+    that:
+      - project_backup_output_dir is defined
+      - (project_backup_output_dir | length) > 0
+      - project_backup_output_filename is defined
+      - (project_backup_output_filename | length) > 0
+      - project_backup_root_key is defined
+      - (project_backup_root_key | length) > 0
+    fail_msg: >-
+      Output configuration is invalid. Ensure project_backup_output_dir,
+      project_backup_output_filename, and project_backup_root_key are set to
+      non-empty values.
+  tags:
+    - preflight
+    - assert
+
+- name: "Auth | Login"
+  ebdruplab.semaphoreui.login:
+    host: "{{ project_backup_semaphore_host }}"
+    port: "{{ project_backup_semaphore_port }}"
+    username: "{{ project_backup_semaphore_username }}"
+    password: "{{ project_backup_semaphore_password }}"
+  register: login_result
+  when: project_backup_semaphore_api_token is not defined
+  no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - auth
+    - login
+
+- name: "Backup | Generate vars file from live project state"
+  block:
+    - name: "Backup | Ensure output dir exists"
+      ansible.builtin.file:
+        path: "{{ project_backup_output_dir }}"
+        state: directory
+        mode: "0750"
+      tags:
+        - output
+
+    - name: "Resolve | Project ID"
+      block:
+        - name: "List projects"
+          ebdruplab.semaphoreui.project_list:
+            host: "{{ project_backup_semaphore_host }}"
+            port: "{{ project_backup_semaphore_port }}"
+            api_token: "{{ project_backup_semaphore_api_token | default(omit) }}"
+            session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+          register: _projects
+          tags:
+            - project
+            - list
+
+        - name: "Resolve | Prefer name when set; else keep provided id"
+          ansible.builtin.set_fact:
+            project_backup_project_id: >-
+              {{
+                (
+                  (project_backup_project_name | default('') | length) > 0
+                )
+                | ternary(
+                    (_projects.projects | default([])
+                      | selectattr('name', 'equalto', project_backup_project_name)
+                      | list
+                      | first
+                    ).id,
+                    project_backup_project_id
+                  )
+              }}
+          tags:
+            - project
+            - resolve
+
+        - name: "Assert | Project id resolved"
+          ansible.builtin.assert:
+            that:
+              - project_backup_project_id is not none
+              - (project_backup_project_id | int) > 0
+            fail_msg: >-
+              Could not resolve project id. Provide a valid
+              project_backup_project_name or set project_backup_project_id (>0).
+          tags:
+            - project
+            - resolve
+      tags:
+        - project
+
+    - name: "Backup | Fetch project data"
+      ansible.builtin.include_tasks:
+        file: "fetch.yml"
+      tags:
+        - project
+        - list
+        - get
+
+    - name: "Backup | Normalize fetched resources"
+      ansible.builtin.include_tasks:
+        file: "normalize.yml"
+      tags:
+        - normalize
+
+    - name: "Build | project_deploy_config"
+      ansible.builtin.set_fact:
+        project_backup_project_deploy_config:
+          project:
+            name: "{{ _project_meta.project.name }}"
+            alert: "{{ _project_meta.project.alert | default(false) }}"
+            alert_chat: "{{ _project_meta.project.alert_chat | default('') }}"
+            max_parallel_tasks: "{{ (_project_meta.project.max_parallel_tasks | default(0)) | int }}"
+            demo: "{{ _project_meta.project.demo | default(false) }}"
+            type: "{{ _project_meta.project.type | default('') }}"
+          users_access: "{{ _users_access_norm | default([]) }}"
+          keys: "{{ dict((_keys_norm | default([]) | map(attribute='name') | list) | zip((_keys_norm | default([])))) }}"
+          repositories: "{{ _repos_norm | default([]) }}"
+          views: "{{ dict((_views_list | map(attribute='title') | list) | zip(_views_list)) }}"
+          inventories: "{{ dict((_invs_norm | default([]) | map(attribute='name') | list) | zip((_invs_norm | default([])))) }}"
+          environments: "{{ dict((_envs_norm | default([]) | map(attribute='name') | list) | zip((_envs_norm | default([])))) }}"
+          templates: "{{ dict((_tpls_norm | default([]) | map(attribute='name') | list) | zip((_tpls_norm | default([])))) }}"
+          schedules: "{{ dict((_sched_norm | default([]) | map(attribute='name') | list) | zip((_sched_norm | default([])))) }}"
+          integrations: "{{ dict((_int_norm | default([]) | map(attribute='name') | list) | zip((_int_norm | default([])))) }}"
+        project_backup_generated_vault_variables: "{{ project_backup_generated_vault_variables | default([]) | unique | sort }}"
+      tags:
+        - build
+
+    - name: "Build | Render backup payload"
+      ansible.builtin.set_fact:
+        project_backup_rendered_output: >-
+          {{
+            {
+              (project_backup_root_key | default('project_deploy_config')): project_backup_project_deploy_config
+            }
+            | combine(
+                {
+                  (
+                    project_backup_vault_variables_root_key
+                    | default('project_backup_vault_variables')
+                  ): (
+                    project_backup_generated_vault_variables | default([])
+                  )
+                }
+              )
+          }}
+      tags:
+        - output
+
+    - name: "Write | YAML vars file"
+      ansible.builtin.copy:
+        dest: "{{ project_backup_output_dir }}/{{ project_backup_output_filename }}"
+        content: "{{ project_backup_rendered_output | to_nice_yaml(indent=2, width=9999) }}"
+        mode: "0640"
+      tags:
+        - output
+
+  always:
+    - name: "Auth | Logout"
+      ebdruplab.semaphoreui.logout:
+        host: "{{ project_backup_semaphore_host }}"
+        port: "{{ project_backup_semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+      when:
+        - project_backup_semaphore_api_token is not defined
+        - login_result is defined
+        - login_result.session_cookie is defined
+      no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
+      tags:
+        - auth
+        - logout
