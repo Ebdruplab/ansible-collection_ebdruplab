@@ -28,6 +28,8 @@
         item
         | dict2items
         | rejectattr('key', 'equalto', 'IgnorePlain')
+        | rejectattr('key', 'equalto', 'id')
+        | rejectattr('key', 'equalto', 'project_id')
         | rejectattr('key', 'equalto', 'string')
         | rejectattr('key', 'equalto', 'ssh')
         | rejectattr('key', 'equalto', 'login_password')
@@ -71,7 +73,13 @@
               | ternary(
                   {
                     'login_password': {
-                      'login': ((item.login_password | default({})).get('login', '')),
+                      'login': (
+                        ((item.login_password | default({})).get('login') | default('', true) | string | length) > 0
+                      )
+                        | ternary(
+                            (item.login_password | default({})).get('login', ''),
+                            'CHANGE_ME_LOGIN'
+                          ),
                       'password': '{{ ' ~ _login_password_var ~ ' }}'
                     }
                   },
@@ -86,7 +94,13 @@
               | ternary(
                   {
                     'ssh': {
-                      'login': ((item.ssh | default({})).get('login', '')),
+                      'login': (
+                        ((item.ssh | default({})).get('login') | default('', true) | string | length) > 0
+                      )
+                        | ternary(
+                            (item.ssh | default({})).get('login', ''),
+                            'CHANGE_ME_SSH_LOGIN'
+                          ),
                       'private_key': '{{ ' ~ _ssh_private_key_var ~ ' }}'
                     }
                       | combine(

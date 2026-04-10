@@ -7,6 +7,7 @@
     _users_access_norm: []
     _keys_norm: []
     _repos_norm: []
+    _views_norm: []
     _invs_norm: []
     _envs_norm: []
     _tpls_norm: []
@@ -45,11 +46,24 @@
     _integration_extraction_values_by_name: >-
       {{
         _integration_extraction_values_by_name | combine({
-          item.item.name: (
-            item.extracted_values | default([]) | unique(attribute='name') | sort(attribute='name')
-          )
+          item.item.name: _normalized_extraction_values
         })
       }}
+  vars:
+    _normalized_extraction_values: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- for extraction_value in (item.extracted_values | default([], true)) -%}
+      {%- set normalized = (
+            extraction_value
+            | dict2items
+            | rejectattr('key', 'equalto', 'id')
+            | rejectattr('key', 'equalto', 'integration_id')
+            | list
+            | items2dict
+          ) -%}
+      {%- set ns.items = ns.items + [normalized] -%}
+      {%- endfor -%}
+      {{ ns.items | unique(attribute='name') | sort(attribute='name') }}
   loop: "{{ _integration_extraction_value_results.results | default([]) }}"
   loop_control:
     label: "{{ item.item.name }}"
@@ -90,30 +104,42 @@
   loop: "{{ _keys_list }}"
   loop_control:
     label: "{{ item.name | default('') }}"
+  when: (item.type | default('')) in ['ssh', 'login_password']
   no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
   tags:
     - normalize
     - keys
 
-- name: "Normalize | Environments: convert env/json and replace secrets with vault placeholders"
-  ansible.builtin.include_tasks:
-    file: "normalize_environment_item.yml"
-  loop: "{{ _environments_list }}"
+- name: "Normalize | Views: keep declarative fields only"
+  ansible.builtin.set_fact:
+    _views_norm: "{{ (_views_norm | default([])) + [ _view_item ] }}"
+  vars:
+    _view_item:
+      title: "{{ item.title }}"
+      position: "{{ item.position | default(0) | int }}"
+  loop: "{{ _views_list }}"
   loop_control:
-    loop_var: env_item
-    label: "{{ env_item.name | default('') }}"
-  no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
+    label: "{{ item.title | default('') }}"
+  when: item.title is defined
   tags:
     - normalize
-    - environments
+    - views
 
-- name: "Normalize | Repositories: add key_name (ssh_key_id -> name)"
+- name: "Normalize | Repositories: add key_name and strip runtime ids"
   ansible.builtin.set_fact:
     _repos_norm: "{{ _repos_norm | default([]) + [ _repo_item ] }}"
   vars:
     _repo_item: >-
       {{
-        item
+        (
+          item
+          | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
+          | rejectattr('key', 'equalto', 'ssh_key_id')
+          | list
+          | items2dict
+        )
         | combine(
             { 'key_name': (_key_name_by_id[item.ssh_key_id] | default(omit)) },
             recursive=True
@@ -132,12 +158,29 @@
   vars:
     _inv_item: >-
       {{
-        item
+        (
+          item
+          | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
+          | rejectattr('key', 'equalto', 'template_id')
+          | rejectattr('key', 'equalto', 'repository_id')
+          | rejectattr('key', 'equalto', 'ssh_key_id')
+          | rejectattr('key', 'equalto', 'become_key_id')
+          | rejectattr('key', 'equalto', 'inventory')
+          | rejectattr('key', 'equalto', 'inventory_file')
+          | list
+          | items2dict
+        )
         | combine(
             {
               'ssh_key_name': (_key_name_by_id[item.ssh_key_id] | default(omit)),
               'become_key_name': (_key_name_by_id[item.become_key_id] | default(omit)),
               'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
+              'inventory': (
+                ((item.type | default('')) != 'file')
+                  | ternary(item.inventory | default(omit), omit)
+              ),
               'inventory_file': (
                 ((item.type | default('')) == 'file')
                   | ternary(item.inventory, omit)
@@ -153,23 +196,70 @@
     - normalize
     - inventories
 
+- name: "Normalize | Environments: convert env/json and replace secrets with vault placeholders"
+  ansible.builtin.include_tasks:
+    file: "normalize_environment_item.yml"
+  loop: "{{ _environments_list }}"
+  loop_control:
+    loop_var: env_item
+    label: "{{ env_item.name | default('') }}"
+  no_log: "{{ project_backup_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - normalize
+    - environments
+
 - name: "Normalize | Templates: convert *_id references to *_name fields and parse arguments"
   ansible.builtin.set_fact:
     _tpls_norm: "{{ _tpls_norm | default([]) + [ _tpl_item ] }}"
   vars:
+    _tpl_vaults: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- for vault in (item.vaults | default([], true)) -%}
+      {%- set entry = {'type': (vault.type | default('password'))} -%}
+      {%- if vault.name is defined and vault.name is not none -%}
+      {%- set _ = entry.update({'name': vault.name}) -%}
+      {%- endif -%}
+      {%- if vault.script is defined and vault.script is not none -%}
+      {%- set _ = entry.update({'script': vault.script}) -%}
+      {%- endif -%}
+      {%- if (vault.type | default('')) == 'password' and vault.vault_key_id is defined and (vault.vault_key_id in (_key_name_by_id | default({}))) -%}
+      {%- set _ = entry.update({'vault_key_name': _key_name_by_id[vault.vault_key_id]}) -%}
+      {%- endif -%}
+      {%- set ns.items = ns.items + [entry] -%}
+      {%- endfor -%}
+      {{ ns.items }}
     _tpl_item: >-
       {{
-        item
+        (
+          item
+          | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
+          | rejectattr('key', 'equalto', 'repository_id')
+          | rejectattr('key', 'equalto', 'inventory_id')
+          | rejectattr('key', 'equalto', 'environment_id')
+          | rejectattr('key', 'equalto', 'view_id')
+          | rejectattr('key', 'equalto', 'build_template_id')
+          | rejectattr('key', 'equalto', 'last_task')
+          | rejectattr('key', 'equalto', 'tasks')
+          | rejectattr('key', 'equalto', 'vaults')
+          | rejectattr('key', 'equalto', 'type')
+          | rejectattr('key', 'equalto', 'arguments')
+          | list
+          | items2dict
+        )
         | combine(
             {
               'inventory_name': (_inv_name_by_id[item.inventory_id] | default(omit)),
               'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
               'environment_name': (_env_name_by_id[item.environment_id] | default(omit)),
               'view_title': (_view_title_by_id[item.view_id] | default(omit)),
+              'type': (item.type | default('', true)),
               'arguments': (
                 (item.arguments is string)
-                  | ternary(item.arguments | from_json, (item.arguments | default([])))
-              )
+                  | ternary(item.arguments | from_json, (item.arguments | default([], true)))
+              ),
+              'vaults': _tpl_vaults
             },
             recursive=True
           )
@@ -185,21 +275,51 @@
   ansible.builtin.set_fact:
     _sched_norm: "{{ _sched_norm | default([]) + [ _sched_item ] }}"
   vars:
+    _schedule_vaults: >-
+      {%- set ns = namespace(items=[]) -%}
+      {%- for vault in (item.vaults | default([], true)) -%}
+      {%- set entry = {'type': (vault.type | default('password'))} -%}
+      {%- if vault.name is defined and vault.name is not none -%}
+      {%- set _ = entry.update({'name': vault.name}) -%}
+      {%- endif -%}
+      {%- if vault.script is defined and vault.script is not none -%}
+      {%- set _ = entry.update({'script': vault.script}) -%}
+      {%- endif -%}
+      {%- if (vault.type | default('')) == 'password' and vault.vault_key_id is defined and (vault.vault_key_id in (_key_name_by_id | default({}))) -%}
+      {%- set _ = entry.update({'vault_key_name': _key_name_by_id[vault.vault_key_id]}) -%}
+      {%- endif -%}
+      {%- set ns.items = ns.items + [entry] -%}
+      {%- endfor -%}
+      {{ ns.items }}
     _tpl_id: "{{ item.template_id | default(omit) }}"
     _tpl_name_resolved: >-
       {{
         (_tpl_id is not undefined and _tpl_id is not none)
           | ternary((_tpl_name_by_id[_tpl_id] | default(omit)), omit)
       }}
-    _args_raw: "{{ item.arguments | default([]) }}"
+    _args_raw: "{{ item.arguments | default([], true) }}"
     _args_list: "{{ _args_raw if (_args_raw is not string) else (_args_raw | from_json) }}"
     _sched_item: >-
       {{
-        item
+        (
+          item
+          | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
+          | rejectattr('key', 'equalto', 'repository_id')
+          | rejectattr('key', 'equalto', 'template_id')
+          | rejectattr('key', 'equalto', 'tpl_name')
+          | rejectattr('key', 'equalto', 'type')
+          | rejectattr('key', 'equalto', 'arguments')
+          | rejectattr('key', 'equalto', 'vaults')
+          | list
+          | items2dict
+        )
         | combine(
             {
               'template_name': (_tpl_name_resolved | default(item.tpl_name | default(omit))),
-              'arguments': (_args_list | default([]))
+              'arguments': (_args_list | default([])),
+              'vaults': _schedule_vaults
             },
             recursive=True
           )
@@ -217,7 +337,17 @@
   vars:
     _int_item: >-
       {{
-        item
+        (
+          item
+          | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
+          | rejectattr('key', 'equalto', 'template_id')
+          | rejectattr('key', 'equalto', 'auth_secret_id')
+          | rejectattr('key', 'equalto', 'searchable')
+          | list
+          | items2dict
+        )
         | combine(
             {
               'template_name': (_tpl_name_by_id[item.template_id] | default(omit)),

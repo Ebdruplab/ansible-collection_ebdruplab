@@ -169,7 +169,7 @@
           users_access: "{{ _users_access_norm | default([]) }}"
           keys: "{{ dict((_keys_norm | default([]) | map(attribute='name') | list) | zip((_keys_norm | default([])))) }}"
           repositories: "{{ _repos_norm | default([]) }}"
-          views: "{{ dict((_views_list | map(attribute='title') | list) | zip(_views_list)) }}"
+          views: "{{ dict((_views_norm | default([]) | map(attribute='title') | list) | zip((_views_norm | default([])))) }}"
           inventories: "{{ dict((_invs_norm | default([]) | map(attribute='name') | list) | zip((_invs_norm | default([])))) }}"
           environments: "{{ dict((_envs_norm | default([]) | map(attribute='name') | list) | zip((_envs_norm | default([])))) }}"
           templates: "{{ dict((_tpls_norm | default([]) | map(attribute='name') | list) | zip((_tpls_norm | default([])))) }}"
