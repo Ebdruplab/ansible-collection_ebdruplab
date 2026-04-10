@@ -3,6 +3,7 @@
   ebdruplab.semaphoreui.user_list:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie }}"
   register: _all_users
   when: project_deploy_config.users_access is defined
@@ -29,6 +30,7 @@
   ebdruplab.semaphoreui.project_user_list:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
     sort: name
@@ -76,6 +78,7 @@
   ebdruplab.semaphoreui.project_user_create:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
     user:
@@ -102,6 +105,7 @@
   ebdruplab.semaphoreui.project_user_update:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
     user_id: "{{ _uname_to_id[item.username] }}"
@@ -164,6 +168,7 @@
   ebdruplab.semaphoreui.project_user_delete:
     host: "{{ project_deploy_semaphore_host }}"
     port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
     session_cookie: "{{ login_result.session_cookie }}"
     project_id: "{{ current_project_id }}"
     user_id: "{{ item.id }}"

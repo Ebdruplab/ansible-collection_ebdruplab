@@ -117,6 +117,8 @@
         (
           env_item
           | dict2items
+          | rejectattr('key', 'equalto', 'id')
+          | rejectattr('key', 'equalto', 'project_id')
           | rejectattr('key', 'equalto', 'password')
           | rejectattr('key', 'equalto', 'env')
           | rejectattr('key', 'equalto', 'json')
@@ -128,11 +130,11 @@
             {
               'env': (
                 (env_item.env is string)
-                | ternary(env_item.env | from_yaml, (env_item.env | default({})))
+                | ternary(env_item.env | from_yaml, (env_item.env | default({}, true)))
               ),
               'json': (
                 (env_item.json is string)
-                | ternary(env_item.json | from_json, (env_item.json | default({})))
+                | ternary(env_item.json | from_json, (env_item.json | default({}, true)))
               ),
               'secrets': (
                 _project_backup_environment_secrets_by_key

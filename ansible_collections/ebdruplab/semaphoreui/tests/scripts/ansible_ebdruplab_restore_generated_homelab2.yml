@@ -1,0 +1,125 @@
+# ANSIBLE_COLLECTIONS_PATH=/home/kristian/git/ebdruplab/ansible-collection_ebdruplab ansible-playbook -i localhost, -c local ansible_collections/ebdruplab/semaphoreui/tests/scripts/ansible_ebdruplab_restore_generated_homelab2.yml
+
+---
+- name: Restore generated Semaphore project as Homelab2
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    semaphore_host: "https://semaphore.home.ebdruplab.dk"
+    semaphore_port: 443
+    restored_project_name: "Homelab2"
+    project_deploy_force_project_update: false
+
+  vars_prompt:
+    - name: project_deploy_semaphore_username
+      prompt: "Semaphore username"
+      private: false
+
+    - name: project_deploy_semaphore_password
+      prompt: "Semaphore password"
+      private: true
+
+  vars_files:
+    - generated/generated.project_deploy.yml
+    - generated/example.project_backup.secrets.yml
+    - generated/example.project_backup.key_logins.yml
+
+  pre_tasks:
+    - name: Seed empty login_result when using API token auth
+      ansible.builtin.set_fact:
+        login_result:
+          session_cookie: ""
+      when:
+        - project_deploy_semaphore_api_token is defined
+        - project_deploy_semaphore_api_token | length > 0
+
+    - name: Build normalized environment overrides from generated backup
+      ansible.builtin.set_fact:
+        restored_environment_overrides: >-
+          {{
+            (restored_environment_overrides | default({}))
+            | combine(
+                {
+                  item.key: (
+                    item.value
+                    | combine(
+                        {
+                          'env': (item.value.env | default({}, true)),
+                          'json': (item.value.json | default({}, true)),
+                          'secrets': (item.value.secrets | default([], true))
+                        },
+                        recursive=True
+                      )
+                  )
+                },
+                recursive=True
+              )
+          }}
+      loop: "{{ project_deploy_config.environments | default({}) | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Build normalized template overrides from generated backup
+      ansible.builtin.set_fact:
+        restored_template_overrides: >-
+          {{
+            (restored_template_overrides | default({}))
+            | combine(
+                {
+                  item.key: (
+                    item.value
+                    | combine(
+                        {
+                          'type': (item.value.type | default('', true))
+                        },
+                        recursive=True
+                      )
+                  )
+                },
+                recursive=True
+              )
+          }}
+      loop: "{{ project_deploy_config.templates | default({}) | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+
+    - name: Override project name and missing key logins from generated backup
+      ansible.builtin.set_fact:
+        project_deploy_config: >-
+          {{
+            project_deploy_config
+            | combine(
+                {
+                  'project': (
+                    project_deploy_config.project
+                    | combine({'name': restored_project_name}, recursive=True)
+                  )
+                },
+                recursive=True
+              )
+            | combine(
+                {
+                  'keys': (
+                    project_deploy_config['keys']
+                    | combine(restored_key_login_overrides | default({}), recursive=True)
+                  ),
+                  'environments': (
+                    project_deploy_config.environments
+                    | combine(restored_environment_overrides | default({}), recursive=True)
+                  ),
+                  'templates': (
+                    project_deploy_config.templates
+                    | combine(restored_template_overrides | default({}), recursive=True)
+                  )
+                },
+                recursive=True
+              )
+          }}
+
+  roles:
+    - role: ebdruplab.semaphoreui.project_deploy
+      vars:
+        project_deploy_semaphore_host: "{{ semaphore_host }}"
+        project_deploy_semaphore_port: "{{ semaphore_port }}"
