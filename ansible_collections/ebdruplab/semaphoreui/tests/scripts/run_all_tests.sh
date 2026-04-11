@@ -50,7 +50,7 @@ function build_and_install_collection() {
 
     ansible-galaxy collection build --force
 
-    archive_name=$(ls *.tar.gz | head -n 1)
+    archive_name=$(ls -t ebdruplab-semaphoreui-*.tar.gz 2>/dev/null | head -n 1)
     if [ -z "$archive_name" ]; then
         error "Collection archive was not created."
         exit 1

@@ -1,6 +1,36 @@
 Changelog
 =========
 
+Version 4.0.0
+-------------
+
+Changes since Version 3.0.0
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- Added the new high-level role ``ebdruplab.semaphoreui.project_backup``.
+  - Reads an existing Semaphore project and writes it as a ``project_deploy``-compatible YAML file.
+  - Collects project settings, users, keys, repositories, views, inventories, environments, templates, schedules, integrations, and integration extraction values.
+  - Replaces secret values with Ansible Vault placeholders and also writes the generated placeholder names under ``project_backup_vault_variables``.
+  - Makes it easier to back up an existing project, keep it in Git, and later redeploy it with ``ebdruplab.semaphoreui.project_deploy``.
+
+- Expanded test coverage for the new backup flow.
+  - Added integration coverage that verifies the generated backup structure, placeholder handling, and repeated-run stability.
+
+- Improved the ``ebdruplab.semaphoreui.project_deploy`` role.
+  - Continued the role overhaul around project synchronization, idempotence, and integration extraction value handling.
+  - The role remains the main companion to ``project_backup`` for redeploying generated project YAML.
+
+- Documentation overhaul.
+  - Reworked the role README files to be simpler and easier to read.
+  - Added a clearer usage guide for ``project_backup``, including what to do with generated vault variables.
+  - Added simple example files for ``project_backup`` under ``roles/project_backup/examples/``.
+  - Added simple example files for ``project_deploy`` under ``roles/project_deploy/examples/``.
+
+Notes
+~~~~~
+
+- This release is versioned as ``4.0.0`` to mark the addition of the new backup role and the broader role/documentation overhaul since ``3.0.0``.
+
 Version 3.0.0
 -------------
 

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT-0
+---
+project_backup_semaphore_host: "https://semaphore.example.com"
+project_backup_semaphore_port: 3000
+project_backup_semaphore_username: "admin"
+project_backup_semaphore_password: "{{ vault_semaphore_password }}"
+# project_backup_semaphore_api_token: "{{ vault_semaphore_api_token }}"
+
+project_backup_project_name: "My Project"
+# project_backup_project_id: 1
+
+project_backup_output_dir: "{{ playbook_dir }}/generated"
+project_backup_output_filename: "generated.project_deploy.yml"
+
+project_backup_sensitive_data_no_log: true

@@ -5,7 +5,7 @@
 
 from ansible.module_utils.basic import AnsibleModule
 from ..module_utils.semaphore_api import (
-    semaphore_request,
+    semaphore_request_allow_status,
     get_auth_headers,
     sanitize_check_mode_value,
 )
@@ -760,12 +760,12 @@ def _prune_none(d):
 
 
 def _http_get(url, headers, validate_certs):
-    return semaphore_request("GET", url, body=None, headers=headers, validate_certs=validate_certs)
+    return semaphore_request_allow_status("GET", url, body=None, headers=headers, validate_certs=validate_certs)
 
 
 def _http_put(url, payload, headers, validate_certs):
     body = json.dumps(payload).encode("utf-8")
-    return semaphore_request("PUT", url, body=body, headers=headers, validate_certs=validate_certs)
+    return semaphore_request_allow_status("PUT", url, body=body, headers=headers, validate_certs=validate_certs)
 
 
 def main():
@@ -928,10 +928,6 @@ def main():
     # 3) Merge user changes into existing object (full PUT semantics)
     merged = copy.deepcopy(existing)
 
-    # Ensure IDs match URL
-    merged["id"] = template_id
-    merged["project_id"] = project_id
-
     # Apply user-provided fields onto merged
     # IMPORTANT: Only apply prompt_* if user explicitly provided them
     for k, v in user_tpl.items():
@@ -939,6 +935,10 @@ def main():
             # Defensive; should never hit due to dict iteration
             continue
         merged[k] = v
+
+    # Ensure IDs always match the URL params, even if the caller supplied them in the payload.
+    merged["id"] = template_id
+    merged["project_id"] = project_id
 
     # Keep allow_parallel alias stable
     if "allow_parallel_tasks" in merged:

@@ -293,7 +293,8 @@ def main():
     # Only keep/use auth_header for token/hmac; set smarter defaults
     if integ.get("auth_method") in ("token", "hmac"):
         default_header = "X-Hub-Signature-256" if integ["auth_method"] == "hmac" else "token"
-        integ["auth_header"] = integ.get("auth_header", default_header)
+        ah = integ.get("auth_header")
+        integ["auth_header"] = ah if (isinstance(ah, str) and ah.strip()) else default_header
     else:
         integ.pop("auth_header", None)
 

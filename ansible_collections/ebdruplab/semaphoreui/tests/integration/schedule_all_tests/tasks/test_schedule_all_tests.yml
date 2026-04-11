@@ -306,6 +306,14 @@
         project_id: "{{ create_project.project.id }}"
         repository_id: "{{ repository_id }}"
 
+    - name: "Delete The Inventory Before Removing The Key"
+      ebdruplab.semaphoreui.project_inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        inventory_id: "{{ inventory_id }}"
+
     - name: "Wait Briefly For Semaphore To Release Key Usage"
       ansible.builtin.pause:
         seconds: 1

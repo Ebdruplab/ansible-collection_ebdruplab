@@ -1,0 +1,66 @@
+# SPDX-License-Identifier: MIT-0
+---
+project_deploy_semaphore_host: "https://semaphore.example.com"
+project_deploy_semaphore_port: 3000
+project_deploy_semaphore_username: "admin"
+project_deploy_semaphore_password: "{{ vault_semaphore_password }}"
+# project_deploy_semaphore_api_token: "{{ vault_semaphore_api_token }}"
+
+project_deploy_force_project_update: true
+project_deploy_sensitive_data_no_log: true
+
+project_deploy_config:
+  project:
+    name: "My Project"
+    alert: false
+    alert_chat: ""
+    max_parallel_tasks: 0
+    demo: false
+
+  users_access:
+    - username: "admin"
+      role: "Owner"
+
+  keys:
+    repo_login:
+      name: "Git Login"
+      type: login_password
+      login_password:
+        login: "git-user"
+        password: "{{ vault_git_password }}"
+
+  repositories:
+    - name: "Example Repo"
+      git_url: "https://github.com/example/repo.git"
+      git_branch: "main"
+      key_name: "Git Login"
+
+  views:
+    main:
+      title: "Main"
+      position: 0
+
+  inventories:
+    local_inventory:
+      name: "Local Inventory"
+      type: "static"
+      inventory: "localhost ansible_connection=local"
+
+  environments:
+    default_env:
+      name: "Default Environment"
+      env:
+        APP_ENV: "prod"
+
+  templates:
+    deploy_job:
+      name: "Deploy"
+      type: "job"
+      repository_name: "Example Repo"
+      inventory_name: "Local Inventory"
+      environment_name: "Default Environment"
+      view_title: "Main"
+      playbook: "playbooks/site.yml"
+
+  schedules: {}
+  integrations: {}
