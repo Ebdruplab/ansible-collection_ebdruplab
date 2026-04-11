@@ -1,47 +1,81 @@
-# Ansible Role — `ebdruplab.semaphoreui.project_deploy`
+# Ansible Role: `ebdruplab.semaphoreui.project_deploy`
 
-Deploy a complete Semaphore project from one declarative variable tree.
-The role authenticates (API token or username/password), validates your configuration, optionally deletes an existing project, and then creates or synchronizes **keys, repositories, views, inventories, environments, templates, schedules, and integrations** — idempotently.
+This role deploys a full Semaphore project from one YAML configuration.
 
-From **v2.0.6**, integrations can also define **extraction values**, allowing request data (for example HTTP headers) to be mapped to environment variables for integration-triggered tasks.
+It can create or update:
 
-A working example can be found in the repository’s **`tests/`** directory.
+- the project itself
+- project users
+- keys
+- repositories
+- views
+- inventories
+- environments
+- templates
+- schedules
+- integrations
+- integration extraction values
 
----
+The goal is simple: describe your project once in YAML and let the role build it in Semaphore.
 
 ## Requirements
 
-* Ansible 2.16.0+
-* Collection: `ebdruplab.semaphoreui` (this role lives inside it)
-* A reachable Semaphore instance
+- Ansible 2.16+
+- The `ebdruplab.semaphoreui` collection
+- A working Semaphore instance
+- Login credentials or an API token
 
----
+## Main Variables
 
-## Defaults (quick view)
+### Connection
 
 ```yaml
-# Connection
 project_deploy_semaphore_host: "http://localhost"
 project_deploy_semaphore_port: 3000
 project_deploy_semaphore_username: "admin"
 project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
+```
 
-# Safety
+You can use either:
+
+- username and password
+- API token
+
+### Safety Flags
+
+```yaml
 project_deploy_debug: false
 project_deploy_sensitive_data_no_log: true
 project_deploy_force_project_creation: false
 project_deploy_force_project_update: false
 project_deploy_force_project_delete: false
 project_deploy_force_project_delete_timer: 5
-
-# Pruning (delete items not present in your YAML)
 project_deploy_variable_delete: false
+```
 
-# Declarative config
+What they do:
+
+- `project_deploy_force_project_update`: update an existing project with the same name
+- `project_deploy_force_project_delete`: delete and recreate the project
+- `project_deploy_force_project_creation`: create a new project even if one with the same name already exists
+- `project_deploy_variable_delete`: remove items in Semaphore that are not present in your YAML
+
+## Basic Configuration
+
+```yaml
 project_deploy_config:
-  project: {}
-  users_access: []
+  project:
+    name: "My Project"
+    alert: false
+    alert_chat: ""
+    max_parallel_tasks: 0
+    demo: false
+
+  users_access:
+    - username: "admin"
+      role: "Owner"
+
   keys: {}
   repositories: []
   views: {}
@@ -52,220 +86,110 @@ project_deploy_config:
   integrations: {}
 ```
 
-> If you previously used empty lists (`[]`) for map-based sections, switch to `{}`.
-> Most task files iterate using `dict2items`.
+Use `{}` for map-based sections like `keys`, `views`, `inventories`, `environments`, `templates`, `schedules`, and `integrations`.
 
----
-
-## What the role does
-
-1. **Authenticate**
-
-   * API token **or**
-   * Username/password
-
-2. **Preflight validation** of `project_deploy_config`
-
-3. **Project handling**
-
-   * No project found → **create**
-   * Project found → behavior controlled by flags:
-
-     * `project_deploy_force_project_delete` → delete → create fresh
-     * `project_deploy_force_project_creation` → create another project with same name
-     * `project_deploy_force_project_update` → reuse and sync resources
-     * Otherwise → fail safely
-
-4. **Create / sync resources in order**
-
-   ```
-   keys → repositories → views → inventories → environments
-        → templates → schedules → integrations → integration extraction values
-   ```
-
-5. **Expose lookup maps** for resolving IDs by name:
-
-   * `created_keys_by_name`
-   * `created_repos_by_name`
-   * `created_project_view_by_title`
-   * `created_inventory_by_name`
-   * `created_environments_by_name`
-   * `created_templates_by_name`
-   * `created_schedules_by_name`
-   * `created_integrations_by_name`
-
-6. **Pruning** (when enabled)
-
-   * Removes existing resources in Semaphore that are **not** present in your YAML
-
----
-
-## Variable schema (overview)
+## Simple Example
 
 ```yaml
 project_deploy_config:
   project:
-    name: "Your Project"
-    alert: false
-    alert_chat: ""
-    max_parallel_tasks: 0
-    demo: false
+    name: "Demo Project"
 
   users_access:
     - username: "admin"
       role: "Owner"
 
   keys:
-    key_handle:
-      name: "Human Name"
-      type: ssh | login_password
-      ssh:
-        login: "ansibleuser"
-        passphrase: "{{ vault_passphrase }}"
-        private_key: "{{ vault_private_key }}"
+    repo_key:
+      name: "Git Login"
+      type: login_password
       login_password:
-        login: "Git User"
+        login: "git-user"
         password: "{{ vault_git_password }}"
 
   repositories:
-    - name: "Repo Name"
-      git_url: "https://github.com/org/repo.git"
+    - name: "Example Repo"
+      git_url: "https://github.com/example/repo.git"
       git_branch: "main"
-      key_name: "Human Name of a key"
+      key_name: "Git Login"
 
   views:
-    my_view:
-      title: "Board Column"
+    main:
+      title: "Main"
       position: 0
 
   inventories:
-    inv1:
-      name: "Static YAML"
-      type: static-yaml | static | file
-      inventory: {}
-      repository_name: "Repo Name"
-      inventory_file: "path/in/repo.ini"
-      ssh_key_name: "SSH key name"
-      become_key_name: "SSH key name (become)"
+    local_inventory:
+      name: "Local Inventory"
+      type: static
+      inventory: "localhost ansible_connection=local"
 
   environments:
-    env1:
-      name: "Env Name"
-      env: { KEY: "value" }
-      json: { foo: "bar" }
-      secrets:
-        - name: "DB_PASSWORD"
-          secret: "{{ vault_db_password }}"
-          type: env
+    default_env:
+      name: "Default Environment"
+      env:
+        APP_ENV: "prod"
 
   templates:
-    job1:
-      name: "Run Example"
-      app: "ansible"
-      type: "job"
-      repository_name: "Repo Name"
-      inventory_name: "Inventory Name"
-      environment_name: "Env Name"
-      view_title: "Board Column"
+    deploy_job:
+      name: "Deploy"
+      type: job
+      repository_name: "Example Repo"
+      inventory_name: "Local Inventory"
+      environment_name: "Default Environment"
+      view_title: "Main"
       playbook: "playbooks/site.yml"
-      arguments: []
-      tags:
-        - web
-        - prod
-
-  schedules:
-    nightly_example:
-      name: "Nightly – Run Example"
-      cron_format: "0 3 * * *"
-      template_name: "Run Example"
-      active: false
-
-  integrations:
-    webhook_hmac:
-      name: "Deploy via HMAC"
-      template_name: "Run Example"
-      auth_method: "HMAC"
-      auth_header: "token"
-      auth_secret_name: "hmac-secret"
-      task_params:
-        diff: false
-        dry_run: false
-
-      # OPTIONAL (v2.0.6+)
-      extraction_values:
-        - name: "Extract Environment"
-          key: "X-Env"
-          value_source: "header"
-          variable_type: "environment"
-          variable: "DEPLOY_ENV"
-
-        - name: "Extract Service"
-          key: "X-Service"
-          value_source: "header"
-          variable_type: "environment"
-          variable: "SERVICE_NAME"
 ```
 
----
+## Examples
 
-## Notes on fields and behavior
+Simple example files are included in:
 
-### Templates
+- `examples/basic.yml`
+- `examples/vars.yml`
 
-* `*_name` fields are automatically resolved to IDs.
-* `arguments` may be string, list, or dict; lists/dicts are serialized to JSON.
-* `tags` are authored as a list and converted to newline-separated strings.
+Run it like this:
 
-### Schedules
+```bash
+ansible-playbook examples/basic.yml
+```
 
-* The API requires `template_id`; `template_name` is resolved automatically.
-
-### Integrations
-
-* `auth_method` uses UI-friendly values; the module converts internally.
-* `auth_header` applies only to Token/HMAC and defaults to `"token"`.
-* Only `diff` and `dry_run` are configurable in `task_params`.
-
-### Integration Extraction Values (v2.0.6+)
-
-* Optional and **fully backwards compatible**
-* Created only when `extraction_values` is defined
-* Map incoming request data (headers, payload, query) to task variables
-* Existing integrations without extraction values are unaffected
-
-### Pruning
-
-* When `project_deploy_variable_delete: true`, resources not present in YAML are removed.
-
----
-
-## Example play
+## Example Playbook
 
 ```yaml
 - hosts: localhost
+  gather_facts: false
   vars_files:
     - vars/project.yml
   roles:
     - role: ebdruplab.semaphoreui.project_deploy
 ```
 
----
+## How It Works
 
-## Tips
+The role will:
 
-* Name-based references are preferred; IDs override names if both are set.
-* Enable `project_deploy_debug: true` to inspect intermediate resolution maps.
-* Extraction values are additive and safe to introduce incrementally.
+1. authenticate to Semaphore
+2. validate your config
+3. create the project if it does not exist
+4. update the project if `project_deploy_force_project_update` is enabled
+5. create or sync the project resources in the correct order
 
----
+If a project already exists and no force flag is enabled, the role fails safely instead of changing it by accident.
+
+## Notes
+
+- Name-based references such as `repository_name`, `inventory_name`, `environment_name`, and `template_name` are resolved automatically.
+- Integrations can include `extraction_values` if you want to map headers, payload values, or query values into variables.
+- Set `project_deploy_debug: true` if you want extra debug output while testing.
+- A full working example is available in the role `tests/` folder.
 
 ## License
 
 MIT
 
-## Author
+## Author Information
 
-Kristian Ebdrup — [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)
+Kristian Ebdrup  
+Email: [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)  
 GitHub: [https://github.com/kris9854](https://github.com/kris9854)
-
-> See the **`tests/`** directory for a runnable end-to-end example.

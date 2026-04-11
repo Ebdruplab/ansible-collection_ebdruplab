@@ -188,6 +188,7 @@
   loop: "{{ _desired_integrations }}"
   loop_control:
     label: "{{ item.name }}"
+  register: _created_integrations
   no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
   tags:
     - project_deploy
@@ -239,6 +240,55 @@
     - project_deploy
     - integrations
     - facts
+
+- name: "Normalize Newly Created Integrations To Final Update Shape"
+  ebdruplab.semaphoreui.project_integration_update:
+    host: "{{ project_deploy_semaphore_host }}"
+    port: "{{ project_deploy_semaphore_port }}"
+    api_token: "{{ project_deploy_semaphore_api_token | default(omit) }}"
+    session_cookie: "{{ login_result.session_cookie | default(omit) }}"
+    project_id: "{{ current_project_id }}"
+    integration_id: "{{ integrations_by_name_after[item.name] | int }}"
+    integration:
+      name: "{{ item.name }}"
+      template_id: >-
+        {{
+          (item.template_id | int)
+          if (item.template_id is defined)
+          else (
+            (templates_by_name_all[item.template_name] | int)
+            if (item.template_name is defined and (item.template_name in (templates_by_name_all | default({}))))
+            else omit
+          )
+        }}
+      auth_method: "{{ item.auth_method | default(omit) }}"
+      auth_header: "{{ item.auth_header | default(omit) }}"
+      auth_secret_id: >-
+        {{
+          (item.auth_secret_id | int)
+          if (item.auth_secret_id is defined)
+          else (
+            (created_keys_by_name[item.auth_secret_name].id | int)
+            if (
+              item.auth_secret_name is defined and
+              created_keys_by_name is defined and
+              (item.auth_secret_name in created_keys_by_name)
+            )
+            else omit
+          )
+        }}
+      task_params: "{{ item.task_params | default(omit) }}"
+  when:
+    - item.name in (integrations_by_name_after | default({}))
+    - item.name not in (integrations_by_name | default({}))
+  loop: "{{ _desired_integrations }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: "{{ project_deploy_sensitive_data_no_log | default(true) | bool }}"
+  tags:
+    - project_deploy
+    - integrations
+    - normalize
 
 - name: "List existing extraction values for integrations with extraction configuration"
   ebdruplab.semaphoreui.project_integration_extraction_value_list:

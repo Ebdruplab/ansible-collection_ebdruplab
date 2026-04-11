@@ -1,22 +1,22 @@
 # Ansible Role: `ebdruplab.semaphoreui.project_backup`
 
-Generate a **`project_deploy_config`** structure from an existing Semaphore UI project and write it as **Ansible vars YAML**.
-The generated file can be committed to Git and later consumed directly by the
-`ebdruplab.semaphoreui.project_deploy` role to recreate the project.
+This role reads an existing Semaphore project and writes it to a YAML file.
 
-This role **reads live project state** from Semaphore (projects, keys, repos, inventories, templates, schedules, integrations, etc.) and converts it into the declarative format expected by `project_deploy`.
+The generated file is made for the `ebdruplab.semaphoreui.project_deploy` role, so you can:
+
+- back up a project
+- save it in Git
+- redeploy it later
+- move it to another Semaphore instance
 
 ## Requirements
 
-* Ansible **2.10+**
-* A reachable Semaphore UI instance
-* Ansible collection: `ebdruplab.semaphoreui`
-* Valid authentication:
+- Ansible 2.10+
+- A reachable Semaphore instance
+- The `ebdruplab.semaphoreui` collection
+- Login credentials or an API token
 
-  * Username/password **or**
-  * API token
-
-## Role Variables
+## Main Variables
 
 ### General
 
@@ -24,12 +24,6 @@ This role **reads live project state** from Semaphore (projects, keys, repos, in
 project_backup_debug: false
 project_backup_sensitive_data_no_log: true
 ```
-
-* `project_backup_debug`
-  Enable additional debug output.
-
-* `project_backup_sensitive_data_no_log`
-  Prevents sensitive values from appearing in Ansible logs.
 
 ### Connection and authentication
 
@@ -41,25 +35,21 @@ project_backup_semaphore_password: "changeme"
 # project_backup_semaphore_api_token: "KEY"
 ```
 
-Authentication is handled internally by the role using `login.yml` and `logout.yml`.
+You can use either:
 
-### Target project selection
+- username and password
+- API token
 
-You must select **exactly one project**.
+### Target project
 
-Project **name is preferred**.
-If a name is provided, it is always used even if an ID is set.
+Use one of these:
 
 ```yaml
 project_backup_project_name: ""
 project_backup_project_id: 0
 ```
 
-Resolution logic:
-
-1. If `project_backup_project_name` is set → resolve project ID by name
-2. Otherwise → use `project_backup_project_id`
-3. Fail if neither resolves to a valid project
+If both are set, the project name is preferred.
 
 ### Output
 
@@ -68,9 +58,9 @@ project_backup_output_dir: "{{ playbook_dir }}/.backup/generated_vars"
 project_backup_output_filename: "generated.project_deploy.yml"
 ```
 
-The role writes a single YAML file containing the generated configuration.
+This is where the generated YAML file will be written.
 
-### Vars structure
+### Generated file structure
 
 ```yaml
 project_backup_root_key: "project_deploy_config"
@@ -93,36 +83,53 @@ project_backup_vault_variables:
   - ansible_vault_MY_ENVIRONMENT_DB_PASSWORD_SECRET
 ```
 
-This format is **shaped for direct use by** `project_deploy`.
-Sensitive password-like values are replaced with Jinja expressions such as
-`{{ ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD }}` and the generated variable
-names are listed under `project_backup_vault_variables` so you can define them
-later in an encrypted vars file.
-Semaphore does not return raw key secret material through the API, so key-related
-vault variables are generated as placeholders that you must populate yourself.
+Sensitive values are replaced with vault variable placeholders.
+
+Example:
+
+```yaml
+password: "{{ ansible_vault_PROJECT_VAULT_PASSWORD_PASSWORD }}"
+```
+
+The variable names are also listed under `project_backup_vault_variables` so you can add them to an encrypted vars file.
 
 ## What the role does
 
-1. Resolves global or role-specific Semaphore connection variables
-2. Logs in to Semaphore
-3. Resolves the target project
-4. Collects:
+The role will:
 
-   * Project metadata
-   * Users access
-   * Keys
-   * Repositories
-   * Views
-   * Inventories
-   * Environments
-   * Templates
-   * Schedules
-   * Integrations
-   * Integration extraction values
-5. Normalizes all resources into `project_deploy`-compatible form
-6. Replaces password-like secrets with vault variable placeholders
-7. Writes a single vars YAML file
-8. Logs out of Semaphore
+1. connect to Semaphore
+2. find the project by name or ID
+3. read project data
+4. convert it into `project_deploy` format
+5. replace secret values with vault placeholders
+6. write the result to one YAML file
+
+The backup includes project data such as:
+
+- project settings
+- users
+- keys
+- repositories
+- views
+- inventories
+- environments
+- templates
+- schedules
+- integrations
+- integration extraction values
+
+## Examples
+
+Simple example files are included in:
+
+- `examples/basic.yml`
+- `examples/vars.yml`
+
+Run it like this:
+
+```bash
+ansible-playbook examples/basic.yml
+```
 
 ## Example Playbook
 
@@ -137,7 +144,7 @@ vault variables are generated as placeholders that you must populate yourself.
         project_backup_project_name: "My Project"
 ```
 
-## Using the output with `project_deploy`
+## Use the Output with `project_deploy`
 
 ```yaml
 vars_files:
@@ -163,13 +170,36 @@ ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET: !vault |
   ...
 ```
 
+## Recommended Workflow
+
+1. Run `project_backup` and generate `generated.project_deploy.yml`.
+2. Open the generated file and look at `project_backup_vault_variables`.
+3. Create a vaulted vars file and define each listed variable.
+4. Use both files together with `ebdruplab.semaphoreui.project_deploy`.
+
+Example:
+
+```yaml
+- hosts: localhost
+  gather_facts: false
+  vars_files:
+    - .backup/generated_vars/generated.project_deploy.yml
+    - vaulted.project_backup.secrets.yml
+  roles:
+    - role: ebdruplab.semaphoreui.project_deploy
+```
+
+This means `project_backup` can be used to generate the YAML, and `project_deploy` can later deploy that same YAML again.
+
+## Notes
+
+- This role is meant to work together with `ebdruplab.semaphoreui.project_deploy`.
+- The generated file is ready for Git, but you still need to define the vault variables for secret values.
+- Semaphore does not return raw key secret material, so some key-related secrets will be written as placeholders that you must fill in yourself.
+
 ## Dependencies
 
 None.
-
-Designed to work together with:
-
-* `ebdruplab.semaphoreui.project_deploy`
 
 ## License
 
@@ -177,5 +207,6 @@ MIT-0
 
 ## Author Information
 
-**Kristian Ebdrup**
+Kristian Ebdrup  
+Email: [kristian@ebdruplab.dk](mailto:kristian@ebdruplab.dk)  
 GitHub: [https://github.com/kris9854](https://github.com/kris9854)

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Backup a Semaphore project
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars.yml
+
+  roles:
+    - role: ebdruplab.semaphoreui.project_backup

@@ -7,6 +7,7 @@
     semaphore_port: 3000
     semaphore_username: "{{ lookup('env','ebdruplab_integration_test_USER') | default('admin', true) }}"
     semaphore_password: "{{ lookup('env','ebdruplab_integration_test_PW') | default('changeme', true) }}"
+    template_test_project_name: "template-get-test-project"
   tasks:
     - name: Log in to Semaphore
       ebdruplab.semaphoreui.login:
@@ -16,31 +17,70 @@
         password: "{{ semaphore_password }}"
       register: login_result
 
-    - name: Get list of projects
-      ebdruplab.semaphoreui.project_list:
+    - name: Create test project
+      ebdruplab.semaphoreui.project_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-      register: projects
+        name: "{{ template_test_project_name }}"
+        alert: false
+        alert_chat: ""
+        max_parallel_tasks: 0
+        demo: false
+      register: created_project
 
-    - name: Ensure at least one project exists
-      ansible.builtin.assert:
-        that:
-          - projects.projects | length > 0
+    - name: Create key for repository and inventory
+      ebdruplab.semaphoreui.project_key_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        name: "Template Test Key"
+        type: "login_password"
+        login_password:
+          login: "git-user"
+          password: "ChangeMe123"
+      register: created_key
+
+    - name: Create repository
+      ebdruplab.semaphoreui.project_repository_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        repository:
+          name: "Template Test Repository"
+          git_url: "https://github.com/example/repo.git"
+          git_branch: "main"
+          ssh_key_id: "{{ created_key.key.id }}"
+      register: created_repository
+
+    - name: Create inventory
+      ebdruplab.semaphoreui.project_inventory_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        inventory:
+          name: "Template Test Inventory"
+          type: "static"
+          inventory: "localhost ansible_connection=local"
+          ssh_key_id: "{{ created_key.key.id }}"
+      register: created_inventory
 
     - name: Create a template to update
       ebdruplab.semaphoreui.project_template_create:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         template:
           name: "Test Template"
           app: "ansible"
           playbook: "site.yml"
-          inventory_id: 1
-          repository_id: 1
-          environment_id: 1
+          inventory_id: "{{ created_inventory.inventory.id }}"
+          repository_id: "{{ created_repository.repository.id }}"
+          environment_id: null
           type: "job"
           allow_override_args_in_task: false
           survey_vars: []
@@ -51,17 +91,16 @@
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-        project_id: "{{ projects.projects[0].id }}"
+        project_id: "{{ created_project.project.id }}"
         template_id: "{{ created_template.template.id }}"
         template:
-          id: "{{ created_template.template.id }}"       # ← make sure this is here
+          id: "{{ created_template.template.id }}"
           name: "Updated Template"
           app: "ansible"
           playbook: "deploy.yml"
-          inventory_id: 1
-          repository_id: 1
-          environment_id: 1
-          view_id: 1
+          inventory_id: "{{ created_inventory.inventory.id }}"
+          repository_id: "{{ created_repository.repository.id }}"
+          environment_id: null
           description: "Updated Description"
           git_branch: "main"
           type: "job"
@@ -75,9 +114,47 @@
       ansible.builtin.debug:
         var: update_result
 
+    - name: Delete template
+      ebdruplab.semaphoreui.project_template_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        template_id: "{{ created_template.template.id }}"
+
+    - name: Delete inventory
+      ebdruplab.semaphoreui.project_inventory_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        inventory_id: "{{ created_inventory.inventory.id }}"
+
+    - name: Delete repository
+      ebdruplab.semaphoreui.project_repository_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        repository_id: "{{ created_repository.repository.id }}"
+
+    - name: Delete key
+      ebdruplab.semaphoreui.project_key_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+        key_id: "{{ created_key.key.id }}"
+
+    - name: Delete project
+      ebdruplab.semaphoreui.project_delete:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ created_project.project.id }}"
+
     - name: Log out
       ebdruplab.semaphoreui.logout:
         host: "{{ semaphore_host }}"
         port: "{{ semaphore_port }}"
         session_cookie: "{{ login_result.session_cookie }}"
-
