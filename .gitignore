@@ -5,4 +5,4 @@
 *.ansible/*.lock
 __pycache__/
 *.pyc
-ansible_collections\ebdruplab\semaphoreui\tests\scripts\generated\*
+ansible_collections/ebdruplab/semaphoreui/tests/scripts/generated/*
