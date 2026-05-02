@@ -173,9 +173,14 @@ ansible_vault_TEST_ENVIRONMENT_DB_PASSWORD_SECRET: !vault |
 ## Recommended Workflow
 
 1. Run `project_backup` and generate `generated.project_deploy.yml`.
-2. Open the generated file and look at `project_backup_vault_variables`.
-3. Create a vaulted vars file and define each listed variable.
-4. Use both files together with `ebdruplab.semaphoreui.project_deploy`.
+2. Open the generated file and review all generated key login values before using it.
+3. Pay special attention to:
+   - `project_deploy_config.keys.<name>.login_password.login`
+   - `project_deploy_config.keys.<name>.ssh.login`
+4. If you see placeholder values such as `CHANGE_ME_LOGIN` or `CHANGE_ME_SSH_LOGIN`, replace them with the real values.
+5. Open the generated file and look at `project_backup_vault_variables`.
+6. Create a vaulted vars file and define each listed variable.
+7. Use both files together with `ebdruplab.semaphoreui.project_deploy`.
 
 Example:
 
@@ -196,6 +201,7 @@ This means `project_backup` can be used to generate the YAML, and `project_deplo
 - This role is meant to work together with `ebdruplab.semaphoreui.project_deploy`.
 - The generated file is ready for Git, but you still need to define the vault variables for secret values.
 - Semaphore does not return raw key secret material, so some key-related secrets will be written as placeholders that you must fill in yourself.
+- Semaphore may also fail to return some key login fields through the API, so always review generated key login values before restoring or redeploying a backup.
 
 ## Dependencies
 
