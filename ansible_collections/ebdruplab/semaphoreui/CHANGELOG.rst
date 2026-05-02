@@ -1,6 +1,29 @@
 Changelog
 =========
 
+Version 4.0.1
+-------------
+
+Bug fixes
+~~~~~~~~~
+
+- Improved shared connection variable support for the high-level roles.
+  - ``ebdruplab.semaphoreui.project_deploy`` now accepts the shared
+    ``ebdruplab_semaphore_host``, ``ebdruplab_semaphore_port``,
+    ``ebdruplab_semaphore_username``, ``ebdruplab_semaphore_password``, and
+    ``ebdruplab_semaphore_api_token`` variables as fallbacks for the
+    role-specific ``project_deploy_semaphore_*`` connection settings.
+  - ``ebdruplab.semaphoreui.project_backup`` continues to support the shared
+    ``ebdruplab_semaphore_*`` variables, and its validation messages now make
+    that behavior explicit.
+
+Documentation
+~~~~~~~~~~~~~
+
+- Updated the ``project_deploy`` and ``project_backup`` role READMEs to show
+  that either the role-specific connection variables or the shared
+  ``ebdruplab_semaphore_*`` variables can be used.
+
 Version 4.0.0
 -------------
 

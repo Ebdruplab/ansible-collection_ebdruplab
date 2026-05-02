@@ -8,7 +8,10 @@
       - project_deploy_semaphore_host | length > 0
       - project_deploy_semaphore_port is defined
       - (project_deploy_semaphore_port | int) > 0
-    fail_msg: "Semaphore host/port must be set."
+    fail_msg: >-
+      Semaphore host/port must be set with either project_deploy_semaphore_host
+      and project_deploy_semaphore_port or the shared
+      ebdruplab_semaphore_host and ebdruplab_semaphore_port variables.
     quiet: true
 
 - name: "Validate authentication (token OR username+password)"
@@ -22,7 +25,10 @@
           and
           project_deploy_semaphore_password is defined and project_deploy_semaphore_password | length > 0
         )
-    fail_msg: "Provide either project_deploy_semaphore_api_token OR username+password."
+    fail_msg: >-
+      Provide either project_deploy_semaphore_api_token, the shared
+      ebdruplab_semaphore_api_token, or a username/password pair through the
+      project_deploy_semaphore_* or ebdruplab_semaphore_* variables.
     quiet: true
 
 - name: "Validate safety flags"

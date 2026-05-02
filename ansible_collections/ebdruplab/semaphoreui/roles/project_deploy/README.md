@@ -37,6 +37,16 @@ project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
 ```
 
+You can also use the shared connection variables instead of the role-specific ones:
+
+```yaml
+ebdruplab_semaphore_host: "http://localhost"
+ebdruplab_semaphore_port: 3000
+ebdruplab_semaphore_username: "admin"
+ebdruplab_semaphore_password: "changeme"
+# ebdruplab_semaphore_api_token: "KEY"
+```
+
 You can use either:
 
 - username and password

@@ -25,7 +25,8 @@
       - (project_backup_semaphore_port | int) > 0
     fail_msg: >-
       Missing connection config. Ensure project_backup_semaphore_host and
-      project_backup_semaphore_port are set.
+      project_backup_semaphore_port are set, or use the shared
+      ebdruplab_semaphore_host and ebdruplab_semaphore_port variables.
   tags:
     - preflight
     - assert
@@ -39,8 +40,10 @@
           and (project_backup_semaphore_password | default('') | length) > 0
         )
     fail_msg: >-
-      Missing auth config. Provide project_backup_semaphore_api_token OR both
-      project_backup_semaphore_username and project_backup_semaphore_password.
+      Missing auth config. Provide project_backup_semaphore_api_token, the
+      shared ebdruplab_semaphore_api_token, or both
+      project_backup_semaphore_username and project_backup_semaphore_password
+      through the project_backup_semaphore_* or ebdruplab_semaphore_* variables.
   tags:
     - preflight
     - assert
