@@ -8,10 +8,10 @@ project_backup_debug: false
 project_backup_sensitive_data_no_log: true
 
 ## Connection and authentication variables
-project_backup_semaphore_host: "http://localhost"
-project_backup_semaphore_port: 3000
-project_backup_semaphore_username: "admin"
-project_backup_semaphore_password: "changeme"
+# project_backup_semaphore_host: "http://localhost"
+# project_backup_semaphore_port: 3000
+# project_backup_semaphore_username: "admin"
+# project_backup_semaphore_password: "changeme"
 # project_backup_semaphore_api_token: "KEY"
 
 # Target project selector (prefer id; name used if id unset/0)

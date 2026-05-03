@@ -23,10 +23,10 @@ project_deploy_force_project_delete: false
 project_deploy_force_project_delete_timer: 5
 
 ## Connection and authentication variables
-project_deploy_semaphore_host: "http://localhost"
-project_deploy_semaphore_port: 3000
-project_deploy_semaphore_username: "admin"
-project_deploy_semaphore_password: "changeme"
+# project_deploy_semaphore_host: "http://localhost"
+# project_deploy_semaphore_port: 3000
+# project_deploy_semaphore_username: "admin"
+# project_deploy_semaphore_password: "changeme"
 # project_deploy_semaphore_api_token: "KEY"
 
 ## Project and resource definitions

@@ -44,6 +44,33 @@
 
 # --- Project ------------------------------------------------------------------
 
+- name: "Validate backup vault variable list shape (if provided)"
+  ansible.builtin.assert:
+    that:
+      - project_backup_vault_variables is sequence
+      - project_backup_vault_variables is not string
+    fail_msg: "project_backup_vault_variables must be a list of variable names."
+    quiet: true
+  when: project_backup_vault_variables is defined
+
+- name: "Validate backup vault variables are defined (if provided)"
+  ansible.builtin.assert:
+    that:
+      - project_deploy_missing_backup_vault_variables | length == 0
+    fail_msg: >-
+      project_backup_vault_variables is defined, but these required vault
+      variables are missing:
+      {{ project_deploy_missing_backup_vault_variables | join(', ') }}.
+      Load the vaulted vars file or define them before running project_deploy.
+    quiet: true
+  vars:
+    project_deploy_missing_backup_vault_variables: >-
+      {{
+        (project_backup_vault_variables | default([], true))
+        | difference(vars.keys() | list)
+      }}
+  when: project_backup_vault_variables is defined
+
 - name: "Validate project configuration"
   ansible.builtin.assert:
     that:

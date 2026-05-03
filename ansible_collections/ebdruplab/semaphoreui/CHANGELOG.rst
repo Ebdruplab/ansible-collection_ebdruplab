@@ -1,6 +1,17 @@
 Changelog
 =========
 
+Version 4.0.2
+-------------
+
+Bug fixes
+~~~~~~~~~
+
+- Improved ``ebdruplab.semaphoreui.project_deploy`` validation for backup-based restores.
+  - If ``project_backup_vault_variables`` is defined, the role now fails early when any listed vault variable is missing.
+  - This validation now happens before checking ``project_deploy_config.project.name``, so missing vaulted secrets produce a clearer error first.
+- Fixed a bug where setting the `ebdruplab_semaphore_*` variables ended up not taking effect - `ebdruplab.semaphoreui.project_deploy` and `ebdruplab.semaphoreui.project_backup`
+
 Version 4.0.1
 -------------
 

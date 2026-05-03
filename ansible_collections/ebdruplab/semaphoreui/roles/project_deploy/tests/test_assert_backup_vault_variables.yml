@@ -1,0 +1,32 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: "Project Deploy Missing Backup Vault Variables Test"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    project_deploy_semaphore_host: "http://localhost"
+    project_deploy_semaphore_port: 3000
+    project_deploy_semaphore_api_token: "dummy-token"
+    project_backup_vault_variables:
+      - "ansible_vault_missing_example_secret"
+    project_deploy_config: {}
+
+  tasks:
+    - name: "Assert role fails before project name validation when backup vault variables are missing"
+      block:
+        - name: "Include project_deploy role with a missing backup vault variable"
+          ansible.builtin.include_role:
+            name: ebdruplab.semaphoreui.project_deploy
+
+        - name: "Fail because the role should have stopped on missing backup vault variables"
+          ansible.builtin.fail:
+            msg: "Expected project_deploy to fail when project_backup_vault_variables contains undefined variables."
+      rescue:
+        - name: "Assert failure references the missing backup vault variable first"
+          ansible.builtin.assert:
+            that:
+              - ansible_failed_result is defined
+              - ansible_failed_result.failed | default(true) | bool
+              - "'ansible_vault_missing_example_secret' in (ansible_failed_result.msg | default(''))"
+              - "'project_deploy_config.project.name must be defined.' not in (ansible_failed_result.msg | default(''))"
+            quiet: true
