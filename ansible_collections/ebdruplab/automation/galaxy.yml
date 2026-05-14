@@ -1,0 +1,42 @@
+namespace: ebdruplab
+name: automation
+version: 1.0.0
+readme: README.md
+
+authors:
+  - Kristian Ebdrup <kristian@ebdruplab.dk>
+
+description: Ansible automation utilities, including callback plugins for triggering webhooks on playbook success, failure, or unreachable results.
+
+license:
+  - MIT
+
+tags:
+  - automation
+  - ansible
+  - callback
+  - webhook
+  - api_call
+  - devops
+  - infrastructure
+  - semaphoreui
+
+dependencies: {}
+
+repository: https://github.com/ebdruplab/ansible-collection_ebdruplab
+documentation: https://github.com/ebdruplab/ansible-collection_ebdruplab
+homepage: https://github.com/Ebdruplab/ansible-collection_ebdruplab/tree/main/ebdruplab/automation
+issues: https://github.com/Ebdruplab/ansible-collection_ebdruplab/issues
+
+build_ignore:
+  - tools
+  - setup.cfg
+  - galaxy.yml.j2
+  - template_galaxy.yml
+  - '*.tar.gz'
+  - 'test/*'
+  - '.gitignore'
+  - '*.zip'
+  - '__pycache__'
+  - '**/__pycache__'
+  - '*.pyc'
