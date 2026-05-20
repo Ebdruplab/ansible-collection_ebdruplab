@@ -1,22 +1,6 @@
 # -*- coding: utf-8 -*-
-
-from __future__ import annotations
-
-import json
-import socket
-import ssl
-from typing import Any
-from typing import Dict
-from typing import Iterable
-from typing import List
-from typing import Optional
-from urllib.error import HTTPError
-from urllib.error import URLError
-from urllib.request import Request
-from urllib.request import urlopen
-
-from ansible.plugins.callback import CallbackBase
-
+# Copyright (c) 2026, Kristian Ebdrup
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
 
 DOCUMENTATION = r"""
 ---
@@ -27,8 +11,6 @@ description:
   - Supports separate URLs for success, failure, and unreachable results.
   - Supports token authentication, status headers, custom headers, and host headers.
   - Supports configuration from ansible.cfg and environment variables.
-author:
-  - ebdruplab
 type: aggregate
 requirements:
   - ansible-core
@@ -83,7 +65,6 @@ options:
       - No authentication header is sent when this value is empty.
     type: str
     required: false
-    no_log: true
     ini:
       - section: callback_http_event
         key: auth_token
@@ -129,7 +110,7 @@ options:
     description:
       - Additional static headers.
       - Format is comma-separated key/value pairs.
-      - Example: C(X-Source=ansible,X-Environment=production)
+      - 'Example: C(X-Source=ansible,X-Environment=production).'
     type: str
     required: false
     ini:
@@ -198,6 +179,19 @@ options:
     env:
       - name: EBDRUPLAB_AUTOMATION_HTTP_EVENT_SEND_BODY
 """
+
+import json
+import socket
+from typing import Any
+from typing import Dict
+from typing import Iterable
+from typing import List
+from typing import Optional
+from urllib.error import HTTPError
+from urllib.error import URLError
+
+from ansible.module_utils.urls import open_url
+from ansible.plugins.callback import CallbackBase
 
 CALLBACK_VERSION = 2.0
 CALLBACK_TYPE = "aggregate"
@@ -378,19 +372,15 @@ class CallbackModule(CallbackBase):
         timeout = self._get_int("timeout", default=10)
         validate_certs = self._get_bool("validate_certs", default=True)
 
-        context = None
-        if url.lower().startswith("https://") and not validate_certs:
-            context = ssl._create_unverified_context()
-
-        request = Request(
-            url=url,
-            data=body,
-            headers=headers,
-            method=method,
-        )
-
         try:
-            with urlopen(request, timeout=timeout, context=context) as response:
+            with open_url(
+                url,
+                data=body,
+                headers=headers,
+                method=method,
+                timeout=timeout,
+                validate_certs=validate_certs,
+            ) as response:
                 response.read()
                 self._display.vvv(
                     "ebdruplab.automation.http_event: callback sent successfully, status_code=%s"

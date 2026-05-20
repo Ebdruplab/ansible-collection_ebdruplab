@@ -1,0 +1,13 @@
+---
+- name: SMTP failure integration play
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Mark healthy hosts
+      ansible.builtin.debug:
+        msg: healthy
+
+    - name: Trigger failure on secondary host
+      ansible.builtin.fail:
+        msg: callback_smtp_event integration failure
+      when: inventory_hostname == 'smtp_host2'

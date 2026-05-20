@@ -1,0 +1,8 @@
+---
+- name: HTTP success integration play
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Report success
+      ansible.builtin.debug:
+        msg: callback_http_event integration success
