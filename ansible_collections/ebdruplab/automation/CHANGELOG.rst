@@ -6,6 +6,32 @@ The format is based on Keep a Changelog.
 
 ---
 
+# [2.0.0] - 2026-05-26
+
+## Added
+
+- Added `smtp_event` callback plugin
+- Added support for SMTP email reports on:
+  - success
+  - failure
+  - unreachable
+- Added configurable SMTP authentication
+- Added STARTTLS support
+- Added SMTP-over-SSL support
+- Added CC and BCC recipient support
+- Added configurable subject prefixes
+- Added affected host and error detail reporting
+- Added final playbook recap in email reports
+- Added TLS certificate validation control
+- Added optional captured event dump support
+- Added environment variable configuration support
+- Added `ansible.cfg` configuration support
+- Added non-blocking email delivery behavior
+
+## Notes
+
+This release introduces SMTP-based final playbook reporting alongside the existing webhook integration.
+
 # [1.0.0] - 2026-05-14
 
 ## Added
