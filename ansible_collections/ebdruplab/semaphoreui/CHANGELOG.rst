@@ -1,6 +1,29 @@
 Changelog
 =========
 
+Version 4.0.3
+-------------
+
+Bug fixes
+~~~~~~~~~
+
+- Fixed ``ebdruplab.semaphoreui.project_environment_update`` to send a complete,
+  identity-preserving PUT payload. Updating an environment no longer risks being
+  treated as a new resource by Semaphore.
+- Environment secrets supplied to ``project_environment_update`` now update a
+  matching existing secret instead of always creating another one.
+- Added ``state: present`` and ``lookup_name`` to
+  ``ebdruplab.semaphoreui.project_environment_create`` so direct playbooks can
+  look up, create, update, and rename environments without duplicate resources.
+- ``project_deploy`` supports ``existing_name`` for rename-safe environment
+  lookup.
+
+Tests
+~~~~~
+
+- Added environment integration coverage for repeated ``state: present`` and
+  update operations, including preservation of the original resource ID.
+
 Version 4.0.2
 -------------
 

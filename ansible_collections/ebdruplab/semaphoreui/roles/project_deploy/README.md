@@ -190,6 +190,7 @@ If a project already exists and no force flag is enabled, the role fails safely 
 ## Notes
 
 - Name-based references such as `repository_name`, `inventory_name`, `environment_name`, and `template_name` are resolved automatically.
+- To rename an existing environment without creating another one, set `existing_name` to its current Semaphore name and set `name` to the new value. Remove `existing_name` after the rename has been applied.
 - Integrations can include `extraction_values` if you want to map headers, payload values, or query values into variables.
 - Set `project_deploy_debug: true` if you want extra debug output while testing.
 - A full working example is available in the role `tests/` folder.

@@ -9,6 +9,7 @@
     semaphore_password: "{{ lookup('env', 'ebdruplab_integration_test_PW') | default('changeme', true) }}"
     test_env_name: "Integration Env"
     updated_env_name: "Updated Env"
+    semaphore_cleanup: true
 
   tasks:
     - name: "Log in to Semaphore"
@@ -31,6 +32,42 @@
         demo: false
       register: create_project
 
+    - name: "Ensure the same project is present without creating a duplicate"
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "Integration Test Env Project"
+        alert: false
+        alert_chat: "test"
+        max_parallel_tasks: 1
+        demo: false
+        state: present
+      register: present_project
+
+    - name: "Assert state present updated the original project"
+      ansible.builtin.assert:
+        that:
+          - (present_project.project.id | int) == (create_project.project.id | int)
+
+    - name: "Repeat project state present without creating a duplicate"
+      ebdruplab.semaphoreui.project_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        name: "Integration Test Env Project"
+        alert: false
+        alert_chat: "test"
+        max_parallel_tasks: 1
+        demo: false
+        state: present
+      register: repeated_present_project
+
+    - name: "Assert repeated project state present retained the original project"
+      ansible.builtin.assert:
+        that:
+          - (repeated_present_project.project.id | int) == (create_project.project.id | int)
+
     - name: "Create environment"
       ebdruplab.semaphoreui.project_environment_create:
         host: "{{ semaphore_host }}"
@@ -51,6 +88,27 @@
               type: "env"
 
       register: env_create
+
+    - name: "Ensure the same environment is present without creating a duplicate"
+      ebdruplab.semaphoreui.project_environment_create:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        state: present
+        environment:
+          name: "{{ test_env_name }}"
+          extra_variables:
+            key: "value"
+          env:
+            KEY: "value"
+      register: env_present
+
+    - name: "Assert state present found the original environment"
+      ansible.builtin.assert:
+        that:
+          - not env_present.changed
+          - (env_present.environment.id | int) == (env_create.environment.id | int)
 
     - name: "Get created environment"
       ebdruplab.semaphoreui.project_environment_get:
@@ -83,6 +141,22 @@
               type: extra_variables        # alias for 'json'
       register: env_update
 
+    - name: "Repeat the environment update without creating another environment"
+      ebdruplab.semaphoreui.project_environment_update:
+        host: "{{ semaphore_host }}"
+        port: "{{ semaphore_port }}"
+        session_cookie: "{{ login_result.session_cookie }}"
+        project_id: "{{ create_project.project.id }}"
+        environment_id: "{{ env_create.environment.id }}"
+        environment:
+          name: "{{ updated_env_name }}"
+      register: repeated_env_update
+
+    - name: "Assert repeated update is idempotent"
+      ansible.builtin.assert:
+        that:
+          - not repeated_env_update.changed
+
     - name: "List all environments"
       ebdruplab.semaphoreui.project_environment_list:
         host: "{{ semaphore_host }}"
@@ -93,6 +167,13 @@
         order: asc
       register: env_list
 
+    - name: "Assert update renamed the existing environment instead of creating another"
+      ansible.builtin.assert:
+        that:
+          - (env_list.environments | selectattr('name', 'equalto', test_env_name) | list | length) == 0
+          - (env_list.environments | selectattr('name', 'equalto', updated_env_name) | list | length) == 1
+          - (env_list.environments | selectattr('name', 'equalto', updated_env_name) | map(attribute='id') | first | int) == (env_create.environment.id | int)
+
     - name: "Delete environment"
       ebdruplab.semaphoreui.project_environment_delete:
         host: "{{ semaphore_host }}"
@@ -101,6 +182,7 @@
         project_id: "{{ create_project.project.id }}"
         environment_id: "{{ env_create.environment.id }}"
       register: env_delete
+      when: semaphore_cleanup | bool
 
     - name: "Delete test project"
       ebdruplab.semaphoreui.project_delete:
@@ -109,6 +191,7 @@
         session_cookie: "{{ login_result.session_cookie }}"
         project_id: "{{ create_project.project.id }}"
       register: project_delete
+      when: semaphore_cleanup | bool
 
     - name: "Log out"
       ebdruplab.semaphoreui.logout:

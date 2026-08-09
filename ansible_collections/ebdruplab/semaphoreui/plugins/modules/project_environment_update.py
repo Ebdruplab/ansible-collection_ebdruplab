@@ -22,7 +22,7 @@ description:
   - "Plain variables live in C(env) (environment vars) and C(json) (extra vars)."
   - "C(extra_variables) is an alias for C(json); provide one or the other."
   - "Secrets target C(env) or C(var). Aliases C(json), C(extra_vars), C(extra_variables) map to C(var)."
-  - "Secrets are always sent with C(operation=create)."
+  - "Existing secrets are updated by ID (or by matching name and type); new secrets are created."
 options:
   host:
     description:
@@ -72,7 +72,7 @@ options:
         type: raw
       secrets:
         description:
-          - "List of secret items to create (always sent with C(operation=create))."
+          - "List of secret items to create or update."
           - "Each secret targets either C(env) or C(var). Aliases C(json), C(extra_vars), and C(extra_variables) map to C(var)."
         type: list
         elements: dict
@@ -151,11 +151,21 @@ def _normalize_secret_type(stype):
         "extra_variables": "var",
     }.get(stype)
 
-def _normalize_secrets(module, secrets):
+def _normalize_secrets(module, secrets, existing_secrets=None):
     if secrets is None:
         return None
     if not isinstance(secrets, list):
         module.fail_json(msg="Field 'secrets' must be a list.")
+    existing_by_name_and_type = {}
+    for existing in existing_secrets or []:
+        if not isinstance(existing, dict):
+            continue
+        existing_id = existing.get("id")
+        existing_name = existing.get("name")
+        existing_type = _normalize_secret_type(existing.get("type"))
+        if isinstance(existing_id, int) and existing_id > 0 and existing_name and existing_type:
+            existing_by_name_and_type[(existing_name, existing_type)] = existing_id
+
     out = []
     for i, s in enumerate(secrets):
         if not isinstance(s, dict):
@@ -169,15 +179,18 @@ def _normalize_secrets(module, secrets):
             module.fail_json(msg=f"Secret '{name}' invalid type; use env/var (aliases json/extra_vars/extra_variables map to var).")
         if sval in (None, ""):
             module.fail_json(msg=f"Secret '{name}' missing 'secret' value.")
+        existing_id = s.get("id")
+        if not isinstance(existing_id, int) or existing_id <= 0:
+            existing_id = existing_by_name_and_type.get((name, stype))
+
         entry = {
             "name": name,
             "secret": sval,
             "type": stype,
-            "operation": "create",
+            "operation": "update" if existing_id else "create",
         }
-        # Only send id if explicitly > 0
-        if isinstance(s.get("id"), int) and s["id"] > 0:
-            entry["id"] = s["id"]
+        if existing_id:
+            entry["id"] = existing_id
         out.append(entry)
     return out
 
@@ -220,7 +233,13 @@ def main():
     port = module.params["port"]
     project_id = module.params["project_id"]
     environment_id = module.params["environment_id"]
-    env_update = dict(module.params["environment"] or {})
+    # Ansible includes omitted dict suboptions as ``None``. Exclude them so a
+    # name-only update does not clear unrelated fields in the PUT payload.
+    env_update = {
+        key: value
+        for key, value in (module.params["environment"] or {}).items()
+        if value is not None
+    }
     validate_certs = module.params["validate_certs"]
 
     env_update["project_id"] = project_id
@@ -237,17 +256,6 @@ def main():
     _ensure_json_string(module, env_update, "env")
     _ensure_json_string(module, env_update, "json")
 
-    if "secrets" in env_update:
-        env_update["secrets"] = _normalize_secrets(module, env_update.get("secrets"))
-
-    # Ensure buckets exist if secrets target them
-    if env_update.get("secrets"):
-        targets = {s["type"] for s in env_update["secrets"]}
-        if "env" in targets and "env" not in env_update:
-            env_update["env"] = "{}"
-        if "var" in targets and "json" not in env_update:
-            env_update["json"] = "{}"
-
     url = f"{host}:{port}/api/project/{project_id}/environment/{environment_id}"
     headers = get_auth_headers(
         session_cookie=module.params.get("session_cookie"),
@@ -257,7 +265,6 @@ def main():
     headers.setdefault("Accept", "application/json")
 
     try:
-        body = json.dumps(env_update).encode("utf-8")
         current_environment, response_body, get_status, _ = semaphore_get_json(
             url,
             headers=headers,
@@ -270,12 +277,36 @@ def main():
                 response=response_body,
             )
 
+        if "secrets" in env_update:
+            env_update["secrets"] = _normalize_secrets(
+                module,
+                env_update.get("secrets"),
+                current_environment.get("secrets"),
+            )
+
+        # PUT is a replacement in Semaphore. Start from the current mutable
+        # fields so an update of one field cannot turn the resource into a new,
+        # incomplete object on servers that require a full payload.
+        payload = {"id": environment_id, "project_id": project_id}
+        for field in ("name", "password", "env", "json"):
+            if field in current_environment:
+                payload[field] = current_environment[field]
+        payload.update(env_update)
+
+        # Ensure buckets exist if newly supplied secrets target them.
+        if payload.get("secrets"):
+            targets = {secret["type"] for secret in payload["secrets"]}
+            if "env" in targets and "env" not in payload:
+                payload["env"] = "{}"
+            if "var" in targets and "json" not in payload:
+                payload["json"] = "{}"
+
         before = {
             key: current_environment.get(key)
             for key in env_update.keys()
         }
         after = {
-            key: env_update.get(key)
+            key: payload.get(key)
             for key in env_update.keys()
         }
         changed = before != after
@@ -295,6 +326,8 @@ def main():
                 status=200,
             )
 
+        body = json.dumps(payload).encode("utf-8")
+
         response_body, status, _ = semaphore_put(
             url,
             body=body,
@@ -303,7 +336,7 @@ def main():
         )
 
         if status == 204:
-            module.exit_json(changed=True, environment=env_update, status=status)
+            module.exit_json(changed=True, environment=payload, status=status)
 
         if status != 200:
             error = response_body.decode() if isinstance(response_body, (bytes, bytearray)) else str(response_body)

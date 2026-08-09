@@ -51,6 +51,41 @@ This Ansible collection provides modules for automating the management of [Semap
 
 Example for how to use this.
 
+### Preventing duplicate projects and variable groups
+
+The project and project-environment create modules support an idempotent
+resource lifecycle. Their default is C(state=present): a resource with the
+same name is updated when exactly one match exists and created when no match
+exists. Use C(state=create) only when an intentional duplicate is required.
+
+For a safe rename, provide the stable Semaphore resource ID. A new name by
+itself cannot distinguish a rename from a request to create a different
+resource.
+
+```yaml
+- name: Rename a project without creating another project
+  ebdruplab.semaphoreui.project_create:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
+    state: present
+    id: 42
+    name: "Production Automation"
+
+- name: Create a duplicate project deliberately
+  ebdruplab.semaphoreui.project_create:
+    host: http://localhost
+    port: 3000
+    api_token: "{{ semaphore_api_token }}"
+    state: create
+    name: "Temporary Test Project"
+```
+
+The same C(state) and C(id) pattern is available in
+C(project_environment_create). For existing environment secrets, use
+C(project_environment_update), which can update matching secrets instead of
+creating new secret records.
+
 
 ### Example Playbook – Logging in, Creating a Project, and Uploading a Key
 

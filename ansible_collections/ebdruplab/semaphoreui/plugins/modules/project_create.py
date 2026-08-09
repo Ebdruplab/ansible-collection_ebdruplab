@@ -4,16 +4,25 @@
 # MIT License (see LICENSE file or https://opensource.org/licenses/MIT)
 
 from ansible.module_utils.basic import AnsibleModule
-from ..module_utils.semaphore_api import semaphore_post, get_auth_headers, exit_check_mode
+from ..module_utils.semaphore_api import (
+    semaphore_post,
+    semaphore_put,
+    semaphore_get_json,
+    get_auth_headers,
+    sanitize_check_mode_value,
+    exit_check_mode,
+)
 import json
 
 DOCUMENTATION = r"""
 ---
 module: project_create
-short_description: Create a new Semaphore project
+short_description: Create or manage a Semaphore project
 version_added: "1.0.0"
 description:
-  - Sends a POST request to the Semaphore API to create a new project.
+  - C(state=present) looks up a project by name and creates it only when absent.
+  - Supply C(id) with C(state=present) to update a specific project, including a rename.
+  - C(state=create) explicitly creates a new project even when the name already exists.
 options:
   host:
     description:
@@ -66,6 +75,19 @@ options:
     required: false
     type: bool
     default: false
+  state:
+    description:
+      - Desired lifecycle behavior.
+      - C(present) finds a single matching project by name, updates it, or creates it when absent.
+      - C(create) always creates a new project.
+    type: str
+    choices: [present, create]
+    default: present
+  id:
+    description:
+      - Existing project ID to manage with C(state=present).
+      - Takes precedence over name lookup and enables safe renames.
+    type: int
   validate_certs:
     description:
       - Whether to validate TLS certificates.
@@ -77,12 +99,21 @@ author:
 """
 
 EXAMPLES = r"""
-- name: Create a new Semaphore project
+- name: Ensure a Semaphore project is present
   ebdruplab.semaphoreui.project_create:
     host: http://localhost
     port: 3000
     session_cookie: "{{ login_result.session_cookie }}"
     name: "ebdruplab integration test"
+
+- name: Rename a project by its stable ID
+  ebdruplab.semaphoreui.project_create:
+    host: http://localhost
+    port: 3000
+    session_cookie: "{{ login_result.session_cookie }}"
+    state: present
+    id: 42
+    name: "Renamed Project"
 
 - name: Create project with token and custom settings
   ebdruplab.semaphoreui.project_create:
@@ -122,6 +153,8 @@ def main():
             alert_chat=dict(type='str', default='Ansible'),
             max_parallel_tasks=dict(type='int', default=0),
             demo=dict(type='bool', default=False),
+            state=dict(type='str', choices=['present', 'create'], default='present'),
+            id=dict(type='int', required=False),
             validate_certs=dict(type='bool', default=True),
         ),
         required_one_of=[["session_cookie", "api_token"]],
@@ -146,8 +179,84 @@ def main():
         "demo": module.params["demo"],
         "type": ""
     }
+    state = module.params['state']
+    project_id = module.params.get('id')
+
+    if state == 'create' and project_id:
+        module.fail_json(msg="id is only valid when state=present")
 
     try:
+        if state == 'present':
+            if project_id:
+                matches = [{'id': project_id}]
+            else:
+                projects, response_body, status, _ = semaphore_get_json(
+                    url, headers=headers, validate_certs=module.params['validate_certs']
+                )
+                if status != 200 or not isinstance(projects, list):
+                    module.fail_json(
+                        msg=f"Failed to list projects for lookup: HTTP {status}",
+                        status=status,
+                        response=response_body,
+                    )
+                matches = [project for project in projects if project.get('name') == project_data['name']]
+                if len(matches) > 1:
+                    module.fail_json(
+                        msg=(f"Project lookup for '{project_data['name']}' matched {len(matches)} resources; "
+                             "specify id to select one explicitly.")
+                    )
+
+            if len(matches) == 1:
+                project_id = matches[0].get('id')
+                if not isinstance(project_id, int):
+                    module.fail_json(msg="Matched project has no valid ID.")
+                item_url = f"{host}:{port}/api/project/{project_id}"
+                current, response_body, status, _ = semaphore_get_json(
+                    item_url, headers=headers, validate_certs=module.params['validate_certs']
+                )
+                if status != 200 or not isinstance(current, dict):
+                    module.fail_json(
+                        msg=f"Failed to fetch matched project state: HTTP {status}",
+                        status=status,
+                        response=response_body,
+                    )
+
+                payload = {
+                    key: current[key]
+                    for key in ('name', 'alert', 'alert_chat', 'max_parallel_tasks', 'demo', 'type')
+                    if key in current
+                }
+                managed_data = dict(project_data)
+                # Semaphore normalizes this internal field differently across
+                # versions. It is not user-configurable in this module, so do
+                # not force a change merely to rewrite it.
+                managed_data.pop('type', None)
+                payload.update(managed_data)
+                payload['id'] = project_id
+                before = {key: current.get(key) for key in managed_data}
+                after = {key: payload.get(key) for key in managed_data}
+                changed = before != after
+
+                if module.check_mode:
+                    module.exit_json(
+                        changed=changed,
+                        check_mode=True,
+                        before=sanitize_check_mode_value(before),
+                        after=sanitize_check_mode_value(after),
+                    )
+                if not changed:
+                    module.exit_json(changed=False, project=sanitize_check_mode_value(current), status=200)
+
+                response_body, status, _ = semaphore_put(
+                    item_url,
+                    body=json.dumps(payload).encode('utf-8'),
+                    headers=headers,
+                    validate_certs=module.params['validate_certs'],
+                )
+                if status not in (200, 204):
+                    module.fail_json(msg=f"Failed to update project: HTTP {status} - {response_body}", status=status)
+                module.exit_json(changed=True, project=payload, status=status)
+
         body = json.dumps(project_data).encode("utf-8")
         if module.check_mode:
             exit_check_mode(module)
@@ -170,4 +279,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
