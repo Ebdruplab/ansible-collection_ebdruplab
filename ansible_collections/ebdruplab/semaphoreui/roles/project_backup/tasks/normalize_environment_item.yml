@@ -129,12 +129,14 @@
         | combine(
             {
               'env': (
-                (env_item.env is string)
-                | ternary(env_item.env | from_yaml, (env_item.env | default({}, true)))
+                (env_item.env | from_yaml)
+                if (env_item.env is string and (env_item.env | trim | length) > 0)
+                else (env_item.env | default({}, true))
               ),
               'json': (
-                (env_item.json is string)
-                | ternary(env_item.json | from_json, (env_item.json | default({}, true)))
+                (env_item.json | from_json)
+                if (env_item.json is string and (env_item.json | trim | length) > 0)
+                else (env_item.json | default({}, true))
               ),
               'secrets': (
                 _project_backup_environment_secrets_by_key

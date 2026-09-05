@@ -134,6 +134,10 @@ project_deploy_config:
           secret: "{{ vault_api_token | default('token', true) }}"
           type: json
 
+    environment_empty:
+      # Exercise backup of a valid environment with no password or variables.
+      name: "Empty"
+
   # Templates (jobs)
   templates:
     an_example:

@@ -246,6 +246,7 @@
     }}
   loop_control:
     label: "{{ item.name | default('unnamed-secret') }}"
+  no_log: true
   when: (project_deploy_config | default({})).get('environments', {}) | length > 0
 
 # --- Templates ----------------------------------------------------------------

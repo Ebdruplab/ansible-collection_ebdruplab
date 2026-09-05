@@ -1,0 +1,31 @@
+---
+- name: Regression | Backup empty Semaphore environments
+  hosts: localhost
+  gather_facts: false
+  vars:
+    project_backup_vault_variable_prefix: ansible_vault
+    env_item:
+      id: 1
+      project_id: 1
+      name: Empty
+      env: ''
+      json: ''
+      secrets: []
+  tasks:
+    - name: Initialize backup normalization facts
+      ansible.builtin.set_fact:
+        _envs_norm: []
+        project_backup_generated_vault_variables: []
+
+    - name: Normalize the empty environment
+      ansible.builtin.include_tasks: ../../roles/project_backup/tasks/normalize_environment_item.yml
+
+    - name: Assert empty values are preserved without JSON parsing errors
+      ansible.builtin.assert:
+        that:
+          - _envs_norm | length == 1
+          - _envs_norm[0].name == 'Empty'
+          - _envs_norm[0].env == {}
+          - _envs_norm[0].json == {}
+          - _envs_norm[0].secrets == []
+          - _envs_norm[0].password is not defined

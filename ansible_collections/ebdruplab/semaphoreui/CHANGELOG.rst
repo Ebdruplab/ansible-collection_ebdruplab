@@ -1,6 +1,26 @@
 Changelog
 =========
 
+Version 4.0.4
+-------------
+
+Bug fixes
+~~~~~~~~~
+
+- Prevented environment secret values from being written to Ansible output
+  during ``project_deploy`` validation.
+- ``project_backup`` now supports templates without a ``view_id`` (templates
+  that are not assigned to a Semaphore board view).
+- ``project_backup`` now preserves environments whose API response contains
+  empty ``env`` or ``json`` strings.
+
+Tests
+~~~~~
+
+- Added a regression test for templates without a board view.
+- Added a Docker-based release smoke test covering direct environment updates,
+  project deployment, backup, and repeated-run stability.
+
 Version 4.0.3
 -------------
 

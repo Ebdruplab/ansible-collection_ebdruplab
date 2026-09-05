@@ -38,6 +38,10 @@
   loop: "{{ _desired_environments | dict2items }}"
   loop_control:
     label: "{{ item.value.name | default(item.key) }}"
+  # `success_msg` exposes the complete loop item in Ansible's default callback.
+  # Environment definitions can contain secret values, so this validation must
+  # not log its result.
+  no_log: true
   tags:
     - project_deploy
     - environments
