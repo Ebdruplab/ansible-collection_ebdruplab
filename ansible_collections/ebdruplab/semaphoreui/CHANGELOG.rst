@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Version 4.0.4
+Version 4.0.3 extended
 -------------
 
 Bug fixes
