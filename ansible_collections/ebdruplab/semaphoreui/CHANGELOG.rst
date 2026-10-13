@@ -1,7 +1,7 @@
 Changelog
 =========
 
-Version 4.0.3 extended
+Version 4.0.4
 -------------
 
 Bug fixes
@@ -11,6 +11,8 @@ Bug fixes
   during ``project_deploy`` validation.
 - ``project_backup`` now supports templates without a ``view_id`` (templates
   that are not assigned to a Semaphore board view).
+- ``project_backup`` now supports Bash and other templates that do not have an
+  ``inventory_id``.
 - ``project_backup`` now preserves environments whose API response contains
   empty ``env`` or ``json`` strings.
 
@@ -18,6 +20,7 @@ Tests
 ~~~~~
 
 - Added a regression test for templates without a board view.
+- Added a regression test for templates without an inventory.
 - Added a Docker-based release smoke test covering direct environment updates,
   project deployment, backup, and repeated-run stability.
 
