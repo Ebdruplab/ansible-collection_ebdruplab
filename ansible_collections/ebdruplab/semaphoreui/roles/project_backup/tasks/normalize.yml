@@ -253,9 +253,9 @@
         )
         | combine(
             {
-              'inventory_name': (_inv_name_by_id[item.inventory_id] | default(omit)),
-              'repository_name': (_repo_name_by_id[item.repository_id] | default(omit)),
-              'environment_name': (_env_name_by_id[item.environment_id] | default(omit)),
+              'inventory_name': (_inv_name_by_id.get(item.get('inventory_id'), omit)),
+              'repository_name': (_repo_name_by_id.get(item.get('repository_id'), omit)),
+              'environment_name': (_env_name_by_id.get(item.get('environment_id'), omit)),
               'view_title': (_view_title_by_id.get(item.get('view_id'), omit)),
               'type': (item.type | default('', true)),
               'arguments': (

@@ -1,0 +1,42 @@
+---
+- name: Regression | Backup templates without an inventory
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _users_access:
+      users: []
+    _keys:
+      keys: []
+    _repositories:
+      repositories: []
+    _views:
+      views: []
+    _inventories:
+      inventories: []
+    _environments:
+      environments: []
+    _environment_detail_results:
+      results: []
+    _templates:
+      templates:
+        - id: 1
+          project_id: 1
+          name: no-inventory-template
+          app: bash
+          arguments: '[]'
+    _schedules:
+      schedules: []
+    _integrations:
+      integrations: []
+    _integration_extraction_value_results:
+      results: []
+  tasks:
+    - name: Normalize a Bash template without an inventory_id
+      ansible.builtin.include_tasks: ../../roles/project_backup/tasks/normalize.yml
+
+    - name: Assert the template is normalized without an inventory name
+      ansible.builtin.assert:
+        that:
+          - _tpls_norm | length == 1
+          - _tpls_norm[0].name == 'no-inventory-template'
+          - _tpls_norm[0].inventory_name is not defined
