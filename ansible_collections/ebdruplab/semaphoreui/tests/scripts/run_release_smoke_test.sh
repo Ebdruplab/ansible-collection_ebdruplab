@@ -66,6 +66,10 @@ echo "Running backup regression test for templates without a board view"
 ansible-playbook -i 'localhost,' --connection=local \
   "${COLLECTION_DIR}/tests/regression/test_template_without_view.yml"
 
+echo "Running backup regression test for templates without an inventory"
+ansible-playbook -i 'localhost,' --connection=local \
+  "${COLLECTION_DIR}/tests/regression/test_template_without_inventory.yml"
+
 echo "Running backup regression test for empty environments"
 ansible-playbook -i 'localhost,' --connection=local \
   "${COLLECTION_DIR}/tests/regression/test_empty_environment.yml"

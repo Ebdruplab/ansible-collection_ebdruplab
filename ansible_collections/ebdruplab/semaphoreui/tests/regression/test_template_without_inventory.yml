@@ -1,0 +1,18 @@
+---
+- name: Regression | Backup templates without an inventory
+  hosts: localhost
+  gather_facts: false
+  vars:
+    _inv_name_by_id: {}
+    item:
+      id: 1
+      name: no-inventory-template
+  tasks:
+    - name: Normalize an absent inventory_id without failing
+      ansible.builtin.set_fact:
+        normalized: "{{ {'inventory_name': (_inv_name_by_id.get(item.get('inventory_id'), omit))} }}"
+
+    - name: Assert no inventory name is emitted
+      ansible.builtin.assert:
+        that:
+          - normalized.inventory_name is not defined
